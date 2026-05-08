@@ -11,9 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('ip_pools')) {
+            return;
+        }
+
         Schema::create('ip_pools', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('isp_id')->constrained()->onDelete('cascade');
+            $table->foreignId('isp_id')->constrained('i_s_p_s')->onDelete('cascade');
             $table->foreignId('router_id')->nullable()->constrained()->onDelete('cascade');
             $table->string('name'); // Pool name (e.g., 'hotspot_pool')
             $table->json('ranges'); // IP ranges array

@@ -1,24 +1,100 @@
+@import './mobile-optimizations.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Import mobile optimizations */
-@import './mobile-optimizations.css';
-
 /* Toast Notifications */
 .toast-container {
     position: fixed;
-    top: 80px;
-    right: 20px;
+    top: 82px;
+    right: 16px;
     z-index: 9999;
     pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(360px, calc(100vw - 1.5rem));
 }
 
 .toast-notification {
+    background: #111827;
+    color: #f9fafb;
+    border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(17, 24, 39, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 12px 14px;
     pointer-events: auto;
-    margin-bottom: 10px;
-    max-width: 400px;
-    word-wrap: break-word;
+    transform: translateX(110%);
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.toast-notification.is-visible {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast-body {
+    min-width: 0;
+}
+
+.toast-badge {
+    display: inline-flex;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 9999px;
+    padding: 2px 8px;
+    margin-bottom: 8px;
+}
+
+.toast-title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.toast-message {
+    margin-top: 2px;
+    font-size: 13px;
+    line-height: 1.35;
+    color: #d1d5db;
+}
+
+.toast-close {
+    background: transparent;
+    border: 0;
+    color: #d1d5db;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+}
+
+.dashboard-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: #f9fafb;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.dark .dashboard-list-item {
+    background: rgba(31, 41, 55, 0.9);
+}
+
+@media (max-width: 768px) {
+    .toast-container {
+        top: 72px;
+        right: 8px;
+        width: calc(100vw - 1rem);
+    }
 }
 
 /* Line clamp for long messages */

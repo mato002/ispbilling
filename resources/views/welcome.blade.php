@@ -3,562 +3,518 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Smart ISP Billing System - Connect. Earn. Expand.</title>
+        <title>ISP Billing | Run Your Entire ISP From One Platform</title>
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700,800" rel="stylesheet" />
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
             @vite(['resources/css/app.css', 'resources/js/app.js'])
-        @else
-            <style>
-                /* Tailwind CSS will be injected here */
-            </style>
         @endif
     </head>
-    <body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased">
-        <!-- Navigation -->
-        <nav class="fixed top-0 w-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 z-50">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center h-16">
-                    <div class="flex items-center">
-                        <span class="text-2xl font-bold text-blue-600 dark:text-blue-400">ISP Billing</span>
-                    </div>
-                    <div class="hidden md:flex items-center space-x-8">
-                        <a href="#features" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">Features</a>
-                        <a href="#integrations" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">Integrations</a>
-                        <a href="#automations" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">Automations</a>
-            @if (Route::has('login'))
-                            @auth
-                                <a href="{{ url('/dashboard') }}" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">Dashboard</a>
-                            @else
-                                <a href="{{ route('login') }}" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">Log in</a>
-                                @if (Route::has('register'))
-                                    <a href="{{ route('register') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">Get Started</a>
-                                @endif
-                            @endauth
+    <body class="bg-slate-50 text-slate-900 antialiased">
+        <div class="absolute inset-x-0 top-0 -z-10 h-[30rem] bg-gradient-to-br from-blue-600/10 via-violet-500/10 to-white"></div>
+
+        <nav class="fixed top-0 inset-x-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
+            <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+                <a href="{{ route('welcome') }}" class="text-xl font-extrabold tracking-tight text-blue-700">ISP Billing</a>
+
+                <div class="hidden items-center gap-7 md:flex">
+                    <a href="#features" class="text-sm font-medium text-slate-600 hover:text-blue-700">Features</a>
+                    <a href="#operations" class="text-sm font-medium text-slate-600 hover:text-blue-700">Operations</a>
+                    <a href="#integrations" class="text-sm font-medium text-slate-600 hover:text-blue-700">Integrations</a>
+                    <a href="#how-it-works" class="text-sm font-medium text-slate-600 hover:text-blue-700">How it Works</a>
+                    <a href="#pricing" class="text-sm font-medium text-slate-600 hover:text-blue-700">Pricing</a>
+
+                    @auth
+                        <a href="{{ url('/dashboard') }}" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-blue-600 hover:text-blue-700">Dashboard</a>
+                    @else
+                        <a href="{{ route('login') }}" class="text-sm font-semibold text-slate-700 hover:text-blue-700">Log in</a>
+                        @if (Route::has('register'))
+                            <a href="{{ route('register') }}" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Get Started</a>
                         @endif
-                    </div>
+                    @endauth
+                </div>
+
+                <button id="mobile-menu-btn" type="button" class="inline-flex items-center justify-center rounded-md border border-slate-200 p-2 text-slate-700 md:hidden" aria-controls="mobile-menu" aria-expanded="false">
+                    <span class="sr-only">Open menu</span>
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div id="mobile-menu" class="hidden border-t border-slate-200 bg-white px-4 py-4 md:hidden">
+                <div class="flex flex-col gap-3">
+                    <a href="#features" class="text-sm font-medium text-slate-700">Features</a>
+                    <a href="#operations" class="text-sm font-medium text-slate-700">Operations</a>
+                    <a href="#integrations" class="text-sm font-medium text-slate-700">Integrations</a>
+                    <a href="#how-it-works" class="text-sm font-medium text-slate-700">How it Works</a>
+                    <a href="#pricing" class="text-sm font-medium text-slate-700">Pricing</a>
+                    @auth
+                        <a href="{{ url('/dashboard') }}" class="text-sm font-semibold text-blue-700">Dashboard</a>
+                    @else
+                        <a href="{{ route('login') }}" class="text-sm font-semibold text-slate-700">Log in</a>
+                        @if (Route::has('register'))
+                            <a href="{{ route('register') }}" class="inline-flex w-fit rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Get Started</a>
+                        @endif
+                    @endauth
                 </div>
             </div>
         </nav>
 
-        <!-- Hero Section -->
-        <section class="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-            <!-- Background gradient -->
-            <div class="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-blue-950 dark:via-gray-900 dark:to-purple-950"></div>
-            
-            <!-- Decorative elements -->
-            <div class="absolute top-20 left-10 w-72 h-72 bg-blue-200 dark:bg-blue-800 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-xl opacity-20 animate-pulse"></div>
-            <div class="absolute top-40 right-10 w-72 h-72 bg-purple-200 dark:bg-purple-800 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-xl opacity-20 animate-pulse animation-delay-2000"></div>
-            <div class="absolute -bottom-8 left-20 w-72 h-72 bg-pink-200 dark:bg-pink-800 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-xl opacity-20 animate-pulse animation-delay-4000"></div>
-            
-            <div class="relative max-w-7xl mx-auto text-center">
-                <!-- Trust badges -->
-                <div class="flex flex-wrap justify-center items-center gap-8 mb-8 opacity-80">
-                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                        </svg>
-                        <span>ISO 27001 Certified</span>
-                    </div>
-                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
-                        </svg>
-                        <span>GDPR Compliant</span>
-                    </div>
-                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <svg class="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                        </svg>
-                        <span>4.9/5 Rating</span>
-                    </div>
-                </div>
-                
-                <h1 class="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Smart ISP Billing System
-                </h1>
-                <p class="text-xl md:text-3xl text-gray-600 dark:text-gray-400 mb-6 font-semibold">
-                    Connect. Earn. Expand.
-                </p>
-                <p class="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-4xl mx-auto mb-12 leading-relaxed">
-                    Transform your ISP business with our comprehensive billing platform. Automate operations, integrate with MikroTik, and accept multiple payments. <span class="font-semibold text-blue-600 dark:text-blue-400">Focus on growth while we handle the complexity.</span>
-                </p>
-                
-                <!-- Enhanced CTA buttons -->
-                <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-                    @auth
-                        <a href="{{ url('/dashboard') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-semibold transition transform hover:scale-105 shadow-lg inline-flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                            </svg>
-                            Go to Dashboard
-                        </a>
-                    @else
-                        @if (Route::has('register'))
-                            <a href="{{ route('register') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-semibold transition transform hover:scale-105 shadow-lg inline-flex items-center gap-2">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                </svg>
-                                Get Started - Free
-                            </a>
-                        @endif
-                        <a href="{{ route('login') }}" class="border-2 border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-8 py-4 rounded-xl font-semibold transition transform hover:scale-105 inline-flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            View Demo
-                        </a>
-                    @endauth
-                </div>
-                
-                <!-- Social proof -->
-                <div class="text-center text-gray-600 dark:text-gray-400">
-                    <p class="text-sm mb-2">Trusted by leading ISPs worldwide</p>
-                    <div class="flex flex-wrap justify-center items-center gap-6 opacity-60">
-                        <span class="text-2xl font-bold text-gray-400">500+</span>
-                        <span class="text-sm">ISPs Managed</span>
-                        <span class="text-2xl font-bold text-gray-400">50K+</span>
-                        <span class="text-sm">Active Subscribers</span>
-                        <span class="text-2xl font-bold text-gray-400">99.9%</span>
-                        <span class="text-sm">Uptime</span>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <main class="overflow-x-hidden pt-24">
+            <section class="px-4 pb-14 pt-12 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <div class="grid gap-10 lg:grid-cols-2 lg:items-center">
+                        <div>
+                            <div class="mb-5 flex flex-wrap gap-2">
+                                @foreach (['MikroTik Ready', 'M-Pesa Payments', 'Hotspot & PPPoE', 'Automated Billing', 'Built for ISPs'] as $badge)
+                                    <span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $badge }}</span>
+                                @endforeach
+                            </div>
 
-        <!-- Customer Testimonials Section -->
-        <section class="py-20 px-4 sm:px-6 lg:px-8 bg-white dark:bg-gray-900">
-            <div class="max-w-7xl mx-auto">
-                <div class="text-center mb-16">
-                    <h2 class="text-4xl font-bold mb-4">Trusted by Industry Leaders</h2>
-                    <p class="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-                        See how ISPs worldwide are transforming their business operations with our platform
+                            <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+                                Run Your Entire ISP From One Platform
+                            </h1>
+
+                            <p class="mt-5 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+                                Billing, MikroTik automation, M-Pesa payments, and customer management in one system built for African and local ISPs.
+                            </p>
+                            <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
+                                Move from manual chaos to automated operations: manage subscriptions, automate invoices, monitor collections, trigger suspensions/reconnections, and track business outcomes without juggling spreadsheets, router scripts, and manual follow-ups.
+                            </p>
+
+                            <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+                                @auth
+                                    <a href="{{ url('/dashboard') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-700">Go to Dashboard</a>
+                                @else
+                                    @if (Route::has('register'))
+                                        <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-700">Start Free Trial</a>
+                                    @endif
+                                    <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-6 py-3 text-sm font-bold text-slate-700 hover:border-blue-600 hover:text-blue-700">Watch Demo</a>
+                                    <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-xl px-2 py-3 text-sm font-semibold text-blue-700 hover:text-blue-800">Talk to Sales</a>
+                                @endauth
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:p-6">
+                            <div class="mb-4 flex items-center justify-between">
+                                <h2 class="text-sm font-semibold text-slate-800">Live Operations Snapshot</h2>
+                                <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">Mock Preview</span>
+                            </div>
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div class="rounded-xl bg-slate-50 p-4 sm:col-span-2">
+                                    <p class="text-xs text-slate-500">Revenue Trend (7 Days)</p>
+                                    <div class="mt-3 flex h-16 items-end gap-2">
+                                        <span class="w-1/6 rounded-t bg-blue-200" style="height: 38%;"></span>
+                                        <span class="w-1/6 rounded-t bg-blue-300" style="height: 58%;"></span>
+                                        <span class="w-1/6 rounded-t bg-blue-400" style="height: 44%;"></span>
+                                        <span class="w-1/6 rounded-t bg-blue-500" style="height: 70%;"></span>
+                                        <span class="w-1/6 rounded-t bg-blue-600" style="height: 62%;"></span>
+                                        <span class="w-1/6 rounded-t bg-violet-600" style="height: 82%;"></span>
+                                    </div>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 p-4">
+                                    <p class="text-xs text-slate-500">Total Customers</p>
+                                    <p class="mt-1 text-2xl font-bold text-slate-900">1,286</p>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 p-4">
+                                    <p class="text-xs text-slate-500">Monthly Revenue</p>
+                                    <p class="mt-1 text-2xl font-bold text-slate-900">KES 2.48M</p>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 p-4">
+                                    <p class="text-xs text-slate-500">Active Subscriptions</p>
+                                    <p class="mt-1 text-2xl font-bold text-slate-900">1,094</p>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 p-4">
+                                    <p class="text-xs text-slate-500">Overdue Invoices</p>
+                                    <p class="mt-1 text-2xl font-bold text-amber-600">83</p>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 p-4">
+                                    <p class="text-xs text-slate-500">Online Sessions</p>
+                                    <p class="mt-1 text-2xl font-bold text-slate-900">742</p>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 p-4">
+                                    <p class="text-xs text-slate-500">Router Status</p>
+                                    <p class="mt-1 text-2xl font-bold text-emerald-600">18/19 Online</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Your Team Should Not Spend The Day Chasing Payments</h2>
+                    <div class="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
+                        @php
+                            $painPoints = [
+                                ['Manual Billing', 'Staff waste hours generating invoices and reconnecting customers manually.'],
+                                ['Late Payments', 'Collections slip because reminders and follow-up are inconsistent.'],
+                                ['Network Disconnections', 'Manual suspension and reconnection creates support chaos.'],
+                                ['Poor Visibility', 'No real-time insight into revenue, collections, and subscriber activity.'],
+                                ['Scattered Systems', 'Excel, WhatsApp, router scripts, and separate tools slow daily operations.'],
+                            ];
+                        @endphp
+                        @foreach ($painPoints as [$title, $desc])
+                            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <h3 class="text-base font-bold text-slate-900">{{ $title }}</h3>
+                                <p class="mt-2 text-sm leading-6 text-slate-600">{{ $desc }}</p>
+                            </article>
+                        @endforeach
+                    </div>
+                    <p class="mt-8 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-medium text-blue-800">
+                        ISP Billing automates your ISP operations so you can focus on growth instead of repetitive operational work.
                     </p>
                 </div>
-                
-                <div class="grid md:grid-cols-3 gap-8 mb-16">
-                    <div class="bg-gray-50 dark:bg-gray-800 p-8 rounded-2xl shadow-sm hover:shadow-lg transition-shadow">
-                        <div class="flex items-center mb-4">
-                            <img src="https://picsum.photos/seed/avatar1/48/48.jpg" alt="Customer avatar" class="w-12 h-12 rounded-full mr-4">
-                            <div>
-                                <h4 class="font-semibold text-gray-900 dark:text-gray-100">Michael Chen</h4>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">CEO, FastNet ISP</p>
+            </section>
+
+            <section id="features" class="bg-white px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Operational Workflows That Run Your ISP Daily</h2>
+                    <p class="mt-3 max-w-3xl text-slate-600">Each module is built around how real ISPs operate day to day.</p>
+
+                    <div class="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h3 class="text-base font-bold text-slate-900">Billing Automation</h3>
+                            <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                                <li>- Recurring billing and automated invoicing</li>
+                                <li>- Due-date tracking and reminder workflows</li>
+                                <li>- Automatic suspension and reconnection logic</li>
+                            </ul>
+                        </article>
+                        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h3 class="text-base font-bold text-slate-900">MikroTik Integration</h3>
+                            <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                                <li>- Hotspot and PPPoE support</li>
+                                <li>- Auto disconnect/reconnect from payment state</li>
+                                <li>- Bandwidth profile assignment and router sync</li>
+                            </ul>
+                        </article>
+                        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h3 class="text-base font-bold text-slate-900">M-Pesa Integration</h3>
+                            <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                                <li>- STK Push workflows</li>
+                                <li>- Paybill/Till payment tracking</li>
+                                <li>- Real-time confirmation and activation</li>
+                            </ul>
+                        </article>
+                        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h3 class="text-base font-bold text-slate-900">Customer Management</h3>
+                            <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                                <li>- Subscription lifecycle management</li>
+                                <li>- KYC, contracts, and service records</li>
+                                <li>- Usage and payment history visibility</li>
+                            </ul>
+                        </article>
+                        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h3 class="text-base font-bold text-slate-900">ISP Analytics</h3>
+                            <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                                <li>- Revenue trend and collection tracking</li>
+                                <li>- Overdue accounts and churn indicators</li>
+                                <li>- Active sessions and package performance</li>
+                            </ul>
+                        </article>
+                        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h3 class="text-base font-bold text-slate-900">Notifications</h3>
+                            <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                                <li>- SMS reminders and overdue alerts</li>
+                                <li>- Payment confirmation messaging</li>
+                                <li>- Planned outage and network notices</li>
+                            </ul>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section id="operations" class="px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">One Live View Across Billing, Network, and Collections</h2>
+                    <div class="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        @foreach ([
+                            'Active Subscribers: 1,094',
+                            'Online Sessions: 742',
+                            'Suspended Users: 63',
+                            'Overdue Accounts: 83',
+                            'Revenue Today: KES 94,300',
+                            'Network Alerts: 4',
+                            'Expiring Subscriptions: 37',
+                        ] as $metric)
+                            <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-800 shadow-sm">{{ $metric }}</div>
+                        @endforeach
+                    </div>
+                    <p class="mt-4 text-xs text-slate-500">Metrics shown as mock dashboard preview data.</p>
+                </div>
+            </section>
+
+            <section class="bg-white px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Automate The Work That Slows ISP Growth</h2>
+                    <div class="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2">
+                        <div class="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                            <h3 class="text-base font-bold text-blue-900">Payment-to-Access Automation</h3>
+                            <p class="mt-3 text-sm text-blue-800">Customer Pays -> Payment Confirmed -> Subscription Activated -> MikroTik Access Restored -> SMS Sent</p>
+                        </div>
+                        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                            <h3 class="text-base font-bold text-amber-900">Overdue-to-Suspension Automation</h3>
+                            <p class="mt-3 text-sm text-amber-800">Invoice Overdue -> Reminder Sent -> Grace Period Ends -> Auto Suspension -> Reconnection After Payment</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Built For Every Type of Growing ISP</h2>
+                    <div class="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        @foreach (['Wireless ISPs', 'Fiber ISPs', 'Estate WiFi Providers', 'Hotspot Businesses', 'Rural ISPs', 'Campus Networks', 'SACCO ISPs'] as $segment)
+                            <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-800 shadow-sm">{{ $segment }}</div>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Why ISPs Choose ISP Billing</h2>
+                    <div class="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                        @foreach ([
+                            ['African Payments', 'M-Pesa-native workflows for local collection patterns.'],
+                            ['MikroTik First', 'Built around RouterOS hotspot and PPPoE realities.'],
+                            ['Automation Focused', 'Reduce repetitive operational work and manual follow-up.'],
+                            ['Multi-Tenant SaaS', 'Manage multiple ISP entities from one platform.'],
+                            ['Scalable', 'From small hotspot operations to growing regional ISPs.'],
+                        ] as [$title, $desc])
+                            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <h3 class="text-base font-bold text-slate-900">{{ $title }}</h3>
+                                <p class="mt-2 text-sm text-slate-600">{{ $desc }}</p>
+                            </article>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+
+            <section class="px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">A Full ISP Operating Stack</h2>
+                    <div class="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                        @foreach ([
+                            'Billing', 'Customers', 'Subscriptions', 'Routers',
+                            'Hotspots', 'Payments', 'Notifications', 'Reports',
+                            'CRM', 'Field Operations (Coming Soon)', 'Accounting (Coming Soon)', 'Inventory (Coming Soon)',
+                            'Technician Management (Coming Soon)'
+                        ] as $module)
+                            <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-800 shadow-sm">{{ $module }}</div>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">See The Platform In Action</h2>
+                    <p class="mt-3 text-slate-600">Replace placeholders below with real screenshots as your visual assets are finalized.</p>
+                    <div class="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                        @foreach ([
+                            'Dashboard Overview',
+                            'Customer Management',
+                            'Invoices & Billing',
+                            'Hotspot Packages',
+                            'Payment Collection',
+                            'Reports & Router Monitoring'
+                        ] as $screen)
+                            <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6">
+                                <div class="h-32 rounded-lg bg-slate-200"></div>
+                                <p class="mt-3 text-sm font-semibold text-slate-700">{{ $screen }}</p>
                             </div>
-                        </div>
-                        <div class="flex mb-3">
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                        </div>
-                        <p class="text-gray-700 dark:text-gray-300 italic">"The automation features have saved us 20+ hours per week. Our revenue increased by 35% in the first 6 months."</p>
+                        @endforeach
                     </div>
-                    
-                    <div class="bg-gray-50 dark:bg-gray-800 p-8 rounded-2xl shadow-sm hover:shadow-lg transition-shadow">
-                        <div class="flex items-center mb-4">
-                            <img src="https://picsum.photos/seed/avatar2/48/48.jpg" alt="Customer avatar" class="w-12 h-12 rounded-full mr-4">
-                            <div>
-                                <h4 class="font-semibold text-gray-900 dark:text-gray-100">Sarah Johnson</h4>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">Operations Director, ConnectISP</p>
+                </div>
+            </section>
+
+            <section class="px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">What Early ISP Teams Say</h2>
+                    <div class="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <p class="text-sm text-slate-700">"We reduced manual reconnection calls after automating payment-to-access flow."</p>
+                            <p class="mt-3 text-xs font-semibold text-slate-500">Beta pilot - Local wireless ISP ops team</p>
+                        </article>
+                        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <p class="text-sm text-slate-700">"Collections visibility improved once overdue tracking and reminders were centralized."</p>
+                            <p class="mt-3 text-xs font-semibold text-slate-500">Internal pilot statement - Finance/Admin workflow</p>
+                        </article>
+                        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <p class="text-sm text-slate-700">"MikroTik automation removed repetitive operator tasks and speeded up service restoration."</p>
+                            <p class="mt-3 text-xs font-semibold text-slate-500">Beta pilot - Hotspot and PPPoE deployment</p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section id="how-it-works" class="px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">How it works</h2>
+                    <div class="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
+                        @php
+                            $steps = [
+                                'Register ISP account',
+                                'Add routers and service packages',
+                                'Add customers/subscriptions',
+                                'Collect payments and automate access',
+                            ];
+                        @endphp
+                        @foreach ($steps as $index => $step)
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{{ $index + 1 }}</span>
+                                <p class="mt-3 text-sm font-semibold text-slate-900">{{ $step }}</p>
                             </div>
-                        </div>
-                        <div class="flex mb-3">
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                        </div>
-                        <p class="text-gray-700 dark:text-gray-300 italic">"MikroTik integration is seamless. Customer support tickets dropped by 60% after implementing the self-service portal."</p>
+                        @endforeach
                     </div>
-                    
-                    <div class="bg-gray-50 dark:bg-gray-800 p-8 rounded-2xl shadow-sm hover:shadow-lg transition-shadow">
-                        <div class="flex items-center mb-4">
-                            <img src="https://picsum.photos/seed/avatar3/48/48.jpg" alt="Customer avatar" class="w-12 h-12 rounded-full mr-4">
-                            <div>
-                                <h4 class="font-semibold text-gray-900 dark:text-gray-100">David Kimani</h4>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">Technical Manager, SwiftNet</p>
+                </div>
+            </section>
+
+            <section id="integrations" class="bg-white px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Integrations</h2>
+                    <div class="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        @foreach (['MikroTik', 'M-Pesa', 'SMS', 'Email', 'WhatsApp (Placeholder)', 'Payment Gateway (Placeholder)'] as $integration)
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-800">{{ $integration }}</div>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+
+            <section id="pricing" class="px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Pricing (Editable)</h2>
+                    <p class="mt-3 text-slate-600">Use these placeholders now and adjust plan limits/pricing later.</p>
+                    <div class="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                        @foreach (['Starter', 'Growth', 'Enterprise'] as $plan)
+                            <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <h3 class="text-lg font-bold text-slate-900">{{ $plan }}</h3>
+                                <p class="mt-2 text-sm text-slate-500">Price: <span class="font-semibold">[Editable]</span></p>
+                                <ul class="mt-4 space-y-2 text-sm text-slate-600">
+                                    <li>- Plan limits configurable</li>
+                                    <li>- Billing cycle configurable</li>
+                                    <li>- Feature scope configurable</li>
+                                </ul>
                             </div>
-                        </div>
-                        <div class="flex mb-3">
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                            </svg>
-                        </div>
-                        <p class="text-gray-700 dark:text-gray-300 italic">"Payment gateway integration with MPesa has been game-changing. Collection efficiency improved by 45%."</p>
+                        @endforeach
                     </div>
                 </div>
-                
-                <!-- Partner logos -->
-                <div class="text-center">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Proudly serving ISPs of all sizes</p>
-                    <div class="flex flex-wrap justify-center items-center gap-8 opacity-60">
-                        <div class="bg-gray-200 dark:bg-gray-700 px-6 py-3 rounded-lg text-gray-600 dark:text-gray-400 font-semibold">FastNet</div>
-                        <div class="bg-gray-200 dark:bg-gray-700 px-6 py-3 rounded-lg text-gray-600 dark:text-gray-400 font-semibold">ConnectISP</div>
-                        <div class="bg-gray-200 dark:bg-gray-700 px-6 py-3 rounded-lg text-gray-600 dark:text-gray-400 font-semibold">SwiftNet</div>
-                        <div class="bg-gray-200 dark:bg-gray-700 px-6 py-3 rounded-lg text-gray-600 dark:text-gray-400 font-semibold">TechLink</div>
-                        <div class="bg-gray-200 dark:bg-gray-700 px-6 py-3 rounded-lg text-gray-600 dark:text-gray-400 font-semibold">NetPro</div>
-                    </div>
-                </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- Features Section -->
-        <section id="features" class="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-800">
-            <div class="max-w-7xl mx-auto">
-                <h2 class="text-4xl font-bold text-center mb-4">Comprehensive Features</h2>
-                <p class="text-center text-gray-600 dark:text-gray-400 mb-12 max-w-2xl mx-auto">
-                    Purpose-built for ISPs to track customer engagement and make data-driven decisions to grow your business.
-                </p>
-                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                        <div class="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 rounded-xl flex items-center justify-center mb-6">
-                            <svg class="w-7 h-7 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                            </svg>
+            <section class="bg-white px-4 py-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">ROI and Operational Impact</h2>
+                    <div class="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h3 class="text-base font-bold text-slate-900">Manual Operations vs ISP Billing</h3>
+                            <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                                <li>- Manual: Disconnected billing, messaging, and router actions</li>
+                                <li>- ISP Billing: One workflow from invoice to access control</li>
+                                <li>- Manual: Delayed payment follow-up and service restoration</li>
+                                <li>- ISP Billing: Trigger-based automation and real-time visibility</li>
+                            </ul>
                         </div>
-                        <h3 class="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Real-Time Analytics</h3>
-                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed">Monitor revenue, payments, and subscriber metrics with live dashboards and customizable reports.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                        <div class="w-14 h-14 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-xl flex items-center justify-center mb-6">
-                            <svg class="w-7 h-7 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
+                        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h3 class="text-base font-bold text-slate-900">Security and Control</h3>
+                            <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                                <li>- Role-based access and permissions</li>
+                                <li>- Activity and router action logs</li>
+                                <li>- Secure payment workflows</li>
+                                <li>- Backup strategy configurable per deployment</li>
+                            </ul>
+                            <p class="mt-4 text-xs text-slate-500">Automation impact varies by operations size and current process maturity.</p>
                         </div>
-                        <h3 class="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Smart Automation</h3>
-                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed">Schedule billing, send reminders, and manage subscriptions with intelligent workflow automation.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                        <div class="w-14 h-14 bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900 dark:to-purple-800 rounded-xl flex items-center justify-center mb-6">
-                            <svg class="w-7 h-7 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">MikroTik Control</h3>
-                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed">Remote management of all RouterOS devices with automated user provisioning and bandwidth control.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                        <div class="w-14 h-14 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900 dark:to-orange-800 rounded-xl flex items-center justify-center mb-6">
-                            <svg class="w-7 h-7 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Multi-Payment Gateway</h3>
-                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed">Accept MPesa, Selcom, and manual payments with instant reconciliation and auto-activation.</p>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- Statistics Section -->
-        <section class="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-            <div class="max-w-7xl mx-auto">
-                <div class="text-center mb-16">
-                    <h2 class="text-4xl font-bold mb-4">Impact & Growth Metrics</h2>
-                    <p class="text-xl text-blue-100 max-w-3xl mx-auto">
-                        Real numbers from real ISPs using our platform daily
-                    </p>
-                </div>
-                
-                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    <div class="text-center">
-                        <div class="text-5xl font-bold mb-2 counter" data-target="500">0</div>
-                        <div class="text-blue-100 text-lg font-semibold mb-1">ISPs Managed</div>
-                        <div class="text-blue-200 text-sm">Across 15+ countries</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-5xl font-bold mb-2 counter" data-target="50000">0</div>
-                        <div class="text-blue-100 text-lg font-semibold mb-1">Active Subscribers</div>
-                        <div class="text-blue-200 text-sm">Growing daily</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-5xl font-bold mb-2">99.9%</div>
-                        <div class="text-blue-100 text-lg font-semibold mb-1">Uptime SLA</div>
-                        <div class="text-blue-200 text-sm">24/7 monitoring</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-5xl font-bold mb-2">35%</div>
-                        <div class="text-blue-100 text-lg font-semibold mb-1">Revenue Growth</div>
-                        <div class="text-blue-200 text-sm">Average increase</div>
+            <section class="px-4 py-16 sm:px-6 lg:px-8" id="faq">
+                <div class="mx-auto max-w-7xl">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Questions Before You Launch?</h2>
+                    <div class="mt-8 space-y-4">
+                        <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-sm font-semibold text-slate-900">Does it support MikroTik?</p><p class="mt-2 text-sm text-slate-600">Yes. Built with MikroTik hotspot and PPPoE workflows in mind.</p></div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-sm font-semibold text-slate-900">Does it support M-Pesa?</p><p class="mt-2 text-sm text-slate-600">Yes. Supports M-Pesa collection flows and payment confirmation handling.</p></div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-sm font-semibold text-slate-900">Can I automate suspensions?</p><p class="mt-2 text-sm text-slate-600">Yes. Suspension and reconnection can follow billing and payment states automatically.</p></div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-sm font-semibold text-slate-900">Can I manage hotspots and PPPoE?</p><p class="mt-2 text-sm text-slate-600">Yes. Both use cases are supported in the operations workflow.</p></div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-sm font-semibold text-slate-900">Is it cloud based?</p><p class="mt-2 text-sm text-slate-600">Yes, cloud deployment is supported.</p></div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-sm font-semibold text-slate-900">Can I host it myself?</p><p class="mt-2 text-sm text-slate-600">Self-hosting can be provided as an optional deployment model.</p></div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-sm font-semibold text-slate-900">Does it support multiple branches?</p><p class="mt-2 text-sm text-slate-600">Yes. Multi-tenant and multi-branch operations can be managed centrally.</p></div>
                     </div>
                 </div>
-                
-                <div class="mt-16 text-center">
-                    <p class="text-lg text-blue-100 mb-8">Join thousands of ISPs transforming their business operations</p>
-                    @if (Route::has('register'))
-                        <a href="{{ route('register') }}" class="bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold hover:bg-gray-100 transition transform hover:scale-105 inline-flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                            </svg>
-                            Start Your Growth Journey
-                        </a>
-                    @endif
-                </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- Integrations Section -->
-        <section id="integrations" class="py-20 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-7xl mx-auto">
-                <h2 class="text-4xl font-bold text-center mb-4">Seamless Integration</h2>
-                <p class="text-center text-gray-600 dark:text-gray-400 mb-12 max-w-2xl mx-auto">
-                    Multiple payment gateways, SMS platforms, and full MikroTik RouterOS support
-                </p>
-                <div class="grid md:grid-cols-3 gap-8">
-                    <div class="text-center">
-                        <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-                    </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold mb-2">Payment Gateways</h3>
-                        <p class="text-gray-600 dark:text-gray-400">MPesa STK Push, Selcom, and manual payment options</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                    </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold mb-2">SMS Platforms</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Vonage/Nexmo integration for automated notifications</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="w-16 h-16 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-8 h-8 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
-                    </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold mb-2">MikroTik RouterOS</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Full API integration for automated user management</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Time-Saving Automations -->
-        <section id="automations" class="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-800">
-            <div class="max-w-7xl mx-auto">
-                <h2 class="text-4xl font-bold text-center mb-4">Time-Saving Automations</h2>
-                <p class="text-center text-gray-600 dark:text-gray-400 mb-12 max-w-2xl mx-auto">
-                    Simplify the management of your ISP business
-                </p>
-                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-3">PPPoE Integration</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Seamless authentication and access control for broadband subscribers. Monitor bandwidth usage and manage connection settings.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-3">HotSpot Management</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Create and manage voucher-based and account-based hotspot access. Track usage patterns and enforce bandwidth policies.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-3">Automated Billing</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Schedule recurring invoices and automate payment collection across multiple payment gateways. Reduce manual processing.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-3">Remote MikroTik</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Control and configure all your MikroTik devices from a central dashboard. Monitor network health and deploy changes instantly.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-3">Package Management</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Create and manage customizable service plans with flexible pricing tiers. Easily update packages and apply changes automatically.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-3">Customer Portal</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Self-service platform for subscribers to view bills, make payments, and manage services. Reduce support workload.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- FAQ Section -->
-        <section class="py-20 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-4xl mx-auto">
-                <h2 class="text-4xl font-bold text-center mb-4">Questions? Answers!</h2>
-                <p class="text-center text-gray-600 dark:text-gray-400 mb-12">
-                    Find quick answers to the most common questions about our platform
-                </p>
-                <div class="space-y-6">
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-2">Which MikroTik models do you support?</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Our billing system is fully compatible with MikroTik RouterOS v6 and v7, including hAP, RB, CCR, CRS, LHG, SXT, and LtAP series. As long as your router supports API access, you can take full advantage of our features.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-2">What payment methods do you support?</h3>
-                        <p class="text-gray-600 dark:text-gray-400">We integrate with MPesa STK Push, Selcom, and support manual payments. Our platform ensures real-time payment confirmations and instant service activation.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-2">Do you support multiple locations?</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Yes, we support multiple locations and multiple MikroTik devices. Our multi-tenant architecture allows you to manage multiple ISPs from a single platform.</p>
-                    </div>
-                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-2">Is there technical support available?</h3>
-                        <p class="text-gray-600 dark:text-gray-400">Yes, we offer technical support to help you get started and resolve any issues you may encounter.</p>
-                    </div>
-                </div>
-        </div>
-        </section>
-
-        <!-- Enhanced CTA Section -->
-        <section class="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-600 via-purple-600 to-blue-700 text-white relative overflow-hidden">
-            <!-- Background decorative elements -->
-            <div class="absolute inset-0">
-                <div class="absolute top-10 left-10 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-                <div class="absolute bottom-10 right-10 w-48 h-48 bg-white/5 rounded-full blur-2xl"></div>
-                <div class="absolute top-1/2 left-1/3 w-24 h-24 bg-white/10 rounded-full blur-lg"></div>
-            </div>
-            
-            <div class="relative max-w-6xl mx-auto text-center">
-                <h2 class="text-4xl md:text-5xl font-bold mb-6">Ready to Transform Your ISP Business?</h2>
-                <p class="text-xl text-blue-100 mb-12 max-w-3xl mx-auto">
-                    Join thousands of successful ISPs using our platform to automate operations, boost revenue, and delight customers.
-                </p>
-                
-                <div class="flex flex-col lg:flex-row gap-8 justify-center items-center mb-16">
-                    @auth
-                        <a href="{{ url('/dashboard') }}" class="bg-white text-blue-600 px-10 py-4 rounded-xl font-bold hover:bg-gray-100 transition transform hover:scale-105 shadow-2xl inline-flex items-center gap-3 text-lg">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                            </svg>
-                            Go to Dashboard
-                        </a>
-                    @else
+            <section class="px-4 pb-16 sm:px-6 lg:px-8">
+                <div class="mx-auto max-w-7xl rounded-3xl bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-12 text-white sm:px-10">
+                    <h2 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Ready To Run Your ISP With Automation And Control?</h2>
+                    <p class="mt-3 max-w-3xl text-blue-100">Stop managing subscribers manually. Start running billing, payments, and network access from one operating system.</p>
+                    <div class="mt-7 flex flex-col gap-3 sm:flex-row">
                         @if (Route::has('register'))
-                            <a href="{{ route('register') }}" class="bg-white text-blue-600 px-10 py-4 rounded-xl font-bold hover:bg-gray-100 transition transform hover:scale-105 shadow-2xl inline-flex items-center gap-3 text-lg">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                </svg>
-                                Get Started - Free
-                            </a>
+                            <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50">Start Free Trial</a>
                         @endif
-                    @endauth
-                    
-                    <a href="{{ route('login') }}" class="border-2 border-white text-white px-10 py-4 rounded-xl font-bold hover:bg-white/10 transition transform hover:scale-105 inline-flex items-center gap-3 text-lg">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        Schedule Demo
-                    </a>
-                </div>
-                
-                <!-- Mobile App Downloads -->
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 max-w-2xl mx-auto">
-                    <h3 class="text-2xl font-bold mb-4">Manage Your Business On The Go</h3>
-                    <p class="text-blue-100 mb-6">Download our mobile app for iOS and Android to monitor your ISP operations from anywhere.</p>
-                    
-                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                        <button class="bg-black hover:bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2">
-                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                            </svg>
-                            Download for iOS
-                        </button>
-                        <button class="bg-black hover:bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2">
-                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
-                            </svg>
-                            Download for Android
-                        </button>
+                        <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-xl border border-white/60 px-6 py-3 text-sm font-bold text-white hover:bg-white/10">Book Demo</a>
                     </div>
                 </div>
-                
-                <!-- Trust indicators -->
-                <div class="mt-12 flex flex-wrap justify-center items-center gap-8 text-sm text-blue-100">
-                    <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-green-300" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                        </svg>
-                        <span>30-Day Free Trial</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-green-300" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                        </svg>
-                        <span>No Credit Card Required</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-green-300" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                        </svg>
-                        <span>Free Setup & Migration</span>
-                    </div>
-                </div>
-            </div>
-        </section>
+            </section>
+        </main>
 
-        <!-- Footer -->
-        <footer class="bg-gray-900 text-gray-400 py-12 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-7xl mx-auto">
-                <div class="grid md:grid-cols-4 gap-8">
+        <footer class="border-t border-slate-200 bg-white px-4 py-10 sm:px-6 lg:px-8">
+            <div class="mx-auto max-w-7xl text-sm text-slate-600">
+                <div class="grid grid-cols-1 gap-8 md:grid-cols-5">
                     <div>
-                        <h3 class="text-white font-bold text-xl mb-4">ISP Billing</h3>
-                        <p class="text-sm">Smart billing system for Internet Service Providers</p>
+                        <p class="font-semibold text-slate-800">ISP Billing</p>
+                        <p class="mt-2 text-xs text-slate-500">The operating system for modern ISP operations.</p>
                     </div>
                     <div>
-                        <h4 class="text-white font-semibold mb-4">Features</h4>
-                        <ul class="space-y-2 text-sm">
-                            <li><a href="#features" class="hover:text-white transition">Billing & Invoicing</a></li>
-                            <li><a href="#automations" class="hover:text-white transition">Automations</a></li>
-                            <li><a href="#integrations" class="hover:text-white transition">Integrations</a></li>
-                        </ul>
+                        <p class="font-semibold text-slate-800">Product</p>
+                        <div class="mt-2 flex flex-col gap-2">
+                            <a href="#features" class="hover:text-blue-700">Features</a>
+                            <a href="#pricing" class="hover:text-blue-700">Pricing</a>
+                            <a href="#operations" class="hover:text-blue-700">Operations</a>
+                        </div>
                     </div>
                     <div>
-                        <h4 class="text-white font-semibold mb-4">Resources</h4>
-                        <ul class="space-y-2 text-sm">
-                            <li><a href="{{ route('documentation') }}" class="hover:text-white transition">Documentation</a></li>
-                            <li><a href="{{ route('documentation') }}#api" class="hover:text-white transition">API Reference</a></li>
-                            <li><a href="#faq" class="hover:text-white transition">FAQ</a></li>
-                        </ul>
+                        <p class="font-semibold text-slate-800">Integrations</p>
+                        <div class="mt-2 flex flex-col gap-2">
+                            <a href="#integrations" class="hover:text-blue-700">MikroTik</a>
+                            <a href="#integrations" class="hover:text-blue-700">M-Pesa</a>
+                            <a href="#integrations" class="hover:text-blue-700">SMS & Email</a>
+                        </div>
                     </div>
                     <div>
-                        <h4 class="text-white font-semibold mb-4">Legal</h4>
-                        <ul class="space-y-2 text-sm">
-                            <li><a href="{{ route('terms') }}" class="hover:text-white transition">Terms of Service</a></li>
-                            <li><a href="{{ route('privacy') }}" class="hover:text-white transition">Privacy Policy</a></li>
-                        </ul>
+                        <p class="font-semibold text-slate-800">Resources</p>
+                        <div class="mt-2 flex flex-col gap-2">
+                            <a href="{{ route('documentation') }}" class="hover:text-blue-700">Documentation</a>
+                            <a href="{{ route('terms') }}" class="hover:text-blue-700">Terms</a>
+                            <a href="{{ route('privacy') }}" class="hover:text-blue-700">Privacy</a>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-slate-800">Support</p>
+                        <div class="mt-2 flex flex-col gap-2">
+                            <a href="{{ route('login') }}" class="hover:text-blue-700">Contact Sales</a>
+                            <a href="{{ route('login') }}" class="hover:text-blue-700">WhatsApp</a>
+                            <a href="{{ route('login') }}" class="hover:text-blue-700">Email Support</a>
+                        </div>
                     </div>
                 </div>
-                <div class="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
-                    <p>&copy; {{ date('Y') }} ISP Billing System. All rights reserved.</p>
-                </div>
+                <p class="mt-4">&copy; {{ date('Y') }} ISP Billing. All rights reserved.</p>
             </div>
         </footer>
+
+        <script>
+            const menuBtn = document.getElementById('mobile-menu-btn');
+            const mobileMenu = document.getElementById('mobile-menu');
+            if (menuBtn && mobileMenu) {
+                menuBtn.addEventListener('click', () => {
+                    mobileMenu.classList.toggle('hidden');
+                    const expanded = menuBtn.getAttribute('aria-expanded') === 'true';
+                    menuBtn.setAttribute('aria-expanded', String(!expanded));
+                });
+            }
+        </script>
     </body>
 </html>

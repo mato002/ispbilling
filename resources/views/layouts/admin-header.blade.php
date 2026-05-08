@@ -5,7 +5,8 @@
             this.mobileMenuOpen = !this.mobileMenuOpen;
         }
     }"
-    class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 fixed top-0 left-64 right-0 z-50 transition-all duration-300 ease-in-out">
+    :class="$store.sidebar.collapsed ? 'md:left-16' : 'md:left-64'"
+    class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out">
     <div class="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
         <!-- Logo / Title -->
         <div class="flex items-center">
@@ -18,9 +19,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
                 </svg>
             </button>
-            <a href="{{ route('admin.dashboard') }}" class="flex items-center">
+            <a href="{{ Auth::user()->isSuperAdmin() ? route('admin.dashboard') : route('isp.dashboard') }}" class="flex items-center">
                 <span class="text-xl font-bold text-gray-800 dark:text-gray-200">
-                    ISP Billing Admin
+                    {{ Auth::user()->isSuperAdmin() ? 'ISP Billing Admin' : (Auth::user()->isp->name ?? 'ISP Billing') }}
                 </span>
             </a>
         </div>
@@ -48,7 +49,7 @@
                         </div>
                         <div class="text-left hidden md:block">
                             <div class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ Auth::user()->name }}</div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">Super Admin</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ Auth::user()->isSuperAdmin() ? 'Super Admin' : (Auth::user()->isIspAdmin() ? 'ISP Admin' : 'ISP Staff') }}</div>
                         </div>
                     </div>
                     <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

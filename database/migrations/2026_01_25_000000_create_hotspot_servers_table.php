@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('hotspot_servers')) {
+            return;
+        }
+
         Schema::create('hotspot_servers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained()->onDelete('cascade');

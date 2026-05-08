@@ -11,9 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('bandwidth_profiles')) {
+            return;
+        }
+
         Schema::create('bandwidth_profiles', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('isp_id')->constrained()->onDelete('cascade');
+            $table->foreignId('isp_id')->constrained('i_s_p_s')->onDelete('cascade');
             $table->string('name'); // Profile name (e.g., 'Basic', 'Standard', 'Premium')
             
             // Speed limits (in Kbps)

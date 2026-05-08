@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('bandwidth_profiles')) {
+            return;
+        }
+
         Schema::create('bandwidth_profiles', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('isp_id');
@@ -63,7 +67,7 @@ return new class extends Migration
         
         // Add foreign keys after table creation
         Schema::table('bandwidth_profiles', function (Blueprint $table) {
-            $table->foreign('isp_id')->references('id')->on('isps')->onDelete('cascade');
+            $table->foreign('isp_id')->references('id')->on('i_s_p_s')->onDelete('cascade');
         });
     }
 
