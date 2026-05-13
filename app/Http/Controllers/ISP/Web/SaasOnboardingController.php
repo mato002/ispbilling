@@ -18,7 +18,7 @@ class SaasOnboardingController extends Controller
         abort_unless($user->isp_id, 403);
         abort_unless($user->isIspAdmin(), 403);
 
-        $isp = ISP::query()->with(['saasPlan', 'pendingSaasPlan'])->findOrFail($user->isp_id);
+        $isp = ISP::query()->with(['saasPlan', 'pendingSaasPlan', 'routers'])->findOrFail($user->isp_id);
 
         if (! $isp->needsSaasOnboarding()) {
             return redirect()->route('isp.dashboard');

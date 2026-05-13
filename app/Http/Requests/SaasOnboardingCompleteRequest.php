@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\ISP;
 use App\Services\PlatformSaasBillingService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class SaasOnboardingCompleteRequest extends FormRequest
@@ -51,6 +53,16 @@ class SaasOnboardingCompleteRequest extends FormRequest
 
         $step = (int) $this->input('wizard_step', 1);
         $base = ['wizard_step' => ['required', 'integer', 'in:1,2,3,4']];
+
+        if ($this->routeIs('isp.saas-onboarding.*') && $this->input('wizard_action') === 'go_back') {
+            $isp = ISP::query()->find($this->user()->isp_id);
+            $serverStep = min(4, max(1, (int) ($isp?->saas_onboarding_step ?? 1)));
+
+            return [
+                'wizard_action' => ['required', 'in:go_back'],
+                'wizard_step' => ['required', 'integer', Rule::in([$serverStep])],
+            ];
+        }
 
         if ($step === 2 && $this->input('wizard_action') === 'continue_after_verify') {
             return array_merge($base, [
@@ -113,6 +125,10 @@ class SaasOnboardingCompleteRequest extends FormRequest
     {
         $validator->after(function (Validator $validator): void {
             if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            if ($this->routeIs('isp.saas-onboarding.*') && $this->input('wizard_action') === 'go_back') {
                 return;
             }
 

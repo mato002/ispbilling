@@ -3,6 +3,7 @@
     $current = min(4, max(1, (int) ($isp->saas_onboarding_step ?? 1)));
     $pending = $isp->pendingSaasPlan;
     $verifyAmount = $verifyAmount ?? max(1, (int) ceil((float) config('services.mpesa.saas_onboarding_verification_amount', 1)));
+    $onboardingRouter = $isp->relationLoaded('routers') ? $isp->routers->sortBy('id')->first() : $isp->routers()->orderBy('id')->first();
 @endphp
 
 <input type="hidden" name="wizard_step" value="{{ $current }}">
@@ -54,7 +55,8 @@
         @error('platform_saas_plan_id')
             <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
         @enderror
-        <div class="mt-6 flex justify-end">
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <span aria-hidden="true"></span>
             <button type="submit" class="pb-btn pb-btn-primary px-8">Next</button>
         </div>
     </div>
@@ -182,7 +184,8 @@
             <span>White-label (one-time on first invoice)</span>
         </label>
 
-        <div class="flex justify-end gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <button type="submit" formnovalidate name="wizard_action" value="go_back" class="pb-btn px-6">Back</button>
             <button type="submit" class="pb-btn pb-btn-primary px-8">Save &amp; continue</button>
         </div>
     </div>
@@ -195,22 +198,22 @@
         <div class="grid gap-4 sm:grid-cols-2">
             <div class="sm:col-span-2">
                 <label class="isp-form-label">Router display name</label>
-                <input type="text" name="router_name" value="{{ old('router_name', 'Primary router') }}" required class="isp-form-input">
+                <input type="text" name="router_name" value="{{ old('router_name', $onboardingRouter?->name ?? 'Primary router') }}" required class="isp-form-input">
                 @error('router_name')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
             <div>
                 <label class="isp-form-label">Router IP or hostname</label>
-                <input type="text" name="router_ip_address" value="{{ old('router_ip_address') }}" required class="isp-form-input" placeholder="192.168.88.1">
+                <input type="text" name="router_ip_address" value="{{ old('router_ip_address', $onboardingRouter?->ip_address) }}" required class="isp-form-input" placeholder="192.168.88.1">
                 @error('router_ip_address')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
             <div>
                 <label class="isp-form-label">API port</label>
-                <input type="number" name="router_port" value="{{ old('router_port', 8728) }}" required class="isp-form-input" min="1" max="65535">
+                <input type="number" name="router_port" value="{{ old('router_port', $onboardingRouter?->port ?? 8728) }}" required class="isp-form-input" min="1" max="65535">
                 @error('router_port')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
             <div>
                 <label class="isp-form-label">API username</label>
-                <input type="text" name="router_username" value="{{ old('router_username') }}" required class="isp-form-input" autocomplete="username" placeholder="RouterOS API user (e.g. admin)">
+                <input type="text" name="router_username" value="{{ old('router_username', $onboardingRouter?->username) }}" required class="isp-form-input" autocomplete="username" placeholder="RouterOS API user (e.g. admin)">
                 @error('router_username')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
             <div>
@@ -246,7 +249,8 @@
             @error('new_plan_speed_profile')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
         </div>
 
-        <div class="flex justify-end">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <button type="submit" formnovalidate name="wizard_action" value="go_back" class="pb-btn px-6">Back</button>
             <button type="submit" class="pb-btn pb-btn-primary px-8">Next</button>
         </div>
     </div>
@@ -293,7 +297,8 @@
             </div>
         </div>
 
-        <div class="flex justify-end">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <button type="submit" formnovalidate name="wizard_action" value="go_back" class="pb-btn px-6">Back</button>
             <button type="submit" class="pb-btn pb-btn-primary px-8">Finish setup</button>
         </div>
     </div>
@@ -343,7 +348,7 @@
         var list = form.querySelectorAll('input, select, textarea');
         for (var i = 0; i < list.length; i++) {
             var el = list[i];
-            if (!el.name || el.name === '_token') {
+            if (!el.name || el.name === '_token' || el.name === 'wizard_step') {
                 continue;
             }
             if (el.type === 'checkbox') {
@@ -382,6 +387,9 @@
                 var parsed = JSON.parse(raw);
                 if (parsed && typeof parsed === 'object') {
                     Object.keys(parsed).forEach(function (name) {
+                        if (name === 'wizard_step' || name === '_token') {
+                            return;
+                        }
                         setControlValue(name, parsed[name]);
                     });
                     syncPanels();

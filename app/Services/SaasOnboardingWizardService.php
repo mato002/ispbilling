@@ -85,6 +85,10 @@ class SaasOnboardingWizardService
 
     public function processIspWizard(ISP $isp, Request $request): RedirectResponse
     {
+        if ($request->input('wizard_action') === 'go_back') {
+            return $this->goBackStep($isp);
+        }
+
         $step = (int) $request->input('wizard_step', max(1, (int) $isp->saas_onboarding_step));
 
         return match ($step) {
@@ -94,6 +98,21 @@ class SaasOnboardingWizardService
             4 => $this->stepPaybillAndFinish($isp, $request),
             default => redirect()->route('isp.saas-onboarding.show')->with('error', 'Invalid onboarding step.'),
         };
+    }
+
+    protected function goBackStep(ISP $isp): RedirectResponse
+    {
+        $current = min(4, max(1, (int) $isp->saas_onboarding_step));
+
+        if ($current <= 1) {
+            return redirect()->route('isp.saas-onboarding.show')->with('info', 'You are already on the first step.');
+        }
+
+        $next = $current - 1;
+
+        $isp->update(['saas_onboarding_step' => $next]);
+
+        return redirect()->route('isp.saas-onboarding.show')->with('info', 'Returned to the previous step.');
     }
 
     protected function stepPlan(ISP $isp, Request $request): RedirectResponse
@@ -203,6 +222,12 @@ class SaasOnboardingWizardService
             'saas_white_label_opt_in' => $request->boolean('saas_white_label_opt_in'),
             'settings' => $settings,
         ]);
+
+        if ($method === 'mpesa' && $isp->saas_payment_verified_at) {
+            $isp->update(['saas_onboarding_step' => 3]);
+
+            return redirect()->route('isp.saas-onboarding.show')->with('success', 'Billing profile updated. Continue to network setup.');
+        }
 
         if ($method !== 'mpesa') {
             $isp->update([
@@ -326,16 +351,20 @@ class SaasOnboardingWizardService
             }
         }
 
-        $router = Router::create([
-            'isp_id' => $isp->id,
-            'name' => $data['router_name'],
-            'ip_address' => $data['router_ip_address'],
-            'port' => (int) $data['router_port'],
-            'username' => $data['router_username'],
-            'password' => $data['router_password'],
-            'use_ssl' => false,
-            'is_active' => true,
-        ]);
+        $router = Router::query()->updateOrCreate(
+            [
+                'isp_id' => $isp->id,
+                'ip_address' => $data['router_ip_address'],
+            ],
+            [
+                'name' => $data['router_name'],
+                'port' => (int) $data['router_port'],
+                'username' => $data['router_username'],
+                'password' => $data['router_password'],
+                'use_ssl' => false,
+                'is_active' => true,
+            ]
+        );
 
         $imported = $this->importHotspotServers($router, $result['hotspot_servers'] ?? []);
         PollRouterHealthJob::dispatch($router->id);
