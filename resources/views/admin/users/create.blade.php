@@ -78,7 +78,7 @@
                                 <option value="">Select Role</option>
                                 <option value="super_admin" {{ old('role') == 'super_admin' ? 'selected' : '' }}>Super Admin</option>
                                 <option value="isp_admin" {{ old('role') == 'isp_admin' ? 'selected' : '' }}>ISP Admin</option>
-                                <option value="staff" {{ old('role') == 'staff' ? 'selected' : '' }}>Staff</option>
+                                <option value="isp_staff" {{ old('role') == 'isp_staff' ? 'selected' : '' }}>Staff</option>
                             </select>
                             @error('role')
                                 <p class="text-red-500 text-xs mt-1">{{ $message }}</p>

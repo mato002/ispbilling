@@ -285,7 +285,7 @@
         }
     </style>
 </head>
-<body class="pb-auth-shell antialiased text-slate-900 dark:text-slate-100">
+<body class="pb-auth-shell antialiased text-slate-900 dark:text-slate-100" data-turbo="false">
 
     <div class="pb-mesh min-h-screen w-full">
         <div class="grid min-h-screen w-full lg:grid-cols-[1.05fr_1fr] xl:grid-cols-[1.1fr_1fr]">

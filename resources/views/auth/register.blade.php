@@ -2,6 +2,13 @@
 
 <x-guest-layout>
     <div class="mb-7">
+        @if(Route::has('register.isp'))
+        <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+            <strong>ISP workspace.</strong> To create your company tenant (operators, routers, billing), use
+            <a href="{{ route('register.isp') }}" class="font-semibold text-indigo-700 underline hover:text-indigo-900 dark:text-indigo-300">Register your ISP</a>
+            instead of this form.
+        </div>
+        @endif
         <div class="mb-1 inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>

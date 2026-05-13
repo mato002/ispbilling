@@ -14,6 +14,10 @@
         <div class="p-6">
             <form method="POST" action="{{ route('admin.isps.store') }}" class="space-y-6">
                 @csrf
+
+                <p class="text-sm text-slate-600 dark:text-slate-400 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-900/40">
+                    After save you will be taken to <strong>PrimeBilling SaaS onboarding</strong> for this ISP (same form as self-service): plan, billing profile, payment method (M-Pesa, bank, or card/invoice), and optional white-label. Complete that before operators can use the workspace.
+                </p>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Basic Information -->
@@ -25,6 +29,19 @@
                             <input type="text" name="name" value="{{ old('name') }}" required
                                    class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                             @error('name')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">URL slug (optional)</label>
+                            <input type="text" name="slug" value="{{ old('slug') }}"
+                                   pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                                   title="Lowercase letters, numbers, single hyphens"
+                                   placeholder="Leave blank to auto-generate from ISP name"
+                                   class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                            <p class="mt-1 text-xs text-gray-500">Customer portal host: <span class="font-mono">{slug}.{{ config('app.central_domain') }}</span></p>
+                            @error('slug')
                                 <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>

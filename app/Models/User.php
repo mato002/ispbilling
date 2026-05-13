@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToIspTenant;
+use App\Support\IspTenant;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -22,11 +23,32 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'isp_id',
         'role',
         'is_active',
     ];
+
+    /**
+     * {@inheritdoc}
+     *
+     * Super admins manage operators across all ISPs; tenant scope would 404
+     * on users outside the current tenant when resolving route model binding.
+     */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        $field ??= $this->getRouteKeyName();
+
+        $query = static::query();
+
+        $auth = IspTenant::resolveAuthenticatedUser();
+        if ($auth !== null && $auth->isSuperAdmin()) {
+            $query->withoutGlobalScope('isp_tenant');
+        }
+
+        return $query->where($field, $value)->firstOrFail();
+    }
 
     /**
      * The attributes that should be hidden for serialization.

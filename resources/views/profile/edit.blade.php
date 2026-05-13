@@ -4,7 +4,7 @@
 
 @php
     $user = $user ?? auth()->user();
-    $ispName = $user->isp->name ?? 'PrimeBilling Workspace';
+    $ispName = $user->isp?->name ?? 'PrimeBilling Workspace';
     $roleLabel = $user->isSuperAdmin()
         ? 'Super Administrator'
         : ($user->isIspAdmin() ? 'ISP Administrator' : ($user->isIspStaff() ? 'ISP Staff' : 'Member'));
@@ -210,7 +210,7 @@
              x-data="{
                  theme: localStorage.getItem('pb.theme') || 'system',
                  notifs: localStorage.getItem('pb.notifs') || 'all',
-                 timezone: localStorage.getItem('pb.timezone') || '{{ $user->isp->timezone ?? 'Africa/Nairobi' }}',
+                 timezone: localStorage.getItem('pb.timezone') || @json($user->isp?->timezone ?? config('app.timezone', 'Africa/Nairobi')),
                  landing: localStorage.getItem('pb.landing') || 'dashboard',
                  save(key, value) { localStorage.setItem('pb.' + key, value); }
              }">

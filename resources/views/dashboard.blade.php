@@ -6,7 +6,7 @@
     $stats = $stats ?? [];
     $alerts = $alerts ?? [];
     $user = Auth::user();
-    $ispName = $user->isp->name ?? 'your ISP';
+    $ispName = $user->isp?->name ?? ($user->isSuperAdmin() ? config('app.name', 'PrimeBilling') : 'your ISP');
 
     $hourOfDay = (int) now()->format('H');
     $greeting = $hourOfDay < 12 ? 'Good morning' : ($hourOfDay < 17 ? 'Good afternoon' : 'Good evening');

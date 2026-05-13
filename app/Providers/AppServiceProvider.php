@@ -23,8 +23,49 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (! $this->app->runningInConsole()) {
+            $raw = (string) ini_get('memory_limit');
+            if ($raw !== '' && $raw !== '-1') {
+                $bytes = self::parseIniMemoryToBytes($raw);
+                if ($bytes < 256 * 1024 * 1024) {
+                    @ini_set('memory_limit', '256M');
+                }
+            }
+
+            static $logsProbeDone = false;
+            if (! $logsProbeDone) {
+                $logsProbeDone = true;
+                $dir = storage_path('logs');
+                if (! is_dir($dir) && ! @mkdir($dir, 0755, true)) {
+                    error_log('[ispbilling] Cannot create storage/logs directory at '.$dir);
+                } else {
+                    $probe = $dir.DIRECTORY_SEPARATOR.'.write-probe-'.getmypid();
+                    $ok = @file_put_contents($probe, '1') !== false;
+                    if ($ok) {
+                        @unlink($probe);
+                    } else {
+                        error_log('[ispbilling] storage/logs is not writable by the web PHP user — Path: '.$dir);
+                    }
+                }
+            }
+        }
+
         View::composer('isp.settings.*', IspSettingsComposer::class);
         View::composer('layouts.admin', IspBrandingComposer::class);
         View::composer('layouts.admin', IspSystemAnnouncementsComposer::class);
+    }
+
+    private static function parseIniMemoryToBytes(string $val): int
+    {
+        $val = trim($val);
+        $last = strtolower($val[strlen($val) - 1] ?? '');
+        $num = (int) $val;
+
+        return match ($last) {
+            'g' => $num * 1024 * 1024 * 1024,
+            'm' => $num * 1024 * 1024,
+            'k' => $num * 1024,
+            default => max(0, $num),
+        };
     }
 }

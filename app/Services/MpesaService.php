@@ -71,29 +71,104 @@ class MpesaService
      */
     protected function getAccessToken(): ?string
     {
-        // Validate credentials are set
-        if (empty($this->consumerKey) || empty($this->consumerSecret)) {
+        return self::accessTokenForKeys($this->consumerKey, $this->consumerSecret, $this->environment);
+    }
+
+    /**
+     * OAuth client-credentials token for arbitrary Daraja keys (e.g. C2B register before saving).
+     */
+    public static function accessTokenForKeys(?string $consumerKey, ?string $consumerSecret, ?string $environment = null): ?string
+    {
+        if (empty($consumerKey) || empty($consumerSecret)) {
             Log::error('MPesa credentials not configured. Please set consumer_key and consumer_secret in ISP settings or .env file.');
+
             return null;
         }
 
+        $env = $environment ?: config('services.mpesa.environment', 'sandbox');
+
         try {
-            $url = $this->environment === 'production'
+            $url = $env === 'production'
                 ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
                 : 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
 
-            $response = Http::withBasicAuth($this->consumerKey, $this->consumerSecret)
+            $response = Http::withBasicAuth($consumerKey, $consumerSecret)
                 ->get($url);
 
             if ($response->successful()) {
                 return $response->json()['access_token'] ?? null;
             }
 
-            Log::error('MPesa access token failed: ' . $response->body());
+            Log::error('MPesa access token failed: '.$response->body());
+
             return null;
         } catch (Exception $e) {
-            Log::error('MPesa access token error: ' . $e->getMessage());
+            Log::error('MPesa access token error: '.$e->getMessage());
+
             return null;
+        }
+    }
+
+    /**
+     * Register C2B validation and confirmation URLs against a Paybill / Till shortcode.
+     *
+     * @param  array{consumer_key:string,consumer_secret:string,shortcode:string,environment?:string}  $credentials
+     * @return array{success:bool,message:string,response?:array}
+     */
+    public static function registerC2BUrls(array $credentials, string $validationUrl, string $confirmationUrl): array
+    {
+        $consumerKey = (string) ($credentials['consumer_key'] ?? '');
+        $consumerSecret = (string) ($credentials['consumer_secret'] ?? '');
+        $shortcode = (string) ($credentials['shortcode'] ?? '');
+        $environment = (string) ($credentials['environment'] ?? config('services.mpesa.environment', 'sandbox'));
+
+        if ($consumerKey === '' || $consumerSecret === '' || $shortcode === '') {
+            return ['success' => false, 'message' => 'Consumer key, consumer secret, and shortcode are required for C2B registration.'];
+        }
+
+        $token = self::accessTokenForKeys($consumerKey, $consumerSecret, $environment);
+        if (! $token) {
+            return ['success' => false, 'message' => 'Could not obtain Daraja access token. Check consumer key and secret.'];
+        }
+
+        $url = $environment === 'production'
+            ? 'https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl'
+            : 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl';
+
+        $payload = [
+            'ShortCode' => (int) $shortcode,
+            'ResponseType' => 'Completed',
+            'ConfirmationURL' => $confirmationUrl,
+            'ValidationURL' => $validationUrl,
+        ];
+
+        try {
+            $response = Http::withToken($token)->acceptJson()->post($url, $payload);
+            $body = $response->json() ?: ['raw' => $response->body()];
+
+            $desc = strtolower((string) ($body['ResponseDescription'] ?? ''));
+            $ok = $response->successful()
+                && ($desc === 'success'
+                    || (string) ($body['ResponseCode'] ?? '') === '0'
+                    || isset($body['OriginatorCoopID']));
+
+            if ($ok) {
+                return [
+                    'success' => true,
+                    'message' => (string) ($body['ResponseDescription'] ?? 'C2B URLs registered'),
+                    'response' => is_array($body) ? $body : [],
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => (string) ($body['errorMessage'] ?? $body['ResponseDescription'] ?? 'C2B register failed'),
+                'response' => is_array($body) ? $body : [],
+            ];
+        } catch (Exception $e) {
+            Log::warning('M-Pesa C2B registerurl failed: '.$e->getMessage());
+
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
@@ -188,9 +263,11 @@ class MpesaService
                 'CallBackURL' => $callbackUrl,
                 'QueueTimeOutURL' => $timeoutUrl,
                 'AccountReference' => IspPaymentExperience::stkAccountReference($payment),
-                'TransactionDesc' => (($payment->metadata['purpose'] ?? null) === 'platform_saas')
-                    ? 'PrimeBilling SaaS'
-                    : ('ISP Billing Payment - '.$payment->payment_reference),
+                'TransactionDesc' => match ($payment->metadata['purpose'] ?? null) {
+                    'platform_saas' => 'PrimeBilling SaaS',
+                    'saas_onboarding_verification' => 'PrimeBilling verify',
+                    default => 'ISP Billing Payment - '.$payment->payment_reference,
+                },
             ];
 
             // Log request

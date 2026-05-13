@@ -74,6 +74,37 @@
                             <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Timezone</dt>
                             <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $isp->timezone }}</dd>
                         </div>
+                        @php($pb = data_get($isp->settings, 'platform_billing'))
+                        @if (is_array($pb) && ! empty($pb))
+                            <div class="md:col-span-2">
+                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Platform billing (onboarding)</dt>
+                                <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                                    <span class="font-mono text-xs">Method: {{ $pb['method'] ?? '—' }}</span>
+                                    @if (! empty($pb['billing_email']))
+                                        <span class="block mt-1">Billing email: {{ $pb['billing_email'] }}</span>
+                                    @endif
+                                    @if (! empty($pb['bank_name']))
+                                        <span class="block mt-1">Bank: {{ $pb['bank_name'] }} — {{ $pb['bank_account_name'] ?? '' }} / {{ $pb['bank_account_number'] ?? '' }}</span>
+                                    @endif
+                                    @if (! empty($isp->saas_billing_phone))
+                                        <span class="block mt-1">M-Pesa billing: {{ $isp->saas_billing_phone }}</span>
+                                    @endif
+                                </dd>
+                            </div>
+                        @endif
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Public customer portal</dt>
+                            <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                                @if($isp->slug && ! in_array(config('app.central_domain'), ['localhost', '127.0.0.1'], true))
+                                    <a class="text-blue-600 hover:underline font-mono break-all" target="_blank" rel="noopener"
+                                       href="{{ (parse_url(config('app.url'), PHP_URL_SCHEME) ?: 'https').'://'.$isp->slug.'.'.config('app.central_domain') }}">
+                                        {{ (parse_url(config('app.url'), PHP_URL_SCHEME) ?: 'https').'://'.$isp->slug.'.'.config('app.central_domain') }}
+                                    </a>
+                                @else
+                                    <span class="text-gray-500">Set a slug and configure APP_CENTRAL_DOMAIN / DNS for tenant URLs.</span>
+                                @endif
+                            </dd>
+                        </div>
                         <div>
                             <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</dt>
                             <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $isp->created_at->format('M d, Y') }}</dd>
@@ -189,6 +220,11 @@
                 <div class="p-6">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h3>
                     <div class="space-y-2">
+                        @if ($isp->needsSaasOnboarding())
+                            <a href="{{ route('admin.isps.saas-onboarding.show', $isp) }}" class="block w-full text-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">
+                                Complete SaaS onboarding (on behalf)
+                            </a>
+                        @endif
                         <a href="{{ route('admin.isps.edit', $isp->id) }}" class="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                             Edit ISP
                         </a>

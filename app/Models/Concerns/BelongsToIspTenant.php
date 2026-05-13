@@ -8,8 +8,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Global scope: all queries for ISP staff/admin are restricted to their isp_id.
- * Super admins, guests, console, and queue workers (no auth) see unscoped data.
+ * Global scope: HTTP requests only — ISP staff/admin queries are restricted to their isp_id.
+ * Super admins, guests, console, and queue workers see unscoped data.
+ * Tenant context is resolved via {@see \App\Support\IspTenant::resolveAuthenticatedUser()} (session id +
+ * User::withoutGlobalScopes()) so loading the authenticated user does not recurse through this scope.
  */
 trait BelongsToIspTenant
 {

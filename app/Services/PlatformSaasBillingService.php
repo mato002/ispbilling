@@ -6,6 +6,7 @@ use App\Models\ISP;
 use App\Models\Payment;
 use App\Models\PlatformSaasInvoice;
 use App\Models\PlatformSaasPlan;
+use App\Models\PlatformSaasSubscription;
 use App\Models\PlatformSetting;
 use App\Models\User;
 use Carbon\Carbon;
@@ -36,35 +37,74 @@ class PlatformSaasBillingService
     }
 
     /**
-     * ISP admin completes plan + billing step after signup.
+     * ISP admin (or super admin on behalf) completes plan + billing / payment profile.
+     *
+     * @param  array<string, mixed>  $billing  Keys: company_name, saas_company_pin, saas_billing_method,
+     *                                         saas_billing_phone (required for mpesa), billing_email (card),
+     *                                         bank_*, cardholder_name, payment_reference_note
      */
     public function completeOnboarding(ISP $isp, PlatformSaasPlan $plan, array $billing, bool $whiteLabelOptIn): void
     {
-        $phone = static::normalizeKenyanMsisdn($billing['saas_billing_phone'] ?? $isp->saas_billing_phone);
-        if (! $phone) {
-            throw new \InvalidArgumentException('A valid M-Pesa billing number (254XXXXXXXXX) is required.');
+        $method = $billing['saas_billing_method'] ?? 'mpesa';
+
+        $normalizedPhone = static::normalizeKenyanMsisdn($billing['saas_billing_phone'] ?? $isp->saas_billing_phone);
+        if ($method === 'mpesa') {
+            if (! $normalizedPhone) {
+                throw new \InvalidArgumentException('A valid M-Pesa billing number (254XXXXXXXXX) is required.');
+            }
         }
 
-        $trialEnds = now()->addDays(max(0, (int) $plan->trial_days));
+        $trialDays = max(14, (int) $plan->trial_days);
+        $trialEnds = now()->addDays($trialDays);
+
+        $settings = $isp->settings ?? [];
+        $settings['platform_billing'] = array_filter([
+            'method' => $method,
+            'billing_email' => $billing['billing_email'] ?? null,
+            'bank_name' => $billing['bank_name'] ?? null,
+            'bank_account_name' => $billing['bank_account_name'] ?? null,
+            'bank_account_number' => $billing['bank_account_number'] ?? null,
+            'bank_branch' => $billing['bank_branch'] ?? null,
+            'cardholder_name' => $billing['cardholder_name'] ?? null,
+            'payment_reference_note' => $billing['payment_reference_note'] ?? null,
+            'captured_at' => now()->toIso8601String(),
+        ], static fn ($v) => $v !== null && $v !== '');
 
         $isp->update([
             'platform_saas_plan_id' => $plan->id,
+            'saas_pending_platform_plan_id' => null,
             'saas_tier' => $plan->slug,
             'company_name' => $billing['company_name'] ?? $isp->company_name,
             'saas_company_pin' => $billing['saas_company_pin'] ?? null,
-            'saas_billing_phone' => $phone,
-            'saas_billing_method' => $billing['saas_billing_method'] ?? 'mpesa',
+            'saas_billing_phone' => $normalizedPhone,
+            'saas_billing_method' => $method,
             'saas_white_label_opt_in' => $whiteLabelOptIn,
             'saas_subscription_status' => 'trialing',
             'saas_trial_ends_at' => $trialEnds,
             'saas_next_billing_at' => $trialEnds,
             'saas_onboarding_completed_at' => now(),
+            'saas_onboarding_step' => 1,
+            'saas_payment_verified_at' => $isp->saas_payment_verified_at ?? now(),
             'saas_grace_ends_at' => null,
             'platform_access_locked' => false,
             'is_active' => true,
+            'settings' => $settings,
         ]);
 
         User::where('isp_id', $isp->id)->update(['is_active' => true]);
+
+        PlatformSaasSubscription::query()->updateOrCreate(
+            ['isp_id' => $isp->id],
+            [
+                'platform_saas_plan_id' => $plan->id,
+                'status' => PlatformSaasSubscription::STATUS_TRIALING,
+                'trial_ends_at' => $trialEnds,
+                'metadata' => array_merge(
+                    $isp->platformSaasSubscription?->metadata ?? [],
+                    ['completed_at' => now()->toIso8601String()]
+                ),
+            ]
+        );
     }
 
     public function buildUpcomingInvoiceAmounts(ISP $isp): array

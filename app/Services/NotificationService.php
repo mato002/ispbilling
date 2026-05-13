@@ -193,7 +193,10 @@ class NotificationService
      */
     public function getUnreadCount($ispId): int
     {
-        return Notification::forIsp($ispId)->unread()->count();
+        return Notification::withoutGlobalScope('isp_tenant')
+            ->where('isp_id', $ispId)
+            ->unread()
+            ->count();
     }
 
     /**
@@ -201,7 +204,8 @@ class NotificationService
      */
     public function getRecentNotifications($ispId, $limit = 10)
     {
-        return Notification::forIsp($ispId)
+        return Notification::withoutGlobalScope('isp_tenant')
+            ->where('isp_id', $ispId)
             ->latest()
             ->take($limit)
             ->get();
@@ -247,10 +251,12 @@ class NotificationService
      */
     public function getNotificationStats($ispId)
     {
-        $total = Notification::forIsp($ispId)->count();
-        $unread = Notification::forIsp($ispId)->unread()->count();
-        
-        $byType = Notification::forIsp($ispId)
+        $q = fn () => Notification::withoutGlobalScope('isp_tenant')->where('isp_id', $ispId);
+
+        $total = $q()->count();
+        $unread = $q()->unread()->count();
+
+        $byType = $q()
             ->selectRaw('type, count(*) as count')
             ->groupBy('type')
             ->pluck('count', 'type')

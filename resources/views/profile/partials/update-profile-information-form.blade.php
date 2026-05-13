@@ -109,7 +109,7 @@
             </div>
             <div>
                 <label class="isp-form-label">Workspace</label>
-                <input type="text" class="isp-form-input bg-slate-50 dark:bg-slate-800/40" value="{{ $user->isp->name ?? 'PrimeBilling Workspace' }}" disabled>
+                <input type="text" class="isp-form-input bg-slate-50 dark:bg-slate-800/40" value="{{ $user->isp?->name ?? 'PrimeBilling Workspace' }}" disabled>
             </div>
         </div>
 

@@ -79,7 +79,7 @@
                                 <option value="">Select Role</option>
                                 <option value="super_admin" {{ old('role', $user->role) == 'super_admin' ? 'selected' : '' }}>Super Admin</option>
                                 <option value="isp_admin" {{ old('role', $user->role) == 'isp_admin' ? 'selected' : '' }}>ISP Admin</option>
-                                <option value="staff" {{ old('role', $user->role) == 'staff' ? 'selected' : '' }}>Staff</option>
+                                <option value="isp_staff" {{ old('role', $user->role) == 'isp_staff' ? 'selected' : '' }}>Staff</option>
                             </select>
                             @error('role')
                                 <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
@@ -106,8 +106,8 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status *</label>
                             <select name="status" required
                                     class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                <option value="active" {{ old('status', $user->status) == 'active' ? 'selected' : '' }}>Active</option>
-                                <option value="inactive" {{ old('status', $user->status) == 'inactive' ? 'selected' : '' }}>Inactive</option>
+                                <option value="active" {{ old('status', $user->is_active ? 'active' : 'inactive') == 'active' ? 'selected' : '' }}>Active</option>
+                                <option value="inactive" {{ old('status', $user->is_active ? 'active' : 'inactive') == 'inactive' ? 'selected' : '' }}>Inactive</option>
                             </select>
                             @error('status')
                                 <p class="text-red-500 text-xs mt-1">{{ $message }}</p>

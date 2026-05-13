@@ -38,14 +38,14 @@ class DashboardController extends Controller
                 ->sum('amount'),
             'pending_invoices' => Invoice::where('isp_id', $ispId)->where('status', 'pending')->count(),
             'overdue_invoices' => Invoice::where('isp_id', $ispId)->where('status', 'overdue')->count(),
-            'active_subscriptions' => Subscription::whereHas('customer', function ($q) use ($ispId) {
-                $q->where('isp_id', $ispId);
-            })->where('status', 'active')->where('end_date', '>=', now())->count(),
-            'expiring_soon' => Subscription::whereHas('customer', function ($q) use ($ispId) {
-                $q->where('isp_id', $ispId);
-            })->where('status', 'active')
-            ->whereBetween('end_date', [now(), now()->addDays(7)])
-            ->count(),
+            'active_subscriptions' => Subscription::query()
+                ->where('status', 'active')
+                ->where('end_date', '>=', now())
+                ->count(),
+            'expiring_soon' => Subscription::query()
+                ->where('status', 'active')
+                ->whereBetween('end_date', [now(), now()->addDays(7)])
+                ->count(),
             'active_sessions' => HotspotSession::where('isp_id', $ispId)->where('status', 'active')->count(),
             'total_routers' => Router::where('isp_id', $ispId)->count(),
             'active_routers' => Router::where('isp_id', $ispId)->where('is_active', true)->count(),
@@ -124,10 +124,8 @@ class DashboardController extends Controller
 
         // Top Plans by Subscriptions
         $topPlans = Plan::where('isp_id', $ispId)
-            ->withCount(['subscriptions' => function ($query) use ($ispId) {
-                $query->whereHas('customer', function ($q) use ($ispId) {
-                    $q->where('isp_id', $ispId);
-                })->where('status', 'active');
+            ->withCount(['subscriptions' => function ($query) {
+                $query->where('status', 'active');
             }])
             ->orderBy('subscriptions_count', 'desc')
             ->take(10)

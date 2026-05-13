@@ -19,7 +19,7 @@
                     @if($landingIsp && $landingIsp->logoPublicUrl())
                         <img src="{{ $landingIsp->logoPublicUrl() }}" alt="{{ $landingIsp->name }}" class="h-9 w-auto max-w-[160px] object-contain">
                     @endif
-                    <span>{{ $landingIsp->name ?? config('app.name', 'PrimeBilling') }}</span>
+                    <span>{{ $landingIsp?->name ?? config('app.name', 'PrimeBilling') }}</span>
                 </a>
 
                 <div class="hidden items-center gap-7 md:flex">
@@ -462,7 +462,7 @@
                                             <li>Access: {{ strtoupper($plan->access_type) }}</li>
                                         @endif
                                         @if($plan->download_speed_kbps)
-                                            <li>Down: {{ $plan->formatted_speed ?? $plan->download_speed_kbps.' Kbps' }}</li>
+                                            <li>Speed: {{ $plan->formatted_speed }}</li>
                                         @endif
                                         @if($plan->billing_type)
                                             <li>Billing: {{ $plan->billing_type }}</li>
@@ -561,7 +561,7 @@
             <div class="mx-auto max-w-7xl text-sm text-slate-600">
                 <div class="grid grid-cols-1 gap-8 md:grid-cols-5">
                     <div>
-                        <p class="font-semibold text-slate-800">{{ $landingIsp->name ?? config('app.name', 'PrimeBilling') }}</p>
+                        <p class="font-semibold text-slate-800">{{ $landingIsp?->name ?? config('app.name', 'PrimeBilling') }}</p>
                         <p class="mt-2 text-xs text-slate-500">
                             @if($landingIsp)
                                 Customer portal powered by {{ config('app.name', 'PrimeBilling') }}.
@@ -615,7 +615,7 @@
                         </div>
                     </div>
                 </div>
-                <p class="mt-4">&copy; {{ date('Y') }} {{ $landingIsp->name ?? config('app.name', 'PrimeBilling') }}. All rights reserved.</p>
+                <p class="mt-4">&copy; {{ date('Y') }} {{ $landingIsp?->name ?? config('app.name', 'PrimeBilling') }}. All rights reserved.</p>
             </div>
         </footer>
 

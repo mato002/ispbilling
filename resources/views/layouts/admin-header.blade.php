@@ -1,14 +1,23 @@
 @php
     $user = Auth::user();
-    $ispName = $user->isp->name ?? ($user->isSuperAdmin() ? 'PrimeBilling Admin' : 'Your ISP');
+    $ispName = $user->isp?->name ?? ($user->isSuperAdmin() ? 'PrimeBilling Admin' : 'Your ISP');
     $homeRoute = $user->isSuperAdmin() ? route('admin.dashboard') : route('isp.dashboard');
 @endphp
 
 <header
+    id="pb-admin-topbar"
+    data-turbo-permanent
     x-data="{
         searchOpen: false,
         quickActionsOpen: false,
         profileOpen: false,
+        theme: (localStorage.getItem('pb.theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')),
+        toggleTheme() {
+            this.theme = this.theme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('pb.theme', this.theme);
+            if (this.theme === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+        }
     }"
     @keydown.window.cmd.k.prevent="searchOpen = true"
     @keydown.window.ctrl.k.prevent="searchOpen = true"

@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'ensure.isp.platform' => \App\Http\Middleware\EnsureIspPlatformAccess::class,
             'ensure.saas.onboarding' => \App\Http\Middleware\EnsureSaasOnboardingComplete::class,
             'ensure.landing.isp' => \App\Http\Middleware\EnsureLandingIspPresent::class,
+            'ensure.superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

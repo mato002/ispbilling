@@ -38,6 +38,14 @@ Route::post('/payments/mpesa/callback', [PaymentController::class, 'mpesaCallbac
 Route::post('/payments/mpesa/timeout', [PaymentController::class, 'mpesaTimeout'])
     ->name('payments.mpesa.timeout');
 
+Route::post('/payments/mpesa/c2b/validation/{webhook_token}', [\App\Http\Controllers\MpesaC2BWebhookController::class, 'validation'])
+    ->where('webhook_token', '[A-Za-z0-9]{32,128}')
+    ->name('payments.mpesa.c2b.validation');
+
+Route::post('/payments/mpesa/c2b/confirmation/{webhook_token}', [\App\Http\Controllers\MpesaC2BWebhookController::class, 'confirmation'])
+    ->where('webhook_token', '[A-Za-z0-9]{32,128}')
+    ->name('payments.mpesa.c2b.confirmation');
+
 Route::post('/payments/selcom/callback', [PaymentController::class, 'selcomCallback'])
     ->name('payments.selcom.callback');
 

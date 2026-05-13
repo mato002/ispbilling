@@ -30,8 +30,9 @@ class EnsureSaasOnboardingComplete
             return $next($request);
         }
 
-        if ($request->routeIs('isp.saas-onboarding.*')) {
-            return $next($request);
+        if (! $user->isIspAdmin()) {
+            return response()
+                ->view('isp.saas-onboarding-pending-staff', ['isp' => $isp], 403);
         }
 
         return redirect()->route('isp.saas-onboarding.show');

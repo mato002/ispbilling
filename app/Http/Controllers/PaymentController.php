@@ -387,6 +387,10 @@ class PaymentController extends Controller
                     $fresh = $payment->fresh();
                     if ($fresh && $fresh->isPlatformSaasPayment()) {
                         app(\App\Services\PlatformSaasBillingService::class)->onMpesaPaymentSucceeded($fresh);
+                    } elseif ($fresh && $fresh->isSaasOnboardingVerification() && $fresh->isp_id) {
+                        \App\Models\ISP::query()->whereKey($fresh->isp_id)->update([
+                            'saas_payment_verified_at' => now(),
+                        ]);
                     } elseif ($fresh) {
                         $this->paymentCompletionService->processTenantPaymentSuccess($fresh);
                     }

@@ -1,6 +1,92 @@
 import './bootstrap';
 
+import '@hotwired/turbo';
 import Alpine from 'alpinejs';
+
+function syncCsrfFromMeta() {
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (token && window.axios) {
+        window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
+    }
+}
+
+document.addEventListener('turbo:before-render', (event) => {
+    const newBody = event.detail?.newBody;
+    if (!newBody || !window.Alpine) {
+        return;
+    }
+    const main = newBody.querySelector('main');
+    if (main) {
+        window.Alpine.initTree(main);
+    }
+});
+
+document.addEventListener('turbo:load', () => {
+    syncCsrfFromMeta();
+    processPbFlashPayload();
+});
+
+function processPbFlashPayload() {
+    if (!window.Swal) {
+        return;
+    }
+    const el = document.getElementById('pb-flash-payload');
+    if (!el) {
+        return;
+    }
+    let payload = {};
+    try {
+        payload = JSON.parse(el.textContent || '{}');
+    } catch {
+        el.remove();
+
+        return;
+    }
+    el.remove();
+
+    if (payload.success) {
+        window.Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: payload.success,
+            confirmButtonColor: '#10b981',
+            timer: 3000,
+            timerProgressBar: true,
+        });
+    }
+    if (payload.error) {
+        window.Swal.fire({
+            icon: 'error',
+            title: 'Error!',
+            text: payload.error,
+            confirmButtonColor: '#ef4444',
+        });
+    }
+    if (payload.warning) {
+        window.Swal.fire({
+            icon: 'warning',
+            title: 'Warning!',
+            text: payload.warning,
+            confirmButtonColor: '#f59e0b',
+        });
+    }
+    if (payload.info) {
+        window.Swal.fire({
+            icon: 'info',
+            title: 'Information',
+            text: payload.info,
+            confirmButtonColor: '#4f46e5',
+        });
+    }
+    if (payload.validation_errors?.length) {
+        window.Swal.fire({
+            icon: 'error',
+            title: 'Validation Error',
+            text: payload.validation_errors.join('\n'),
+            confirmButtonColor: '#ef4444',
+        });
+    }
+}
 
 window.Alpine = Alpine;
 

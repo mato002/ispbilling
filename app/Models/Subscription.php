@@ -18,7 +18,20 @@ class Subscription extends Model
                 return;
             }
 
-            $builder->whereHas('customer');
+            $tenantId = IspTenant::id();
+            if ($tenantId === null) {
+                return;
+            }
+
+            $table = $builder->getModel()->getTable();
+
+            // Use SQL exists on `customers` instead of whereHas('customer'), so we do not nest
+            // Customer's global scope (avoids pathological query/binding growth on some requests).
+            $builder->whereExists(function ($query) use ($tenantId, $table) {
+                $query->from('customers')
+                    ->whereColumn('customers.id', "{$table}.customer_id")
+                    ->where('customers.isp_id', $tenantId);
+            });
         });
     }
 

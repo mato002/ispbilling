@@ -31,6 +31,19 @@
                         </div>
 
                         <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">URL slug (subdomain)</label>
+                            <input type="text" name="slug" value="{{ old('slug', $isp->slug) }}"
+                                   pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                                   title="Lowercase letters, numbers, single hyphens"
+                                   placeholder="e.g. techconnect"
+                                   class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                            <p class="mt-1 text-xs text-gray-500">Customer portal: <span class="font-mono">{{ parse_url(config('app.url'), PHP_URL_SCHEME) ?: 'https' }}://{slug}.{{ config('app.central_domain') }}</span></p>
+                            @error('slug')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Company Name *</label>
                             <input type="text" name="company_name" value="{{ old('company_name', $isp->company_name) }}" required
                                    class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">

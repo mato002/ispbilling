@@ -11,6 +11,12 @@ class IspTenantScope implements Scope
 {
     public function apply(Builder $builder, Model $model): void
     {
+        // Console: never apply (queues, artisan, schedule). Web user resolution uses
+        // User::withoutGlobalScopes() in IspTenant to avoid recursion with User's own tenant scope.
+        if (app()->runningInConsole()) {
+            return;
+        }
+
         if (! IspTenant::shouldScopeQueries()) {
             return;
         }

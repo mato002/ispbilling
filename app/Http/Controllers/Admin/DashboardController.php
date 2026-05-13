@@ -23,7 +23,7 @@ class DashboardController extends Controller
             'active_isps' => ISP::where('is_active', true)->count(),
             'total_customers' => Customer::count(),
             'active_customers' => Customer::where('status', 'active')->count(),
-            'total_revenue' => Payment::where('status', 'completed')->sum('amount'),
+            'total_revenue' => (float) (Payment::where('status', 'completed')->sum('amount') ?? 0),
             'pending_invoices' => Invoice::where('status', 'pending')->count(),
             'overdue_invoices' => Invoice::where('status', 'overdue')->count(),
         ];
@@ -47,7 +47,7 @@ class DashboardController extends Controller
             'active_isps' => ISP::where('is_active', true)->count(),
             'total_customers' => Customer::count(),
             'active_customers' => Customer::where('status', 'active')->count(),
-            'total_revenue' => Payment::where('status', 'completed')->sum('amount'),
+            'total_revenue' => (float) (Payment::where('status', 'completed')->sum('amount') ?? 0),
             'pending_invoices' => Invoice::where('status', 'pending')->count(),
             'overdue_invoices' => Invoice::where('status', 'overdue')->count(),
         ];

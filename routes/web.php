@@ -338,8 +338,8 @@ Route::prefix('customer')->name('customer.')->group(function () {
     Route::post('/payment/callback/{provider}', [\App\Http\Controllers\Customer\PaymentController::class, 'callback'])->name('payment.callback')->middleware(\App\Http\Middleware\HandlePaymentWebhook::class);
 });
 
-// Admin Routes - Check is done in controllers
-Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
+// Admin Routes — super_admin only (middleware redirects everyone else)
+Route::middleware(['auth', 'ensure.superadmin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
 
     // ISP Management
@@ -347,6 +347,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/isps/create', [\App\Http\Controllers\Admin\ISPController::class, 'create'])->name('isps.create');
     Route::post('/isps', [\App\Http\Controllers\Admin\ISPController::class, 'store'])->name('isps.store');
     Route::get('/isps/{isp}', [\App\Http\Controllers\Admin\ISPController::class, 'show'])->name('isps.show');
+    Route::get('/isps/{isp}/saas-onboarding', [\App\Http\Controllers\Admin\IspSaasOnboardingController::class, 'show'])->name('isps.saas-onboarding.show');
+    Route::post('/isps/{isp}/saas-onboarding', [\App\Http\Controllers\Admin\IspSaasOnboardingController::class, 'store'])->name('isps.saas-onboarding.store');
     Route::get('/isps/{isp}/edit', [\App\Http\Controllers\Admin\ISPController::class, 'edit'])->name('isps.edit');
     Route::put('/isps/{isp}', [\App\Http\Controllers\Admin\ISPController::class, 'update'])->name('isps.update');
     Route::post('/isps/{isp}/force-suspend-network', [\App\Http\Controllers\Admin\ISPController::class, 'forceSuspendNetwork'])->name('isps.force-suspend-network');

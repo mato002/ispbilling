@@ -1,4 +1,4 @@
-@php($title = ($landingIsp->name ?? 'Customer').' · Sign in')
+@php($title = ($landingIsp?->name ?? 'Customer').' · Sign in')
 
 <x-guest-layout>
     <div class="mb-7">

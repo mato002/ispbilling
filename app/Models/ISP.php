@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
 class ISP extends Model
@@ -36,6 +37,11 @@ class ISP extends Model
         'saas_company_pin',
         'saas_billing_method',
         'saas_onboarding_completed_at',
+        'saas_onboarding_step',
+        'saas_pending_platform_plan_id',
+        'support_phone',
+        'saas_payment_verified_at',
+        'saas_c2b_registered_at',
         'saas_setup_fee_paid_at',
         'saas_white_label_opt_in',
         'settings',
@@ -52,6 +58,9 @@ class ISP extends Model
         'saas_next_billing_at' => 'datetime',
         'saas_grace_ends_at' => 'datetime',
         'saas_onboarding_completed_at' => 'datetime',
+        'saas_onboarding_step' => 'integer',
+        'saas_payment_verified_at' => 'datetime',
+        'saas_c2b_registered_at' => 'datetime',
         'saas_setup_fee_paid_at' => 'datetime',
     ];
 
@@ -113,6 +122,38 @@ class ISP extends Model
     public function platformSaasInvoices(): HasMany
     {
         return $this->hasMany(PlatformSaasInvoice::class, 'isp_id');
+    }
+
+    public function platformSaasSubscription(): HasOne
+    {
+        return $this->hasOne(PlatformSaasSubscription::class, 'isp_id');
+    }
+
+    public function pendingSaasPlan(): BelongsTo
+    {
+        return $this->belongsTo(PlatformSaasPlan::class, 'saas_pending_platform_plan_id');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function billingPayloadForSaasComplete(): array
+    {
+        $pb = $this->settings['platform_billing'] ?? [];
+
+        return [
+            'company_name' => $this->company_name,
+            'saas_company_pin' => $this->saas_company_pin,
+            'saas_billing_phone' => $this->saas_billing_phone,
+            'saas_billing_method' => $this->saas_billing_method ?? 'mpesa',
+            'billing_email' => $pb['billing_email'] ?? null,
+            'bank_name' => $pb['bank_name'] ?? null,
+            'bank_account_name' => $pb['bank_account_name'] ?? null,
+            'bank_account_number' => $pb['bank_account_number'] ?? null,
+            'bank_branch' => $pb['bank_branch'] ?? null,
+            'cardholder_name' => $pb['cardholder_name'] ?? null,
+            'payment_reference_note' => $pb['payment_reference_note'] ?? null,
+        ];
     }
 
     public function needsSaasOnboarding(): bool

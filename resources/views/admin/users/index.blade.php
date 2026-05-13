@@ -23,7 +23,7 @@
                         <option value="">All Roles</option>
                         <option value="super_admin" {{ request('role') == 'super_admin' ? 'selected' : '' }}>Super Admin</option>
                         <option value="isp_admin" {{ request('role') == 'isp_admin' ? 'selected' : '' }}>ISP Admin</option>
-                        <option value="staff" {{ request('role') == 'staff' ? 'selected' : '' }}>Staff</option>
+                        <option value="isp_staff" {{ request('role') == 'isp_staff' ? 'selected' : '' }}>Staff</option>
                     </select>
                 </div>
                 <div>
@@ -85,7 +85,7 @@
                                                 ISP Admin
                                             </span>
                                             @break
-                                        @case('staff')
+                                        @case('isp_staff')
                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                                                 Staff
                                             </span>
@@ -96,7 +96,7 @@
                                     {{ $user->isp ? $user->isp->name : '-' }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    @if($user->status === 'active')
+                                    @if($user->is_active)
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                                             Active
                                         </span>

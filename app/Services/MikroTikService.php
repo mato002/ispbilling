@@ -152,6 +152,39 @@ class MikroTikService
         }
     }
 
+    /**
+     * Hotspot user profile names from the router (for billing plan import).
+     *
+     * @return array<int, array{name:string,shared_users:?int,rate_limit:?string}>
+     */
+    public function listHotspotUserProfiles(): array
+    {
+        if (! $this->routerOsLibraryAvailable() || ! $this->connect()) {
+            return [];
+        }
+
+        try {
+            $rows = $this->apiPrint('/ip/hotspot/user/profile/print');
+            $out = [];
+            foreach ($rows as $row) {
+                if (! is_array($row) || empty($row['name'])) {
+                    continue;
+                }
+                $out[] = [
+                    'name' => (string) $row['name'],
+                    'shared_users' => isset($row['shared-users']) ? (int) $row['shared-users'] : null,
+                    'rate_limit' => isset($row['rate-limit']) ? (string) $row['rate-limit'] : null,
+                ];
+            }
+
+            return $out;
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik listHotspotUserProfiles failed: '.$e->getMessage());
+
+            return [];
+        }
+    }
+
     protected function routerOsLibraryAvailable(): bool
     {
         if (class_exists('\RouterOS\Client')) {

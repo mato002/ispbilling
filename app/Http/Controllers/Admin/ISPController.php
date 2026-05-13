@@ -80,11 +80,15 @@ class ISPController extends Controller
         $validated['slug'] = $slug;
 
         $isp = ISP::create(array_merge($validated, [
-            'saas_onboarding_completed_at' => now(),
-            'saas_subscription_status' => 'active',
+            'saas_subscription_status' => 'none',
         ]));
 
-        return redirect()->route('admin.isps.index')->with('success', 'ISP created successfully');
+        return redirect()
+            ->route('admin.isps.saas-onboarding.show', $isp)
+            ->with(
+                'success',
+                'ISP created. Complete the same PrimeBilling SaaS onboarding (plan, billing, payment details) you would capture on self-service—then add operators if you have not already.'
+            );
     }
 
     public function show(ISP $isp)

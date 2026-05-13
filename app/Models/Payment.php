@@ -62,6 +62,11 @@ class Payment extends Model
         return ($this->metadata['purpose'] ?? null) === 'platform_saas';
     }
 
+    public function isSaasOnboardingVerification(): bool
+    {
+        return ($this->metadata['purpose'] ?? null) === 'saas_onboarding_verification';
+    }
+
     /**
      * Locate a tenant payment row for an STK callback using the CheckoutRequestID.
      * After completion, {@see $transaction_id} holds the Mpesa receipt, so we also match metadata.
@@ -88,6 +93,17 @@ class Payment extends Model
         }
 
         if ($this->isPlatformSaasPayment()) {
+            $this->update([
+                'status' => 'completed',
+                'processed_at' => now(),
+                'platform_fee_rate' => null,
+                'platform_fee_amount' => null,
+            ]);
+
+            return;
+        }
+
+        if ($this->isSaasOnboardingVerification()) {
             $this->update([
                 'status' => 'completed',
                 'processed_at' => now(),

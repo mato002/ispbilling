@@ -374,39 +374,30 @@
     </style>
 </head>
 <body class="pb-canvas isp-page antialiased overflow-x-hidden">
-    <div
-        x-data="{
-            theme: (localStorage.getItem('pb.theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')),
-            toggleTheme() {
-                this.theme = this.theme === 'dark' ? 'light' : 'dark';
-                localStorage.setItem('pb.theme', this.theme);
-                if (this.theme === 'dark') document.documentElement.classList.add('dark');
-                else document.documentElement.classList.remove('dark');
-            }
-        }"
-    >
-        <div class="min-h-screen">
-            @include('layouts.admin-sidebar')
-            @include('layouts.admin-header')
+    @include('layouts.admin-header')
 
-            {{-- Mobile sidebar overlay --}}
-            <div
-                x-show="$store.sidebar.mobileOpen"
-                x-cloak
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                class="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm md:hidden"
-                @click="$store.sidebar.closeMobile()"
-            ></div>
+    <div class="min-h-screen">
+        @include('layouts.admin-sidebar')
 
-            <main
-                :class="$store.sidebar.collapsed ? 'md:ml-16' : 'md:ml-64'"
-                class="min-h-screen pt-16 transition-all duration-300 ease-in-out"
-            >
+        {{-- Mobile sidebar overlay --}}
+        <div
+            x-show="$store.sidebar.mobileOpen"
+            x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm md:hidden"
+            @click="$store.sidebar.closeMobile()"
+        ></div>
+
+        <main
+            id="pb-main"
+            :class="$store.sidebar.collapsed ? 'md:ml-16' : 'md:ml-64'"
+            class="min-h-screen pt-16 transition-all duration-300 ease-in-out"
+        >
                 <div class="px-4 py-6 sm:px-6 lg:px-8 overflow-x-hidden">
                     <x-system-announcements-banner :announcements="$systemAnnouncements ?? collect()" />
 
@@ -425,53 +416,20 @@
 
                     @yield('content')
                 </div>
-            </main>
-        </div>
+        </main>
     </div>
 
     @stack('scripts')
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            @if(session('success'))
-                Swal.fire({
-                    icon: 'success', title: 'Success!',
-                    text: @json(session('success')),
-                    confirmButtonColor: '#10b981', timer: 3000, timerProgressBar: true,
-                });
-            @endif
-            @if(session('error'))
-                Swal.fire({
-                    icon: 'error', title: 'Error!',
-                    text: @json(session('error')),
-                    confirmButtonColor: '#ef4444',
-                });
-            @endif
-            @if(session('warning'))
-                Swal.fire({
-                    icon: 'warning', title: 'Warning!',
-                    text: @json(session('warning')),
-                    confirmButtonColor: '#f59e0b',
-                });
-            @endif
-            @if(session('info'))
-                Swal.fire({
-                    icon: 'info', title: 'Information',
-                    text: @json(session('info')),
-                    confirmButtonColor: '#4f46e5',
-                });
-            @endif
-            @if(isset($errors) && $errors->any())
-                const errorMessages = @json($errors->all());
-                Swal.fire({
-                    icon: 'error', title: 'Validation Error',
-                    html: '<ul style="text-align: left; margin-top: 10px; list-style: disc; padding-left: 20px;">' +
-                          errorMessages.map(m => '<li style="margin-bottom: 5px;">' + m + '</li>').join('') +
-                          '</ul>',
-                    confirmButtonColor: '#ef4444',
-                });
-            @endif
-        });
-    </script>
+    @php
+        $pbFlashPayload = [
+            'success' => session('success'),
+            'error' => session('error'),
+            'warning' => session('warning'),
+            'info' => session('info'),
+            'validation_errors' => (isset($errors) && $errors->any()) ? $errors->all() : null,
+        ];
+    @endphp
+    <script type="application/json" id="pb-flash-payload">@json($pbFlashPayload)</script>
 </body>
 </html>

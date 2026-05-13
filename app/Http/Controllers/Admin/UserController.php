@@ -11,9 +11,31 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('isp')->paginate(10);
+        $query = User::with('isp');
+
+        if ($request->filled('search')) {
+            $term = '%'.$request->string('search').'%';
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'like', $term)
+                    ->orWhere('email', 'like', $term)
+                    ->orWhere('phone', 'like', $term);
+            });
+        }
+
+        if ($request->filled('role')) {
+            $query->where('role', $request->input('role'));
+        }
+
+        if ($request->input('status') === 'active') {
+            $query->where('is_active', true);
+        } elseif ($request->input('status') === 'inactive') {
+            $query->where('is_active', false);
+        }
+
+        $users = $query->paginate(10)->withQueryString();
+
         return view('admin.users.index', compact('users'));
     }
 
@@ -29,19 +51,21 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', Rule::in(['super_admin', 'isp_admin', 'staff'])],
-            'isp_id' => ['nullable', 'exists:isps,id'],
+            'role' => ['required', Rule::in(['super_admin', 'isp_admin', 'isp_staff'])],
+            'isp_id' => ['nullable', Rule::exists(ISP::class, 'id')],
             'phone' => ['nullable', 'string', 'max:20'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
+        $validated['is_active'] = $validated['status'] === 'active';
+        unset($validated['status']);
 
         // If role is super_admin, isp_id should be null
         if ($validated['role'] === 'super_admin') {
             $validated['isp_id'] = null;
         } else {
-            // For isp_admin and staff roles, isp_id is required
+            // For isp_admin and isp_staff roles, isp_id is required
             if (!$request->has('isp_id') || is_null($request->input('isp_id'))) {
                 return redirect()->back()
                     ->withInput()
@@ -69,15 +93,31 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        // Quick activate/deactivate from user detail sidebar (only sends status)
+        if (! $request->filled('name') && $request->filled('status')) {
+            $request->validate([
+                'status' => ['required', Rule::in(['active', 'inactive'])],
+            ]);
+            $user->update([
+                'is_active' => $request->input('status') === 'active',
+            ]);
+
+            return redirect()->back()
+                ->with('success', 'User status updated.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', Rule::in(['super_admin', 'isp_admin', 'staff'])],
-            'isp_id' => ['nullable', 'exists:isps,id'],
+            'role' => ['required', Rule::in(['super_admin', 'isp_admin', 'isp_staff'])],
+            'isp_id' => ['nullable', Rule::exists(ISP::class, 'id')],
             'phone' => ['nullable', 'string', 'max:20'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
+
+        $validated['is_active'] = $validated['status'] === 'active';
+        unset($validated['status']);
 
         // If password is provided, hash it
         if (!empty($validated['password'])) {
@@ -90,7 +130,7 @@ class UserController extends Controller
         if ($validated['role'] === 'super_admin') {
             $validated['isp_id'] = null;
         } else {
-            // For isp_admin and staff roles, isp_id is required
+            // For isp_admin and isp_staff roles, isp_id is required
             if (!$request->has('isp_id') || is_null($request->input('isp_id'))) {
                 return redirect()->back()
                     ->withInput()

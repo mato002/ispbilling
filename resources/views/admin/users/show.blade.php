@@ -26,7 +26,7 @@
                             <h3 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ $user->name }}</h3>
                             <p class="text-gray-600 dark:text-gray-400 mt-1">{{ $user->email }}</p>
                         </div>
-                        @if($user->status === 'active')
+                        @if($user->is_active)
                             <span class="px-3 py-1 text-sm rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                                 Active
                             </span>
@@ -60,7 +60,7 @@
                                             ISP Admin
                                         </span>
                                         @break
-                                    @case('staff')
+                                    @case('isp_staff')
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                                             Staff
                                         </span>
@@ -133,7 +133,7 @@
                         <a href="{{ route('admin.users.edit', $user->id) }}" class="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                             Edit User
                         </a>
-                        @if($user->status === 'active')
+                        @if($user->is_active)
                             <form method="POST" action="{{ route('admin.users.update', $user->id) }}">
                                 @csrf
                                 @method('PUT')
@@ -195,7 +195,7 @@
                                     </ul>
                                 </div>
                                 @break
-                            @case('staff')
+                            @case('isp_staff')
                                 <div class="text-gray-700 dark:text-gray-300">
                                     <p class="font-medium">Staff has access to:</p>
                                     <ul class="list-disc list-inside mt-2 space-y-1">

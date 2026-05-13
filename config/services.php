@@ -50,6 +50,8 @@ return [
         'transaction_type' => env('MPESA_TRANSACTION_TYPE', 'CustomerPayBillOnline'),
         'callback_url' => env('MPESA_CALLBACK_URL'),
         'timeout_url' => env('MPESA_TIMEOUT_URL'),
+        /** Small STK amount to confirm the ISP can pay platform invoices (SaaS onboarding). */
+        'saas_onboarding_verification_amount' => (float) env('MPESA_SAAS_VERIFICATION_AMOUNT', 1),
         'allowed_ips' => env('MPESA_ALLOWED_IPS') ? explode(',', env('MPESA_ALLOWED_IPS')) : [
             // Safaricom production IPs
             '196.201.214.200',

@@ -368,7 +368,7 @@
                 <span class="text-[11px] font-semibold text-emerald-300">All systems operational</span>
             </div>
             <p class="mt-1 text-[10px] text-slate-400 leading-relaxed">
-                {{ $user->isp->name ?? 'PrimeBilling' }} · v{{ config('app.version', '1.0') }}
+                {{ $user->isp?->name ?? 'PrimeBilling' }} · v{{ config('app.version', '1.0') }}
             </p>
         </div>
     </div>
