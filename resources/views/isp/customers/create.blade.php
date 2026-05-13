@@ -106,6 +106,8 @@
                     </div>
                 </div>
 
+                <x-isp-custom-fields-form :definitions="$customFieldDefinitions ?? []" :values="[]" />
+
                 <!-- Notes -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes</label>

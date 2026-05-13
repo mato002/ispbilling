@@ -4,31 +4,79 @@
     'href' => '#',
     'action' => 'Open',
     'severity' => 'warning',
-    'icon',
+    'timestamp' => null,
+    'icon' => null,
 ])
 
 @php
-    $styles = [
-        'danger' => 'border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-900/20 text-rose-700 dark:text-rose-200',
-        'warning' => 'border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/20 text-amber-700 dark:text-amber-200',
-        'info' => 'border-sky-200 bg-sky-50 dark:border-sky-900/40 dark:bg-sky-900/20 text-sky-700 dark:text-sky-200',
+    $themes = [
+        'danger' => [
+            'border'  => 'border-rose-200 dark:border-rose-500/30',
+            'bg'      => 'bg-rose-50/70 dark:bg-rose-500/10',
+            'iconBg'  => 'bg-rose-500/15 text-rose-600 dark:text-rose-300',
+            'accent'  => 'before:bg-rose-500',
+            'badge'   => 'bg-rose-500 text-white',
+            'label'   => 'CRITICAL',
+        ],
+        'warning' => [
+            'border'  => 'border-amber-200 dark:border-amber-500/30',
+            'bg'      => 'bg-amber-50/70 dark:bg-amber-500/10',
+            'iconBg'  => 'bg-amber-500/15 text-amber-600 dark:text-amber-300',
+            'accent'  => 'before:bg-amber-500',
+            'badge'   => 'bg-amber-500 text-white',
+            'label'   => 'WARNING',
+        ],
+        'info' => [
+            'border'  => 'border-sky-200 dark:border-sky-500/30',
+            'bg'      => 'bg-sky-50/70 dark:bg-sky-500/10',
+            'iconBg'  => 'bg-sky-500/15 text-sky-600 dark:text-sky-300',
+            'accent'  => 'before:bg-sky-500',
+            'badge'   => 'bg-sky-500 text-white',
+            'label'   => 'INFO',
+        ],
+        'success' => [
+            'border'  => 'border-emerald-200 dark:border-emerald-500/30',
+            'bg'      => 'bg-emerald-50/70 dark:bg-emerald-500/10',
+            'iconBg'  => 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300',
+            'accent'  => 'before:bg-emerald-500',
+            'badge'   => 'bg-emerald-500 text-white',
+            'label'   => 'OK',
+        ],
     ];
-    $theme = $styles[$severity] ?? $styles['warning'];
+    $t = $themes[$severity] ?? $themes['warning'];
 @endphp
 
-<article class="rounded-xl border p-4 {{ $theme }}">
-    <div class="flex items-start justify-between gap-3">
-        <div class="flex items-start gap-3 min-w-0">
-            <div class="h-9 w-9 rounded-lg bg-white/70 dark:bg-black/20 flex items-center justify-center shrink-0">
-                {{ $icon }}
+<article class="relative overflow-hidden rounded-2xl border {{ $t['border'] }} {{ $t['bg'] }} p-4 pl-5 before:absolute before:left-0 before:top-3 before:bottom-3 before:w-1 before:rounded-r {{ $t['accent'] }}">
+    <div class="flex items-start gap-3">
+        <span class="flex h-9 w-9 items-center justify-center rounded-lg {{ $t['iconBg'] }} shrink-0">
+            {{ $icon }}
+        </span>
+        <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wider {{ $t['badge'] }}">{{ $t['label'] }}</span>
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{{ $title }}</h3>
             </div>
-            <div class="min-w-0">
-                <h3 class="text-sm font-semibold">{{ $title }}</h3>
-                <p class="text-xs mt-1 opacity-90">{{ $message }}</p>
+            @if($message)
+                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{{ $message }}</p>
+            @endif
+            <div class="mt-2.5 flex items-center justify-between gap-3">
+                @if($timestamp)
+                    <span class="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        {{ $timestamp }}
+                    </span>
+                @else
+                    <span></span>
+                @endif
+                <a href="{{ $href }}" class="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:text-indigo-300">
+                    {{ $action }}
+                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
             </div>
         </div>
-        <a href="{{ $href }}" class="inline-flex items-center px-3 py-1.5 rounded-md bg-white dark:bg-gray-900 text-xs font-medium text-gray-700 dark:text-gray-100 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
-            {{ $action }}
-        </a>
     </div>
 </article>

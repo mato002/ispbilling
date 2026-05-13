@@ -3,127 +3,103 @@
 @section('title', 'Plans')
 
 @section('header')
-    <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Plans') }}
-        </h2>
-        <a href="{{ route('isp.plans.create') }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            Create Plan
-        </a>
-    </div>
+    <x-isp-page-header
+        title="Plans &amp; packages"
+        module="Catalog"
+        description="Sellable packages with access type, speeds, and pricing for hotspot and PPPoE."
+        primaryLabel="Create plan"
+        :primaryHref="route('isp.plans.create')"
+    />
 @endsection
 
 @section('content')
+<div class="space-y-6">
     @if(session('success'))
-        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
             {{ session('success') }}
         </div>
     @endif
 
-    <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-        <div class="p-6">
-            <form method="GET" action="{{ route('isp.plans.index') }}" class="flex gap-4">
-                <div>
-                    <select name="access_type" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Types</option>
-                        <option value="pppoe" {{ request('access_type') == 'pppoe' ? 'selected' : '' }}>PPPoE</option>
-                        <option value="hotspot" {{ request('access_type') == 'hotspot' ? 'selected' : '' }}>Hotspot</option>
-                    </select>
-                </div>
-                <div>
-                    <select name="is_active" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Status</option>
-                        <option value="1" {{ request('is_active') == '1' ? 'selected' : '' }}>Active</option>
-                        <option value="0" {{ request('is_active') == '0' ? 'selected' : '' }}>Inactive</option>
-                    </select>
-                </div>
-                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                    Filter
-                </button>
-                @if(request()->has('access_type') || request()->has('is_active'))
-                    <a href="{{ route('isp.plans.index') }}" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
-                        Clear
-                    </a>
-                @endif
-            </form>
+    <x-filter-bar :action="route('isp.plans.index')">
+        <div class="min-w-[140px]">
+            <label class="isp-form-label">Access type</label>
+            <select name="access_type" class="isp-form-select">
+                <option value="">All</option>
+                <option value="pppoe" @selected(request('access_type') === 'pppoe')>PPPoE</option>
+                <option value="hotspot" @selected(request('access_type') === 'hotspot')>Hotspot</option>
+            </select>
         </div>
-    </div>
+        <div class="min-w-[140px]">
+            <label class="isp-form-label">Status</label>
+            <select name="is_active" class="isp-form-select">
+                <option value="">All</option>
+                <option value="1" @selected(request('is_active') === '1')>Active</option>
+                <option value="0" @selected(request('is_active') === '0')>Inactive</option>
+            </select>
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
+            <a href="{{ route('isp.plans.index') }}" class="pb-btn">Reset</a>
+        </div>
+    </x-filter-bar>
 
-    <!-- Plans Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        @forelse($plans as $plan)
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ $plan->description }}</p>
-                        </div>
-                        @if($plan->is_active)
-                            <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                                Active
-                            </span>
-                        @else
-                            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100">
-                                Inactive
-                            </span>
-                        @endif
-                    </div>
-
-                    <div class="space-y-2 mb-4">
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray-600 dark:text-gray-400">Price:</span>
-                            <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">KES {{ number_format($plan->price, 2) }}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray-600 dark:text-gray-400">Duration:</span>
-                            <span class="text-sm text-gray-900 dark:text-gray-100">{{ $plan->duration_days }} days</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray-600 dark:text-gray-400">Type:</span>
-                            <span class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                                {{ strtoupper($plan->access_type) }}
-                            </span>
-                        </div>
-                        @if($plan->download_speed_kbps)
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-600 dark:text-gray-400">Speed:</span>
-                                <span class="text-sm text-gray-900 dark:text-gray-100">{{ $plan->formatted_speed }}</span>
-                            </div>
-                        @endif
-                        @if($plan->speed_profile)
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-600 dark:text-gray-400">Speed Profile:</span>
-                                <span class="text-sm text-gray-900 dark:text-gray-100">{{ $plan->speed_profile }}</span>
-                            </div>
-                        @endif
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray-600 dark:text-gray-400">Subscriptions:</span>
-                            <span class="text-sm text-gray-900 dark:text-gray-100">{{ $plan->subscriptions_count }}</span>
-                        </div>
-                    </div>
-
-                    <div class="flex space-x-2 mt-4">
-                        <a href="{{ route('isp.plans.edit', $plan->id) }}" class="flex-1 text-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
-                            Edit
-                        </a>
-                        <a href="{{ route('isp.plans.show', $plan->id) }}" class="flex-1 text-center px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 text-sm">
-                            View
-                        </a>
-                    </div>
-                </div>
-            </div>
-        @empty
-            <div class="col-span-full">
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg p-6 text-center">
-                    <p class="text-gray-500 dark:text-gray-400">No plans found</p>
-                </div>
-            </div>
-        @endforelse
-    </div>
-
-    <div class="mt-6">
-        {{ $plans->links() }}
-    </div>
+    @if($plans->isEmpty())
+        <div class="pb-card p-0">
+            <x-empty-state
+                title="No plans found"
+                message="Create a plan to attach subscriptions and vouchers."
+                ctaLabel="Create plan"
+                :ctaHref="route('isp.plans.create')"
+            />
+        </div>
+    @else
+        <x-data-table>
+            <thead>
+                <tr>
+                    <th>Plan</th>
+                    <th>Type</th>
+                    <th>Price</th>
+                    <th>Duration</th>
+                    <th>Speed</th>
+                    <th>Subs</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($plans as $plan)
+                    <tr>
+                        <td class="max-w-[220px]">
+                            <div class="font-semibold text-slate-900 dark:text-white">{{ $plan->name }}</div>
+                            <div class="truncate text-slate-500 dark:text-slate-400 text-sm">{{ $plan->description ?: '—' }}</div>
+                        </td>
+                        <td>
+                            @if($plan->access_type === 'hotspot')
+                                <span class="pb-pill pb-pill-cyan">Hotspot</span>
+                            @else
+                                <span class="pb-pill pb-pill-info">PPPoE</span>
+                            @endif
+                        </td>
+                        <td class="font-mono whitespace-nowrap">KES {{ number_format($plan->price, 2) }}</td>
+                        <td>{{ $plan->duration_days }} days</td>
+                        <td class="max-w-[160px] truncate text-sm">{{ $plan->speed_profile ?? ($plan->download_speed_kbps ? $plan->formatted_speed : '—') }}</td>
+                        <td class="tabular-nums">{{ $plan->subscriptions_count }}</td>
+                        <td>
+                            @if($plan->is_active)
+                                <x-status-badge status="active" />
+                            @else
+                                <x-status-badge status="inactive" />
+                            @endif
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            <a href="{{ route('isp.plans.edit', $plan) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">Edit</a>
+                            <a href="{{ route('isp.plans.show', $plan) }}" class="ml-3 text-sm font-semibold text-slate-600 hover:text-slate-800 dark:text-slate-300">View</a>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </x-data-table>
+        <div class="pb-card p-4">{{ $plans->withQueryString()->links() }}</div>
+    @endif
+</div>
 @endsection

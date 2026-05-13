@@ -26,6 +26,7 @@
                             <h3 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ $isp->name }}</h3>
                             <p class="text-gray-600 dark:text-gray-400 mt-1">{{ $isp->company_name }}</p>
                         </div>
+                        <div class="flex flex-col items-end gap-2">
                         @if($isp->is_active)
                             <span class="px-3 py-1 text-sm rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                                 Active
@@ -35,7 +36,22 @@
                                 Inactive
                             </span>
                         @endif
+                        @if($isp->platform_access_locked)
+                            <span class="px-3 py-1 text-xs rounded-full bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+                                Dashboard locked (SaaS)
+                            </span>
+                        @endif
+                        </div>
                     </div>
+
+                    @if($isp->platform_access_locked)
+                        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+                            <strong>Operators cannot access the ISP workspace.</strong>
+                            @if($isp->platform_access_message)
+                                <p class="mt-2">{{ $isp->platform_access_message }}</p>
+                            @endif
+                        </div>
+                    @endif
 
                     <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                         <div>
@@ -132,6 +148,39 @@
                     </div>
                 </div>
             </div>
+
+            @if ($isp->paymentMethods->isNotEmpty())
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Payment methods (encrypted)</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Tenant profiles only — secrets are never shown here.</p>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                                <thead>
+                                    <tr>
+                                        <th class="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400">Provider</th>
+                                        <th class="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                    @foreach ($isp->paymentMethods as $pm)
+                                        <tr>
+                                            <td class="py-2 pr-4 font-mono text-xs text-gray-900 dark:text-gray-100">{{ $pm->provider }}</td>
+                                            <td class="py-2 pr-4">
+                                                @if ($pm->active)
+                                                    <span class="text-green-700 dark:text-green-400 font-medium">Active</span>
+                                                @else
+                                                    <span class="text-gray-500 dark:text-gray-400">Inactive</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
 
         <!-- Sidebar -->
@@ -159,6 +208,12 @@
                                 <input type="hidden" name="is_active" value="1">
                                 <button type="submit" class="w-full px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400">
                                     Activate
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.isps.force-suspend-network', $isp->id) }}" onsubmit="return confirm('Queue suspension sync on all routers for this ISP? Use when a router was offline during deactivation.');">
+                                @csrf
+                                <button type="submit" class="w-full px-4 py-2 bg-orange-100 text-orange-900 rounded-lg hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-100 text-sm font-medium">
+                                    Force sync suspension (routers)
                                 </button>
                             </form>
                         @endif

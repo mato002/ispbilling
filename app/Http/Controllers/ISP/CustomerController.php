@@ -21,7 +21,7 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
+
         $query = Customer::where('isp_id', $ispId)
             ->with(['router', 'activeSubscription.plan']);
 
@@ -33,8 +33,8 @@ class CustomerController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                  ->orWhere('phone_number', 'like', "%{$search}%")
-                  ->orWhere('username', 'like', "%{$search}%");
+                    ->orWhere('phone_number', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%");
             });
         }
 
@@ -74,6 +74,10 @@ class CustomerController extends Controller
 
         DB::beginTransaction();
         try {
+            $plainPassword = filled($validated['password'] ?? null)
+                ? $validated['password']
+                : Str::password(12);
+
             $customer = Customer::create([
                 'isp_id' => $ispId,
                 'router_id' => $validated['router_id'],
@@ -83,7 +87,7 @@ class CustomerController extends Controller
                 'location' => $validated['location'],
                 'connection_type' => $validated['connection_type'],
                 'username' => $validated['username'] ?? null, // Will be auto-generated if null
-                'password' => $validated['password'] ?? Str::random(8),
+                'password' => Hash::make($plainPassword),
                 'status' => 'inactive',
                 'installation_date' => $validated['installation_date'],
                 'notes' => $validated['notes'] ?? null,
@@ -91,12 +95,12 @@ class CustomerController extends Controller
 
             // Create user on MikroTik router
             $mikrotik = new MikroTikService($router);
-            
-            $created = $validated['connection_type'] === 'hotspot'
-                ? $mikrotik->createHotspotUser($customer, $plan)
-                : $mikrotik->createPppoeUser($customer, $plan);
 
-            if (!$created) {
+            $created = $validated['connection_type'] === 'hotspot'
+                ? $mikrotik->createHotspotUser($customer, $plan, $plainPassword)
+                : $mikrotik->createPppoeUser($customer, $plan, $plainPassword);
+
+            if (! $created) {
                 throw new \Exception('Failed to create user on router');
             }
 
@@ -124,9 +128,10 @@ class CustomerController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create customer: ' . $e->getMessage(),
+                'message' => 'Failed to create customer: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -188,7 +193,7 @@ class CustomerController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        if (!$customer->router) {
+        if (! $customer->router) {
             return response()->json(['error' => 'No router assigned'], 400);
         }
 
@@ -205,7 +210,7 @@ class CustomerController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to suspend customer: ' . $e->getMessage(),
+                'message' => 'Failed to suspend customer: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -219,7 +224,7 @@ class CustomerController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        if (!$customer->router) {
+        if (! $customer->router) {
             return response()->json(['error' => 'No router assigned'], 400);
         }
 
@@ -235,7 +240,7 @@ class CustomerController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to activate customer: ' . $e->getMessage(),
+                'message' => 'Failed to activate customer: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -264,7 +269,7 @@ class CustomerController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete customer: ' . $e->getMessage(),
+                'message' => 'Failed to delete customer: '.$e->getMessage(),
             ], 500);
         }
     }

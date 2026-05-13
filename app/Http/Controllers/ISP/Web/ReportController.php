@@ -4,19 +4,21 @@ namespace App\Http\Controllers\ISP\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\Payment;
+use App\Models\ISP;
 use App\Models\Invoice;
-use App\Models\Subscription;
+use App\Models\Payment;
 use App\Models\Plan;
+use App\Models\Subscription;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class ReportController extends Controller
 {
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
+        $isp = ISP::query()->with('saasPlan')->findOrFail($ispId);
         $startDate = $request->get('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->get('end_date', now()->toDateString());
 
@@ -32,7 +34,19 @@ class ReportController extends Controller
             })->where('status', 'active')->count(),
         ];
 
-        return view('isp.reports.index', compact('stats', 'startDate', 'endDate'));
+        $saasAdvancedAnalytics = $isp->saasHasFeature('advanced_analytics');
+
+        return view('isp.reports.index', compact('stats', 'startDate', 'endDate', 'saasAdvancedAnalytics'));
+    }
+
+    /**
+     * Decide whether the request is asking for raw JSON (AJAX/fetch).
+     */
+    protected function wantsReportJson(Request $request): bool
+    {
+        return $request->ajax()
+            || $request->wantsJson()
+            || $request->query('format') === 'json';
     }
 
     /**
@@ -40,8 +54,12 @@ class ReportController extends Controller
      */
     public function customerStatusReport(Request $request)
     {
+        if (! $this->wantsReportJson($request)) {
+            return redirect(route('isp.reports.index', ['focus' => 'customer-status']).'#customer-status');
+        }
+
         $ispId = auth()->user()->isp_id;
-        
+
         $data = Customer::where('isp_id', $ispId)
             ->select('status', DB::raw('COUNT(*) as count'))
             ->groupBy('status')
@@ -68,16 +86,16 @@ class ReportController extends Controller
                 [
                     'label' => 'Customers',
                     'data' => $values,
-                    'backgroundColor' => array_map(function($status) use ($colors) {
+                    'backgroundColor' => array_map(function ($status) use ($colors) {
                         return $colors[strtolower($status)] ?? '#6b7280';
                     }, $labels),
-                ]
+                ],
             ],
             'summary' => [
                 'total' => array_sum($values),
                 'active' => $data->where('status', 'active')->first()->count ?? 0,
                 'suspended' => $data->where('status', 'suspended')->first()->count ?? 0,
-            ]
+            ],
         ]);
     }
 
@@ -86,6 +104,10 @@ class ReportController extends Controller
      */
     public function revenuePerPlanReport(Request $request)
     {
+        if (! $this->wantsReportJson($request)) {
+            return redirect(route('isp.reports.index', ['focus' => 'revenue-per-plan']).'#revenue-per-plan');
+        }
+
         $ispId = auth()->user()->isp_id;
         $startDate = $request->get('start_date', now()->startOfYear()->toDateString());
         $endDate = $request->get('end_date', now()->toDateString());
@@ -128,14 +150,14 @@ class ReportController extends Controller
                     'backgroundColor' => '#3b82f6', // blue
                     'borderColor' => '#2563eb',
                     'borderWidth' => 1,
-                ]
+                ],
             ],
             'summary' => [
                 'total_revenue' => array_sum($revenue),
                 'total_payments' => array_sum($paymentCounts),
                 'total_customers' => array_sum($customerCounts),
             ],
-            'details' => $data->map(function($item) {
+            'details' => $data->map(function ($item) {
                 return [
                     'plan_id' => $item->id,
                     'plan_name' => $item->name,
@@ -143,7 +165,7 @@ class ReportController extends Controller
                     'payment_count' => (int) $item->payment_count,
                     'customer_count' => (int) $item->customer_count,
                 ];
-            })
+            }),
         ]);
     }
 
@@ -152,6 +174,10 @@ class ReportController extends Controller
      */
     public function monthlyCollectionsReport(Request $request)
     {
+        if (! $this->wantsReportJson($request)) {
+            return redirect(route('isp.reports.index', ['focus' => 'monthly-collections']).'#monthly-collections');
+        }
+
         $ispId = auth()->user()->isp_id;
         $months = $request->get('months', 12); // Default to last 12 months
         $startDate = $request->get('start_date', now()->subMonths($months - 1)->startOfMonth()->toDateString());
@@ -188,7 +214,7 @@ class ReportController extends Controller
         while ($current <= $end) {
             $monthKey = $current->format('Y-m');
             $labels[] = $current->format('M Y');
-            
+
             if (isset($monthMap[$monthKey])) {
                 $item = $monthMap[$monthKey];
                 $revenue[] = (float) $item->total_revenue;
@@ -213,7 +239,7 @@ class ReportController extends Controller
                     'borderColor' => '#3b82f6',
                     'borderWidth' => 2,
                     'tension' => 0.4,
-                ]
+                ],
             ],
             'summary' => [
                 'total_revenue' => array_sum($revenue),
@@ -223,15 +249,14 @@ class ReportController extends Controller
                 'peak_month' => $labels[array_search(max($revenue), $revenue)] ?? null,
                 'peak_revenue' => max($revenue),
             ],
-            'details' => array_map(function($label, $rev, $payments, $customers) {
+            'details' => array_map(function ($label, $rev, $payments, $customers) {
                 return [
                     'month' => $label,
                     'revenue' => $rev,
                     'payment_count' => $payments,
                     'customer_count' => $customers,
                 ];
-            }, $labels, $revenue, $paymentCounts, $customerCounts)
+            }, $labels, $revenue, $paymentCounts, $customerCounts),
         ]);
     }
 }
-

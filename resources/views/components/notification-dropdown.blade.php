@@ -1,14 +1,22 @@
+@php
+    $serializedRecentNotifications = ($recentNotifications ?? collect())
+        ->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'title' => $item->title,
+                'message' => $item->message,
+                'type' => $item->type,
+                'is_read' => (bool) $item->is_read,
+                'time_ago' => $item->created_at?->diffForHumans(),
+                'created_at' => $item->created_at?->toISOString(),
+            ];
+        })
+        ->values();
+@endphp
+
 <div
     x-data="notificationDropdownComponent($el)"
-    data-notifications='@json(($recentNotifications ?? collect())->map(fn ($item) => [
-        "id" => $item->id,
-        "title" => $item->title,
-        "message" => $item->message,
-        "type" => $item->type,
-        "is_read" => (bool) $item->is_read,
-        "time_ago" => $item->created_at?->diffForHumans(),
-        "created_at" => $item->created_at?->toISOString(),
-    ])->values())'
+    data-notifications='@json($serializedRecentNotifications)'
     data-unread-count="{{ (int) ($unreadCount ?? 0) }}"
     data-recent-url="{{ route('isp.notifications.recent') }}"
     data-mark-read-template="{{ route('isp.notifications.mark-read', ':id') }}"

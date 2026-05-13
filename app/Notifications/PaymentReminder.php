@@ -9,9 +9,13 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\VonageMessage;
 
-class PaymentReminder extends Notification
+class PaymentReminder extends Notification implements ShouldQueue
 {
     use Queueable;
+
+    public int $tries = 3;
+
+    public int $timeout = 120;
 
     protected $invoice;
 
@@ -30,10 +34,13 @@ class PaymentReminder extends Notification
      */
     public function via(object $notifiable): array
     {
-        $channels = ['mail'];
-        
-        // Add SMS if phone number is available
-        if ($notifiable->phone_number) {
+        $channels = [];
+
+        if (! empty($notifiable->email)) {
+            $channels[] = 'mail';
+        }
+
+        if (! empty($notifiable->phone_number)) {
             $channels[] = 'vonage';
         }
 

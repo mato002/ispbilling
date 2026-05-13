@@ -11,29 +11,29 @@ class PaymentController extends Controller
     public function create(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
+
         $invoiceId = $request->get('invoice_id');
         $invoice = null;
-        
+
         if ($invoiceId) {
             $invoice = \App\Models\Invoice::where('isp_id', $ispId)
                 ->with('customer')
                 ->findOrFail($invoiceId);
         }
-        
+
         $invoices = \App\Models\Invoice::where('isp_id', $ispId)
             ->where('status', '!=', 'paid')
             ->with('customer')
             ->latest()
             ->get();
-        
+
         return view('isp.payments.create', compact('invoice', 'invoices'));
     }
 
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
+
         $query = Payment::where('isp_id', $ispId)
             ->with(['customer', 'invoice']);
 
@@ -60,15 +60,15 @@ class PaymentController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('payment_reference', 'like', "%{$search}%")
-                  ->orWhere('transaction_id', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function ($customerQuery) use ($search) {
-                      $customerQuery->where('full_name', 'like', "%{$search}%")
-                                   ->orWhere('phone_number', 'like', "%{$search}%");
-                  });
+                    ->orWhere('transaction_id', 'like', "%{$search}%")
+                    ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                        $customerQuery->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('phone_number', 'like', "%{$search}%");
+                    });
             });
         }
 
-        $payments = $query->latest('processed_at')->latest()->paginate(20);
+        $payments = $query->latest('processed_at')->latest()->paginate(20)->appends($request->query());
 
         return view('isp.payments.index', compact('payments'));
     }
@@ -85,7 +85,7 @@ class PaymentController extends Controller
 
         $customer = $payment->customer;
 
-        if (!$customer || !$customer->router) {
+        if (! $customer || ! $customer->router) {
             return back()->with('error', 'Customer or router not found for this payment.');
         }
 
@@ -117,14 +117,15 @@ class PaymentController extends Controller
             // Log failed activation
             \App\Services\ActivityLogService::logAction(
                 'manual_activation',
-                "Failed to manually activate internet for customer {$customer->full_name} (ID: {$customer->id}) via payment {$payment->payment_reference}: " . $e->getMessage(),
+                "Failed to manually activate internet for customer {$customer->full_name} (ID: {$customer->id}) via payment {$payment->payment_reference}: ".$e->getMessage(),
                 [
                     'customer_id' => $customer->id,
                     'payment_id' => $payment->id,
                     'error' => $e->getMessage(),
                 ]
             );
-            return back()->with('error', 'Failed to activate internet: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to activate internet: '.$e->getMessage());
         }
     }
 
@@ -134,6 +135,7 @@ class PaymentController extends Controller
             abort(403);
         }
         $payment->load(['customer', 'invoice']);
+
         return view('isp.payments.show', compact('payment'));
     }
 
@@ -146,7 +148,7 @@ class PaymentController extends Controller
         ]);
 
         $invoice = \App\Models\Invoice::with('customer', 'isp')->findOrFail($request->invoice_id);
-        
+
         // Verify invoice belongs to ISP
         if ($invoice->isp_id !== auth()->user()->isp_id) {
             abort(403);
@@ -163,8 +165,8 @@ class PaymentController extends Controller
             $phoneNumber = $request->phone_number ?? $invoice->customer->phone_number;
             $phoneNumber = preg_replace('/^0/', '254', $phoneNumber);
             $phoneNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
-            
-            if (!preg_match('/^254[0-9]{9}$/', $phoneNumber)) {
+
+            if (! preg_match('/^254[0-9]{9}$/', $phoneNumber)) {
                 return back()->with('error', 'Invalid phone number format. Please use format: 254XXXXXXXXX');
             }
         }
@@ -224,26 +226,26 @@ class PaymentController extends Controller
     public function transactionLogs(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
+
         $query = \App\Models\PaymentTransactionLog::where('isp_id', $ispId);
 
-        if ($request->has('status') && $request->status) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('transaction_type') && $request->transaction_type) {
+        if ($request->filled('transaction_type')) {
             $query->where('transaction_type', $request->transaction_type);
         }
 
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('payment_reference', 'like', "%{$search}%")
-                  ->orWhere('transaction_id', 'like', "%{$search}%");
+                    ->orWhere('transaction_id', 'like', "%{$search}%");
             });
         }
 
-        $logs = $query->latest()->paginate(20);
+        $logs = $query->latest()->paginate(20)->appends($request->query());
 
         return view('isp.payments.transaction-logs', compact('logs'));
     }
@@ -281,9 +283,8 @@ class PaymentController extends Controller
             $query->where('status', $request->status);
         }
 
-        $payments = $query->latest('processed_at')->latest()->paginate(20);
+        $payments = $query->latest('processed_at')->latest()->paginate(20)->appends($request->query());
 
         return view('isp.payments.customer', compact('customer', 'payments'));
     }
 }
-

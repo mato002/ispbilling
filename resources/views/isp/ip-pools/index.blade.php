@@ -3,247 +3,128 @@
 @section('title', 'IP Pools')
 
 @section('header')
-    <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('IP Pools') }}
-        </h2>
-        <div class="flex space-x-3">
-            <a href="{{ route('isp.ip-pools.create') }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                <i class="fas fa-plus mr-2"></i>Create Pool
-            </a>
-            <button onclick="openSyncModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                <i class="fas fa-sync mr-2"></i>Sync from Router
-            </button>
-        </div>
-    </div>
+    <x-isp-page-header
+        title="IP pools"
+        module="Network"
+        description="DHCP-style ranges for hotspot and PPPoE client addressing."
+        primaryLabel="Create pool"
+        :primaryHref="route('isp.ip-pools.create')"
+    >
+        <x-slot name="actions">
+            <button type="button" onclick="openSyncModal()" class="pb-btn">Sync from router</button>
+        </x-slot>
+    </x-isp-page-header>
 @endsection
 
 @section('content')
-    <div class="space-y-6">
-        <!-- Quick Start Guide -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h3 class="text-lg font-semibold text-blue-800 mb-3">🌐 IP Pool Configuration</h3>
-            <p class="text-blue-700 mb-4">IP pools assign addresses to users connecting to the hotspot:</p>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-white rounded-lg p-4 border border-blue-200">
-                    <h4 class="font-semibold text-gray-800 mb-2">Example Pool</h4>
-                    <table class="text-sm w-full">
-                        <tr class="border-b">
-                            <td class="py-2 font-medium">Pool Name:</td>
-                            <td class="py-2">hotspot_pool</td>
-                        </tr>
-                        <tr class="border-b">
-                            <td class="py-2 font-medium">Range:</td>
-                            <td class="py-2">192.168.10.2 – 192.168.10.200</td>
-                        </tr>
-                        <tr>
-                            <td class="py-2 font-medium">Total IPs:</td>
-                            <td class="py-2">199 addresses</td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <div class="bg-white rounded-lg p-4 border border-blue-200">
-                    <h4 class="font-semibold text-gray-800 mb-2">Configuration Steps</h4>
-                    <ol class="text-sm space-y-2 list-decimal list-inside">
-                        <li>Click <strong>Create Pool</strong> or <strong>Sync from Router</strong></li>
-                        <li>Define pool name and IP range</li>
-                        <li>Set gateway and netmask (optional)</li>
-                        <li>Configure lease time and DNS servers</li>
-                        <li>Activate pool for hotspot use</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-
-        <!-- Filters -->
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6">
-                <form method="GET" action="{{ route('isp.ip-pools.index') }}" class="flex gap-4">
-                    <div>
-                        <select name="is_active" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                            <option value="">All Status</option>
-                            <option value="1" {{ request('is_active') == '1' ? 'selected' : '' }}>Active</option>
-                            <option value="0" {{ request('is_active') == '0' ? 'selected' : '' }}>Inactive</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                        Filter
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- IP Pools List -->
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Your IP Pools</h3>
-                
-                @if($ipPools->isEmpty())
-                    <div class="text-center py-8">
-                        <i class="fas fa-network-wired text-4xl text-gray-400 mb-4"></i>
-                        <p class="text-gray-500 dark:text-gray-400">No IP pools found.</p>
-                        <p class="text-sm text-gray-400 mt-2">Create or sync IP pools to manage user addresses.</p>
-                        <div class="mt-4 space-x-3">
-                            <a href="{{ route('isp.ip-pools.create') }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                <i class="fas fa-plus mr-2"></i>Create Pool
-                            </a>
-                            <button onclick="openSyncModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                                <i class="fas fa-sync mr-2"></i>Sync from Router
-                            </button>
-                        </div>
-                    </div>
-                @else
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Pool Name
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Range
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Router
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Total IPs
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Status
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                @foreach($ipPools as $pool)
-                                    <tr class="{{ $pool->is_active ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-900/50' }}">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <i class="fas fa-network-wired text-blue-600 mr-2"></i>
-                                                <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                                    {{ $pool->name }}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm text-gray-900 dark:text-gray-100">
-                                                {{ $pool->formatted_range }}
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm text-gray-900 dark:text-gray-100">
-                                                {{ $pool->router->name }}
-                                                <div class="text-xs text-gray-500">{{ $pool->router->ip_address }}</div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm text-gray-900 dark:text-gray-100">
-                                                {{ $pool->total_ips }}
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $pool->is_active ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' }}">
-                                                {{ $pool->is_active ? 'Active' : 'Inactive' }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div class="flex justify-end space-x-2">
-                                                <a href="{{ route('isp.ip-pools.show', $pool) }}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300" title="View">
-                                                    <i class="fas fa-eye"></i>
-                                                </a>
-                                                <a href="{{ route('isp.ip-pools.edit', $pool) }}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300" title="Edit">
-                                                    <i class="fas fa-edit"></i>
-                                                </a>
-                                                @if($pool->is_active)
-                                                    <form action="{{ route('isp.ip-pools.deactivate', $pool) }}" method="POST" class="inline">
-                                                        @csrf
-                                                        <button type="submit" class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300" title="Deactivate">
-                                                            <i class="fas fa-pause"></i>
-                                                        </button>
-                                                    </form>
-                                                @else
-                                                    <form action="{{ route('isp.ip-pools.activate', $pool) }}" method="POST" class="inline">
-                                                        @csrf
-                                                        <button type="submit" class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300" title="Activate">
-                                                            <i class="fas fa-play"></i>
-                                                        </button>
-                                                    </form>
-                                                @endif
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Pagination -->
-                    <div class="mt-6">
-                        {{ $ipPools->links() }}
-                    </div>
-                @endif
-            </div>
-        </div>
+<div class="space-y-6">
+    <div class="pb-card p-4 sm:p-5 text-sm text-slate-600 dark:text-slate-300">
+        <p class="font-semibold text-slate-900 dark:text-white">Addressing</p>
+        <p class="mt-1">Create pools manually or sync from RouterOS. Link pools to hotspot profiles and plans as needed.</p>
     </div>
 
-    <!-- Sync Modal -->
-    <div id="syncModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
-            <div class="mt-3">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100">
-                    Sync IP Pools
-                </h3>
-                <div class="mt-2 px-7 py-3">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                        Select a router to sync IP pools from:
-                    </p>
-                    
-                    <form method="POST" action="{{ route('isp.ip-pools.sync') }}" class="mt-4">
-                        @csrf
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Router *</label>
-                            <select name="router_id" required class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                <option value="">Select Router</option>
-                                @foreach($routers as $router)
-                                    <option value="{{ $router->id }}">{{ $router->name }} ({{ $router->ip_address }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        
-                        <div class="flex justify-end space-x-3">
-                            <button type="button" onclick="closeSyncModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
-                                Cancel
-                            </button>
-                            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-                                <i class="fas fa-sync mr-2"></i>Sync Pools
-                            </button>
-                        </div>
-                    </form>
-                </div>
+    <x-filter-bar :action="route('isp.ip-pools.index')">
+        <div class="min-w-[160px]">
+            <label class="isp-form-label">Status</label>
+            <select name="is_active" class="isp-form-select">
+                <option value="">All</option>
+                <option value="1" @selected(request('is_active') === '1')>Active</option>
+                <option value="0" @selected(request('is_active') === '0')>Inactive</option>
+            </select>
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
+            <a href="{{ route('isp.ip-pools.index') }}" class="pb-btn">Reset</a>
+        </div>
+    </x-filter-bar>
+
+    @if($ipPools->isEmpty())
+        <div class="pb-card p-0">
+            <x-empty-state title="No IP pools" message="Create a pool or sync from a router to get started." />
+            <div class="flex flex-wrap justify-center gap-2 border-t border-slate-100 px-6 pb-6 dark:border-slate-800">
+                <a href="{{ route('isp.ip-pools.create') }}" class="pb-btn pb-btn-primary">Create pool</a>
+                <button type="button" onclick="openSyncModal()" class="pb-btn">Sync from router</button>
             </div>
         </div>
-    </div>
+    @else
+        <x-data-table>
+            <thead>
+                <tr>
+                    <th>Pool</th>
+                    <th>Range</th>
+                    <th>Router</th>
+                    <th>IPs</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($ipPools as $pool)
+                    <tr>
+                        <td class="font-semibold text-slate-900 dark:text-white">{{ $pool->name }}</td>
+                        <td class="font-mono text-sm">{{ $pool->formatted_range }}</td>
+                        <td>
+                            <div>{{ $pool->router->name }}</div>
+                            <div class="text-xs text-slate-500 font-mono">{{ $pool->router->ip_address }}</div>
+                        </td>
+                        <td class="tabular-nums">{{ $pool->total_ips }}</td>
+                        <td>
+                            @if($pool->is_active)
+                                <x-status-badge status="active" />
+                            @else
+                                <x-status-badge status="inactive" />
+                            @endif
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            <a href="{{ route('isp.ip-pools.show', $pool) }}" class="text-sm font-semibold text-indigo-600 dark:text-indigo-400">View</a>
+                            <a href="{{ route('isp.ip-pools.edit', $pool) }}" class="ml-3 text-sm font-semibold text-slate-600 dark:text-slate-300">Edit</a>
+                            @if($pool->is_active)
+                                <form action="{{ route('isp.ip-pools.deactivate', $pool) }}" method="POST" class="inline ml-3" onsubmit="return confirm('Deactivate?');">
+                                    @csrf
+                                    <button type="submit" class="text-sm font-semibold text-amber-600 dark:text-amber-400">Pause</button>
+                                </form>
+                            @else
+                                <form action="{{ route('isp.ip-pools.activate', $pool) }}" method="POST" class="inline ml-3" onsubmit="return confirm('Activate?');">
+                                    @csrf
+                                    <button type="submit" class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Activate</button>
+                                </form>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </x-data-table>
+        <div class="pb-card p-4">{{ $ipPools->withQueryString()->links() }}</div>
+    @endif
+</div>
 
-    <script>
-        function openSyncModal() {
-            document.getElementById('syncModal').classList.remove('hidden');
-        }
-        
-        function closeSyncModal() {
-            document.getElementById('syncModal').classList.add('hidden');
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('syncModal');
-            if (event.target == modal) {
-                closeSyncModal();
-            }
-        }
-    </script>
+<div id="syncModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm" onclick="if(event.target===this) closeSyncModal()">
+        <div class="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900" onclick="event.stopPropagation()">
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Sync IP pools</h3>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Select a router to import pool definitions.</p>
+            <form method="POST" action="{{ route('isp.ip-pools.sync') }}" class="mt-4 space-y-4">
+                @csrf
+                <div>
+                    <label class="isp-form-label">Router</label>
+                    <select name="router_id" required class="isp-form-select">
+                        <option value="">Select router</option>
+                        @foreach($routers as $router)
+                            <option value="{{ $router->id }}">{{ $router->name }} ({{ $router->ip_address }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeSyncModal()" class="pb-btn">Cancel</button>
+                    <button type="submit" class="pb-btn pb-btn-primary">Sync</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openSyncModal() { document.getElementById('syncModal').classList.remove('hidden'); }
+    function closeSyncModal() { document.getElementById('syncModal').classList.add('hidden'); }
+</script>
 @endsection

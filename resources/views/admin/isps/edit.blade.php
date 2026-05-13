@@ -103,6 +103,26 @@
                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                             <label class="ml-2 text-sm text-gray-700 dark:text-gray-300">Active</label>
                         </div>
+
+                        <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 space-y-4">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Platform (SaaS) access</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">When locked, ISP admins and staff cannot open the ISP workspace until you clear this flag.</p>
+                            <div class="flex items-center">
+                                <input type="checkbox" name="platform_access_locked" value="1" {{ old('platform_access_locked', $isp->platform_access_locked) ? 'checked' : '' }}
+                                       class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                                <label class="ml-2 text-sm text-gray-700 dark:text-gray-300">Lock ISP dashboard (SaaS billing suspension)</label>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Lock message (shown to operators)</label>
+                                <textarea name="platform_access_message" rows="2" placeholder="e.g. Please renew your PrimeBilling subscription."
+                                          class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">{{ old('platform_access_message', $isp->platform_access_message) }}</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tier label</label>
+                                <input type="text" name="saas_tier" value="{{ old('saas_tier', $isp->saas_tier) }}" placeholder="starter / pro / enterprise"
+                                       class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                            </div>
+                        </div>
                     </div>
                 </div>
 

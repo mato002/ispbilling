@@ -30,6 +30,13 @@
             </div>
         @endif
 
+        @if (! empty(trim($paymentExperience['customer_instructions'] ?? '')))
+            <div class="bg-white/95 text-gray-800 rounded-lg shadow-lg p-4 sm:p-5 mb-4 sm:mb-6 border border-white/40">
+                <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-2">Payment instructions</h2>
+                <div class="text-sm sm:text-base text-gray-700 whitespace-pre-line">{{ $paymentExperience['customer_instructions'] }}</div>
+            </div>
+        @endif
+
         <!-- Pending Invoices Section -->
         @if($pendingInvoices->count() > 0)
             <div class="bg-white rounded-lg shadow-xl p-6 mb-6">

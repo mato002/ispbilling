@@ -3,93 +3,34 @@
 @section('title', 'User Connection Management')
 
 @section('header')
-    <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('User Connection Management') }}
-        </h2>
-        <div class="flex space-x-3">
-            <button onclick="runAutomaticManagement()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                <i class="fas fa-robot mr-2"></i>Run Automatic Management
-            </button>
-            <button onclick="refreshStatistics()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                <i class="fas fa-sync mr-2"></i>Refresh Statistics
-            </button>
-        </div>
-    </div>
+    <x-isp-page-header
+        title="User connection management"
+        module="Automation"
+        description="Disconnect, suspend, and reconnect subscribers with MikroTik-backed actions."
+    >
+        <x-slot name="actions">
+            <button type="button" onclick="runAutomaticManagement()" class="pb-btn pb-btn-primary">Run automation</button>
+            <button type="button" onclick="refreshStatistics()" class="pb-btn">Refresh stats</button>
+        </x-slot>
+    </x-isp-page-header>
 @endsection
-
-@php
-    function getStatusColor($status) {
-        return match($status) {
-            'active' => 'bg-green-100 text-green-800',
-            'suspended' => 'bg-yellow-100 text-yellow-800',
-            'expired' => 'bg-red-100 text-red-800',
-            'inactive' => 'bg-gray-100 text-gray-800',
-            default => 'bg-gray-100 text-gray-800'
-        };
-    }
-@endphp
 
 @section('content')
     <div class="space-y-6">
-        <!-- Statistics Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
-                <div class="p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-users text-2xl text-blue-600"></i>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Customers</p>
-                            <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100" id="total-customers">{{ $stats['total_customers'] }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
-                <div class="p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-wifi text-2xl text-green-600"></i>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Connected</p>
-                            <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100" id="connected-customers">{{ $stats['active_customers'] }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
-                <div class="p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-pause-circle text-2xl text-yellow-600"></i>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Suspended</p>
-                            <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100" id="suspended-customers">{{ $stats['suspended_customers'] }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg">
-                <div class="p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-unlink text-2xl text-red-600"></i>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Disconnected</p>
-                            <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100" id="disconnected-customers">{{ $stats['expired_customers'] }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <x-dashboard.kpi-card title="Total customers" :value="number_format($stats['total_customers'])" valueId="total-customers" subtext="In scope" iconBg="from-indigo-500 to-cyan-500">
+                <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></x-slot:icon>
+            </x-dashboard.kpi-card>
+            <x-dashboard.kpi-card title="Connected" :value="number_format($stats['active_customers'])" valueId="connected-customers" subtext="Active accounts" iconBg="from-emerald-500 to-teal-500">
+                <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14 0"/></svg></x-slot:icon>
+            </x-dashboard.kpi-card>
+            <x-dashboard.kpi-card title="Suspended" :value="number_format($stats['suspended_customers'])" valueId="suspended-customers" subtext="Needs action" iconBg="from-amber-500 to-orange-500">
+                <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></x-slot:icon>
+            </x-dashboard.kpi-card>
+            <x-dashboard.kpi-card title="Disconnected" :value="number_format($stats['expired_customers'])" valueId="disconnected-customers" subtext="Expired / off" iconBg="from-rose-500 to-red-600">
+                <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></x-slot:icon>
+            </x-dashboard.kpi-card>
+        </section>
 
         <!-- Alert Summary -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -135,94 +76,54 @@
             </div>
         </div>
 
-        <!-- Recent Activities -->
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Connection Activities</h3>
-                
-                @if($recentActivities->isEmpty())
-                    <div class="text-center py-8">
-                        <i class="fas fa-history text-4xl text-gray-400 mb-4"></i>
-                        <p class="text-gray-500 dark:text-gray-400">No recent activities found.</p>
-                    </div>
-                @else
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Customer
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Status
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Router
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Last Updated
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                @foreach($recentActivities as $customer)
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                                {{ $customer->username }}
-                                            </div>
-                                            <div class="text-sm text-gray-500">{{ $customer->full_name }}</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ getStatusColor($customer->status) }}">
-                                                {{ ucfirst($customer->status) }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                            {{ $customer->router->name ?? 'N/A' }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                            {{ $customer->updated_at->format('M d, Y H:i') }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div class="flex justify-end space-x-2">
-                                                <button onclick="checkUserStatus({{ $customer->id }})" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300" title="Check Status">
-                                                    <i class="fas fa-search"></i>
-                                                </button>
-                                                
-                                                @if($customer->status === 'active')
-                                                    <form action="{{ route('isp.user-connections.suspend', $customer) }}" method="POST" class="inline" onsubmit="return confirm('Suspend this user?')">
-                                                        @csrf
-                                                        <button type="submit" class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300" title="Suspend">
-                                                            <i class="fas fa-pause"></i>
-                                                        </button>
-                                                    </form>
-                                                    <form action="{{ route('isp.user-connections.disconnect', $customer) }}" method="POST" class="inline" onsubmit="return confirm('Disconnect this user?')">
-                                                        @csrf
-                                                        <button type="submit" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300" title="Disconnect">
-                                                            <i class="fas fa-unlink"></i>
-                                                        </button>
-                                                    </form>
-                                                @else
-                                                    <form action="{{ route('isp.user-connections.reconnect', $customer) }}" method="POST" class="inline" onsubmit="return confirm('Reconnect this user?')">
-                                                        @csrf
-                                                        <button type="submit" class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300" title="Reconnect">
-                                                            <i class="fas fa-link"></i>
-                                                        </button>
-                                                    </form>
-                                                @endif
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-            </div>
+        <div>
+            <h3 class="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">Recent connection activity</h3>
+            @if($recentActivities->isEmpty())
+                <div class="pb-card p-8 text-center text-slate-500 dark:text-slate-400">No recent activity.</div>
+            @else
+                <x-data-table>
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Router</th>
+                            <th>Updated</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($recentActivities as $customer)
+                            <tr>
+                                <td>
+                                    <div class="font-mono font-semibold text-slate-900 dark:text-white">{{ $customer->username }}</div>
+                                    <div class="text-sm text-slate-500">{{ $customer->full_name }}</div>
+                                </td>
+                                <td><x-status-badge :status="ucfirst($customer->status)" /></td>
+                                <td>{{ $customer->router->name ?? 'N/A' }}</td>
+                                <td class="whitespace-nowrap text-sm">{{ $customer->updated_at->format('M j, Y H:i') }}</td>
+                                <td class="text-right whitespace-nowrap">
+                                    <button type="button" onclick="checkUserStatus({{ $customer->id }})" class="text-sm font-semibold text-indigo-600 dark:text-indigo-400">Status</button>
+                                    @if($customer->status === 'active')
+                                        <form action="{{ route('isp.user-connections.suspend', $customer) }}" method="POST" class="inline ml-3" onsubmit="return confirm('Suspend this user?')">
+                                            @csrf
+                                            <button type="submit" class="text-sm font-semibold text-amber-600 dark:text-amber-400">Suspend</button>
+                                        </form>
+                                        <form action="{{ route('isp.user-connections.disconnect', $customer) }}" method="POST" class="inline ml-3" onsubmit="return confirm('Disconnect this user?')">
+                                            @csrf
+                                            <button type="submit" class="text-sm font-semibold text-rose-600 dark:text-rose-400">Disconnect</button>
+                                        </form>
+                                    @else
+                                        <form action="{{ route('isp.user-connections.reconnect', $customer) }}" method="POST" class="inline ml-3" onsubmit="return confirm('Reconnect this user?')">
+                                            @csrf
+                                            <button type="submit" class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Reconnect</button>
+                                        </form>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </x-data-table>
+            @endif
         </div>
     </div>
 
@@ -251,8 +152,12 @@
         function getStatusColor(status) {
             const colors = {
                 'connected': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                'active': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
                 'suspended': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                'disabled': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
                 'disconnected': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+                'not_found': 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                'error': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
                 'unknown': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
             };
             return colors[status] || colors['unknown'];
@@ -304,8 +209,27 @@
             document.getElementById('statusContent').innerHTML = 'Loading...';
             document.getElementById('statusModal').classList.remove('hidden');
 
-            fetch(`/isp/user-connections/status/${customerId}`)
-                .then(response => response.json())
+            const url = '{{ url('/isp/user-connections') }}/' + encodeURIComponent(customerId) + '/status';
+            fetch(url, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            })
+                .then(async (response) => {
+                    const text = await response.text();
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        throw new Error(response.status + ' ' + response.statusText + (text ? ': ' + text.slice(0, 120) : ''));
+                    }
+                    if (!response.ok) {
+                        throw new Error(data.message || data.error || ('HTTP ' + response.status));
+                    }
+                    return data;
+                })
                 .then(data => {
                     if (data.success) {
                         const status = data.status;
@@ -316,14 +240,17 @@
                                 <div><strong>PPPoE:</strong> <span class="px-2 py-1 rounded text-xs ${getStatusColor(status.pppoe)}">${status.pppoe}</span></div>
                             </div>
                         `;
+                        if (status.message) {
+                            html += '<p class="mt-2 text-xs text-slate-600 dark:text-slate-400">' + status.message + '</p>';
+                        }
                         document.getElementById('statusContent').innerHTML = html;
                     } else {
-                        document.getElementById('statusContent').innerHTML = '<div class="text-red-600">Error: ' + data.message + '</div>';
+                        document.getElementById('statusContent').innerHTML = '<div class="text-red-600">Error: ' + (data.message || 'Unknown') + '</div>';
                     }
                 })
                 .catch(error => {
                     console.error('Error checking status:', error);
-                    document.getElementById('statusContent').innerHTML = '<div class="text-red-600">Error checking user status</div>';
+                    document.getElementById('statusContent').innerHTML = '<div class="text-red-600">Error checking user status: ' + (error.message || error) + '</div>';
                 });
         }
 

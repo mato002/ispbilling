@@ -2,9 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\Invoice;
 use App\Models\ISP;
 use App\Models\Subscription;
-use App\Models\Invoice;
+use App\Support\InvoiceTax;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +19,7 @@ class GenerateInvoices implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(ISP $isp = null)
+    public function __construct(?ISP $isp = null)
     {
         $this->isp = $isp;
     }
@@ -44,31 +45,31 @@ class GenerateInvoices implements ShouldQueue
         $subscriptions = Subscription::whereHas('customer', function ($query) use ($isp) {
             $query->where('isp_id', $isp->id);
         })
-        ->where(function ($query) {
-            // Active subscriptions that have expired
-            $query->where(function ($q) {
-                $q->where('status', 'active')
-                  ->where('end_date', '<=', now());
+            ->where(function ($query) {
+                // Active subscriptions that have expired
+                $query->where(function ($q) {
+                    $q->where('status', 'active')
+                        ->where('end_date', '<=', now());
+                })
+                // Or expired subscriptions without pending invoices
+                    ->orWhere(function ($q) {
+                        $q->where('status', 'expired')
+                            ->whereDoesntHave('invoices', function ($invoiceQuery) {
+                                $invoiceQuery->whereIn('status', ['pending', 'overdue']);
+                            });
+                    });
             })
-            // Or expired subscriptions without pending invoices
-            ->orWhere(function ($q) {
-                $q->where('status', 'expired')
-                  ->whereDoesntHave('invoices', function ($invoiceQuery) {
-                      $invoiceQuery->whereIn('status', ['pending', 'overdue']);
-                  });
-            });
-        })
-        ->whereDoesntHave('invoices', function ($query) {
-            // Don't create duplicate invoices for the same subscription
-            $query->whereIn('status', ['pending', 'overdue']);
-        })
-        ->get();
+            ->whereDoesntHave('invoices', function ($query) {
+                // Don't create duplicate invoices for the same subscription
+                $query->whereIn('status', ['pending', 'overdue']);
+            })
+            ->get();
 
         foreach ($subscriptions as $subscription) {
             try {
                 $this->createInvoice($subscription);
             } catch (\Exception $e) {
-                Log::error("Failed to generate invoice for subscription {$subscription->id}: " . $e->getMessage());
+                Log::error("Failed to generate invoice for subscription {$subscription->id}: ".$e->getMessage());
             }
         }
     }
@@ -79,28 +80,27 @@ class GenerateInvoices implements ShouldQueue
         $customer = $subscription->customer;
         $isp = $customer->isp;
 
-        $amount = $plan->price;
-        $tax = 0; // Calculate tax if needed
-        $totalAmount = $amount + $tax;
+        $amount = (float) $plan->price;
+        $lines = InvoiceTax::computeForAmount($amount, $isp);
 
         // If subscription has expired, set due date to today
         // Otherwise use subscription end date
-        $dueDate = $subscription->end_date < now() 
-            ? now() 
+        $dueDate = $subscription->end_date < now()
+            ? now()
             : $subscription->end_date;
 
         Invoice::create([
             'isp_id' => $isp->id,
             'customer_id' => $customer->id,
             'subscription_id' => $subscription->id,
-            'amount' => $amount,
-            'tax' => $tax,
-            'total_amount' => $totalAmount,
+            'amount' => $lines['amount'],
+            'tax' => $lines['tax'],
+            'total_amount' => $lines['total_amount'],
             'issue_date' => now(),
             'due_date' => $dueDate,
             'status' => 'pending',
         ]);
 
-        Log::info("Generated invoice for subscription {$subscription->id} (Customer: {$customer->id}, Amount: {$totalAmount})");
+        Log::info("Generated invoice for subscription {$subscription->id} (Customer: {$customer->id}, Amount: {$lines['total_amount']})");
     }
 }

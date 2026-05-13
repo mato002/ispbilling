@@ -5,12 +5,20 @@ namespace App\Http\Controllers\Customer;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Plan;
+use App\Services\PaymentCompletionService;
 use App\Services\PaymentGatewayService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
+    public function __construct(
+        protected PaymentCompletionService $paymentCompletionService
+    ) {
+    }
+
     public function checkout(Request $request)
     {
         $customer = auth()->user()->customer;
@@ -123,6 +131,9 @@ class PaymentController extends Controller
             // Update payment status if completed
             if (isset($status['ResultCode']) && $status['ResultCode'] === '0') {
                 $payment->markAsCompleted();
+                if (! $payment->isPlatformSaasPayment()) {
+                    $this->paymentCompletionService->processTenantPaymentSuccess($payment->fresh());
+                }
                 return response()->json([
                     'success' => true,
                     'status' => 'completed',
@@ -197,21 +208,56 @@ class PaymentController extends Controller
                 }
             }
 
-            // Find payment by checkout request ID
-            $payment = \App\Models\Payment::where('transaction_id', $checkoutRequestId)->first();
-            
-            if ($payment) {
-                $payment->update([
-                    'status' => 'completed',
-                    'processed_at' => now(),
-                    'metadata' => array_merge($payment->metadata ?? [], [
-                        'mpesa_receipt' => $mpesaReceipt,
-                        'callback_data' => $callbackData
-                    ])
-                ]);
+            // Find payment by checkout request ID (or metadata after receipt replaced transaction_id)
+            $payment = \App\Models\Payment::findByMpesaCheckoutRequestId($checkoutRequestId);
 
-                // Mark invoice as paid and activate service
-                $payment->markAsCompleted();
+            if ($payment) {
+                $finalized = false;
+
+                try {
+                    DB::transaction(function () use ($payment, $mpesaReceipt, $callbackData, $checkoutRequestId, &$finalized) {
+                        $locked = \App\Models\Payment::query()->lockForUpdate()->find($payment->id);
+                        if (! $locked || $locked->status === 'completed') {
+                            return;
+                        }
+
+                        $locked->update([
+                            'transaction_id' => $mpesaReceipt,
+                            'metadata' => array_merge($locked->metadata ?? [], [
+                                'mpesa_receipt' => $mpesaReceipt,
+                                'mpesa_checkout_request_id' => $checkoutRequestId,
+                                'callback_data' => $callbackData,
+                            ]),
+                        ]);
+
+                        $locked->markAsCompleted();
+                        $finalized = true;
+                    });
+                } catch (QueryException $e) {
+                    $mysqlErr = $e->errorInfo[1] ?? null;
+                    $sqlState = $e->errorInfo[0] ?? null;
+                    $isDuplicate = $mysqlErr === 1062
+                        || $sqlState === '23000'
+                        || stripos((string) $e->getMessage(), 'duplicate') !== false;
+
+                    if ($isDuplicate) {
+                        Log::warning('Customer MPesa callback: duplicate transaction_id ignored', [
+                            'payment_id' => $payment->id,
+                            'checkout_request_id' => $checkoutRequestId,
+                        ]);
+
+                        return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
+                    }
+
+                    throw $e;
+                }
+
+                if ($finalized) {
+                    $fresh = $payment->fresh();
+                    if ($fresh && ! $fresh->isPlatformSaasPayment()) {
+                        $this->paymentCompletionService->processTenantPaymentSuccess($fresh);
+                    }
+                }
             }
         }
 

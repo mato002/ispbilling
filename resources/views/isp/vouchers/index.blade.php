@@ -3,223 +3,135 @@
 @section('title', 'Vouchers')
 
 @section('header')
-    <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Vouchers') }}
-        </h2>
-        <div class="flex gap-2">
-            <a href="{{ route('isp.vouchers.create') }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                Create Voucher
-            </a>
-            <a href="{{ route('isp.vouchers.create-bulk') }}" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                Create Bulk
-            </a>
-        </div>
-    </div>
+    <x-isp-page-header
+        title="Vouchers"
+        module="Sales &amp; access"
+        description="Time and data vouchers tied to plans and routers."
+        primaryLabel="Create voucher"
+        :primaryHref="route('isp.vouchers.create')"
+    >
+        <x-slot name="actions">
+            <a href="{{ route('isp.vouchers.create-bulk') }}" class="pb-btn">Bulk create</a>
+        </x-slot>
+    </x-isp-page-header>
 @endsection
 
 @section('content')
+<div class="space-y-6">
     @if(session('success'))
-        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
             {{ session('success') }}
         </div>
     @endif
 
-    <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-        <div class="p-6">
-            <form method="GET" action="{{ route('isp.vouchers.index') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                    <select name="status" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Status</option>
-                        <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
-                        <option value="used" {{ request('status') == 'used' ? 'selected' : '' }}>Used</option>
-                        <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Expired</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Router</label>
-                    <select name="router_id" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Routers</option>
-                        @foreach($routers as $router)
-                            <option value="{{ $router->id }}" {{ request('router_id') == $router->id ? 'selected' : '' }}>
-                                {{ $router->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Voucher Type</label>
-                    <select name="voucher_type" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Types</option>
-                        <option value="time" {{ request('voucher_type') == 'time' ? 'selected' : '' }}>Time-based</option>
-                        <option value="data" {{ request('voucher_type') == 'data' ? 'selected' : '' }}>Data-based</option>
-                        <option value="unlimited" {{ request('voucher_type') == 'unlimited' ? 'selected' : '' }}>Unlimited</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Voucher code or notes..." 
-                           class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                </div>
-                <div class="lg:col-span-4 flex gap-2 mt-4">
-                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                        Filter
-                    </button>
-                    @if(request()->hasAny(['status', 'router_id', 'voucher_type', 'search']))
-                        <a href="{{ route('isp.vouchers.index') }}" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
-                            Clear
-                        </a>
-                    @endif
-                </div>
-            </form>
+    <x-filter-bar :action="route('isp.vouchers.index')">
+        <div class="min-w-[130px]">
+            <label class="isp-form-label">Status</label>
+            <select name="status" class="isp-form-select">
+                <option value="">All</option>
+                <option value="active" @selected(request('status') === 'active')>Active</option>
+                <option value="used" @selected(request('status') === 'used')>Used</option>
+                <option value="expired" @selected(request('status') === 'expired')>Expired</option>
+            </select>
         </div>
-    </div>
+        <div class="min-w-[160px] flex-1">
+            <label class="isp-form-label">Router</label>
+            <select name="router_id" class="isp-form-select">
+                <option value="">All routers</option>
+                @foreach($routers as $router)
+                    <option value="{{ $router->id }}" @selected((string) request('router_id') === (string) $router->id)>{{ $router->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="min-w-[130px]">
+            <label class="isp-form-label">Type</label>
+            <select name="voucher_type" class="isp-form-select">
+                <option value="">All</option>
+                <option value="time" @selected(request('voucher_type') === 'time')>Time</option>
+                <option value="data" @selected(request('voucher_type') === 'data')>Data</option>
+                <option value="unlimited" @selected(request('voucher_type') === 'unlimited')>Unlimited</option>
+            </select>
+        </div>
+        <div class="min-w-[180px] flex-1">
+            <label class="isp-form-label">Search</label>
+            <input type="text" name="search" value="{{ request('search') }}" class="isp-form-input" placeholder="Code or notes…">
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
+            <a href="{{ route('isp.vouchers.index') }}" class="pb-btn">Reset</a>
+        </div>
+    </x-filter-bar>
 
-    <!-- Vouchers Table -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
+    @if($vouchers->isEmpty())
+        <div class="pb-card p-0">
+            <x-empty-state
+                title="No vouchers"
+                message="Create vouchers or sync from your sales workflow."
+                ctaLabel="Create voucher"
+                :ctaHref="route('isp.vouchers.create')"
+            />
+        </div>
+    @else
+        <x-data-table>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Plan</th>
+                    <th>Router</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Used by</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($vouchers as $voucher)
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Voucher Code
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Plan
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Router
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Type
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Status
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Created
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Used By
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Actions
-                        </th>
+                        <td class="font-mono font-semibold">{{ $voucher->voucher_code }}</td>
+                        <td>
+                            @if($voucher->plan)
+                                <div class="font-medium text-slate-900 dark:text-white">{{ $voucher->plan->name }}</div>
+                                <div class="text-slate-500 text-sm">KES {{ number_format($voucher->plan->price, 0) }}</div>
+                            @else
+                                <span class="text-slate-400">—</span>
+                            @endif
+                        </td>
+                        <td>{{ $voucher->router?->name ?? '—' }}</td>
+                        <td><span class="pb-pill">{{ ucfirst($voucher->voucher_type) }}</span></td>
+                        <td>
+                            @if($voucher->status === 'active')
+                                <x-status-badge status="active" />
+                            @elseif($voucher->status === 'used')
+                                <span class="pb-pill">Used</span>
+                            @else
+                                <x-status-badge status="expired" />
+                            @endif
+                        </td>
+                        <td class="whitespace-nowrap text-sm">{{ $voucher->created_at->format('M j, Y H:i') }}</td>
+                        <td>
+                            @if($voucher->usedByCustomer)
+                                <div class="font-medium">{{ $voucher->usedByCustomer->full_name }}</div>
+                                <div class="text-sm text-slate-500">{{ $voucher->used_at?->format('M j, Y H:i') }}</div>
+                            @else
+                                <span class="text-slate-400">—</span>
+                            @endif
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            <a href="{{ route('isp.vouchers.show', $voucher) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">View</a>
+                            @if($voucher->status === 'active')
+                                <form method="POST" action="{{ route('isp.vouchers.deactivate', $voucher) }}" class="inline ml-3" onsubmit="return confirm('Deactivate this voucher?');">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit" class="text-sm font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400">Deactivate</button>
+                                </form>
+                            @endif
+                        </td>
                     </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    @forelse($vouchers as $voucher)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="font-mono text-sm font-semibold">{{ $voucher->voucher_code }}</span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                @if($voucher->plan)
-                                    <div>
-                                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {{ $voucher->plan->name }}
-                                        </div>
-                                        <div class="text-xs text-gray-500 dark:text-gray-400">
-                                            KES {{ number_format($voucher->plan->price, 0) }}
-                                        </div>
-                                    </div>
-                                @else
-                                    <span class="text-sm text-gray-500 dark:text-gray-400">No Plan</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                @if($voucher->router)
-                                    <span class="text-sm text-gray-900 dark:text-gray-100">{{ $voucher->router->name }}</span>
-                                @else
-                                    <span class="text-sm text-gray-500 dark:text-gray-400">No Router</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2 py-1 text-xs font-medium rounded-full 
-                                    {{ $voucher->voucher_type === 'time' ? 'bg-blue-100 text-blue-800' : '' }}
-                                    {{ $voucher->voucher_type === 'data' ? 'bg-green-100 text-green-800' : '' }}
-                                    {{ $voucher->voucher_type === 'unlimited' ? 'bg-purple-100 text-purple-800' : '' }}">
-                                    {{ ucfirst($voucher->voucher_type) }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2 py-1 text-xs font-medium rounded-full 
-                                    {{ $voucher->status === 'active' ? 'bg-green-100 text-green-800' : '' }}
-                                    {{ $voucher->status === 'used' ? 'bg-gray-100 text-gray-800' : '' }}
-                                    {{ $voucher->status === 'expired' ? 'bg-red-100 text-red-800' : '' }}">
-                                    {{ ucfirst($voucher->status) }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                {{ $voucher->created_at->format('M d, Y H:i') }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                @if($voucher->usedByCustomer)
-                                    <div>
-                                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {{ $voucher->usedByCustomer->full_name }}
-                                        </div>
-                                        <div class="text-xs text-gray-500 dark:text-gray-400">
-                                            {{ $voucher->used_at?->format('M d, Y H:i') }}
-                                        </div>
-                                    </div>
-                                @else
-                                    <span class="text-sm text-gray-500 dark:text-gray-400">-</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div class="flex gap-2">
-                                    <a href="{{ route('isp.vouchers.show', $voucher) }}" 
-                                       class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                                        View
-                                    </a>
-                                    @if($voucher->status === 'active')
-                                        <form method="POST" action="{{ route('isp.vouchers.deactivate', $voucher) }}" class="inline">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button type="submit" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                                    onclick="return confirm('Are you sure you want to deactivate this voucher?')">
-                                                Deactivate
-                                            </button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                                No vouchers found.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Pagination -->
-        <div class="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
-            <div class="flex-1 flex justify-between sm:hidden">
-                {{ $vouchers->links() }}
-            </div>
-            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                    <p class="text-sm text-gray-700 dark:text-gray-300">
-                        Showing
-                        <span class="font-medium">{{ $vouchers->firstItem() }}</span>
-                        to
-                        <span class="font-medium">{{ $vouchers->lastItem() }}</span>
-                        of
-                        <span class="font-medium">{{ $vouchers->total() }}</span>
-                        results
-                    </p>
-                </div>
-                <div>
-                    {{ $vouchers->links() }}
-                </div>
-            </div>
-        </div>
-    </div>
+                @endforeach
+            </tbody>
+        </x-data-table>
+        <div class="pb-card p-4">{{ $vouchers->withQueryString()->links() }}</div>
+    @endif
+</div>
 @endsection

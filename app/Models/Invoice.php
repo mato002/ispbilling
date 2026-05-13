@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToIspTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,8 @@ use Carbon\Carbon;
 
 class Invoice extends Model
 {
+    use BelongsToIspTenant;
+
     protected $fillable = [
         'isp_id',
         'customer_id',
@@ -63,6 +66,10 @@ class Invoice extends Model
 
     public function markAsPaid(): void
     {
+        if ($this->status === 'paid') {
+            return;
+        }
+
         $this->update([
             'status' => 'paid',
             'paid_date' => now(),

@@ -1,65 +1,70 @@
 @extends('layouts.admin')
 
-@section('title', 'Router Action Log Details')
+@section('title', 'Router action log')
 
 @section('header')
-    <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Router Action Log Details') }}
-        </h2>
-        <a href="{{ route('isp.logs.router-actions.index') }}" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
-            Back to Router Action Logs
-        </a>
-    </div>
+    <x-isp-page-header
+        title="Router action detail"
+        module="Audit"
+        description="Full payload and outcome for this MikroTik operation."
+        primaryLabel="Back to list"
+        :primaryHref="route('isp.logs.router-actions.index')"
+    />
 @endsection
 
 @section('content')
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-        <div class="p-6 space-y-4">
-            <div>
-                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Date</p>
-                <p class="text-gray-900 dark:text-gray-100">{{ $routerActionLog->created_at->format('M d, Y H:i:s') }}</p>
-            </div>
-            <div>
-                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Router</p>
-                <p class="text-gray-900 dark:text-gray-100">{{ $routerActionLog->router?->name ?? '—' }} ({{ $routerActionLog->router?->ip_address ?? '—' }})</p>
-            </div>
-            <div>
-                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Action</p>
-                <p class="text-gray-900 dark:text-gray-100">{{ $routerActionLog->action }}</p>
-            </div>
-            <div>
-                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</p>
-                <p class="text-gray-900 dark:text-gray-100">{{ $routerActionLog->status ?? '—' }}</p>
-            </div>
-            <div>
-                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
-                <p class="text-gray-900 dark:text-gray-100">{{ $routerActionLog->description ?? '—' }}</p>
-            </div>
-            @if($routerActionLog->customer)
-                <div>
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Customer</p>
-                    <p class="text-gray-900 dark:text-gray-100">{{ $routerActionLog->customer->full_name }} ({{ $routerActionLog->customer->username ?? '—' }})</p>
-                </div>
-            @endif
-            @if($routerActionLog->error_message)
-                <div>
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Error</p>
-                    <p class="text-red-600 dark:text-red-400">{{ $routerActionLog->error_message }}</p>
-                </div>
-            @endif
-            @if(!empty($routerActionLog->request_data))
-                <div>
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Request data</p>
-                    <pre class="text-xs bg-gray-100 dark:bg-gray-700 p-4 rounded overflow-auto max-h-48">{{ json_encode($routerActionLog->request_data, JSON_PRETTY_PRINT) }}</pre>
-                </div>
-            @endif
-            @if(!empty($routerActionLog->response_data))
-                <div>
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Response data</p>
-                    <pre class="text-xs bg-gray-100 dark:bg-gray-700 p-4 rounded overflow-auto max-h-48">{{ json_encode($routerActionLog->response_data, JSON_PRETTY_PRINT) }}</pre>
-                </div>
-            @endif
+<div class="pb-card p-4 sm:p-6 space-y-5 text-sm">
+    <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+            <dt class="isp-form-label mb-1">Date</dt>
+            <dd class="font-medium text-slate-900 dark:text-white">{{ $routerActionLog->created_at->format('M j, Y H:i:s') }}</dd>
         </div>
+        <div>
+            <dt class="isp-form-label mb-1">Router</dt>
+            <dd class="text-slate-800 dark:text-slate-100">{{ $routerActionLog->router?->name ?? '—' }} <span class="font-mono text-slate-500">({{ $routerActionLog->router?->ip_address ?? '—' }})</span></dd>
+        </div>
+        <div>
+            <dt class="isp-form-label mb-1">Action</dt>
+            <dd class="font-mono text-slate-900 dark:text-white">{{ $routerActionLog->action }}</dd>
+        </div>
+        <div>
+            <dt class="isp-form-label mb-1">Status</dt>
+            <dd>
+                @if(($routerActionLog->status ?? '') === 'success')
+                    <span class="pb-pill pb-pill-ok">Success</span>
+                @else
+                    <span class="pb-pill pb-pill-bad">{{ $routerActionLog->status ?? '—' }}</span>
+                @endif
+            </dd>
+        </div>
+    </dl>
+    <div>
+        <p class="isp-form-label mb-1">Description</p>
+        <p class="text-slate-700 dark:text-slate-300">{{ $routerActionLog->description ?? '—' }}</p>
     </div>
+    @if($routerActionLog->customer)
+        <div>
+            <p class="isp-form-label mb-1">Customer</p>
+            <p class="text-slate-800 dark:text-slate-100">{{ $routerActionLog->customer->full_name }} <span class="font-mono text-slate-500">({{ $routerActionLog->customer->username ?? '—' }})</span></p>
+        </div>
+    @endif
+    @if($routerActionLog->error_message)
+        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-900 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100">
+            <p class="isp-form-label mb-1 text-rose-800 dark:text-rose-200">Error</p>
+            <p>{{ $routerActionLog->error_message }}</p>
+        </div>
+    @endif
+    @if(!empty($routerActionLog->request_data))
+        <div>
+            <p class="isp-form-label mb-2">Request data</p>
+            <pre class="max-h-48 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-950">{{ json_encode($routerActionLog->request_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+        </div>
+    @endif
+    @if(!empty($routerActionLog->response_data))
+        <div>
+            <p class="isp-form-label mb-2">Response data</p>
+            <pre class="max-h-48 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-950">{{ json_encode($routerActionLog->response_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+        </div>
+    @endif
+</div>
 @endsection

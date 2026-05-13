@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToIspTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 
 class Customer extends Model
 {
+    use BelongsToIspTenant;
+    use Notifiable;
+
     protected $fillable = [
         'isp_id',
         'router_id',
@@ -23,10 +28,12 @@ class Customer extends Model
         'installation_date',
         'mikrotik_user_id',
         'notes',
+        'custom_attributes',
     ];
 
     protected $casts = [
         'installation_date' => 'date',
+        'custom_attributes' => 'array',
     ];
 
     protected $hidden = [
@@ -134,6 +141,7 @@ class Customer extends Model
         $isp = ISP::find($ispId);
         $prefix = $isp ? Str::upper(Str::substr($isp->name, 0, 3)) : 'ISP';
         $number = static::where('isp_id', $ispId)->max('id') + 1;
-        return $prefix . str_pad($number, 6, '0', STR_PAD_LEFT);
+
+        return $prefix.str_pad($number, 6, '0', STR_PAD_LEFT);
     }
 }

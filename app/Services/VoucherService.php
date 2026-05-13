@@ -168,14 +168,13 @@ class VoucherService
         $voucher->markAsUsed($finalCustomerId);
 
         // Create payment record for voucher usage (even if price is 0, for tracking)
-        \App\Models\Payment::create([
+        $payment = \App\Models\Payment::create([
             'isp_id' => $voucher->isp_id,
             'customer_id' => $finalCustomerId, // Can be null for anonymous vouchers
             'voucher_id' => $voucher->id,
             'payment_method' => 'voucher',
             'amount' => $voucher->price ?? 0,
-            'status' => 'completed',
-            'processed_at' => now(),
+            'status' => 'pending',
             'notes' => "Voucher redemption: {$voucher->voucher_code}",
             'metadata' => [
                 'voucher_code' => $voucher->voucher_code,
@@ -185,6 +184,8 @@ class VoucherService
                 'assigned_to' => $voucher->assigned_to,
             ],
         ]);
+
+        $payment->markAsCompleted();
 
         // Immediately enable the user on router
         if ($voucher->router && isset($voucher->metadata['mikrotik_user_id'])) {

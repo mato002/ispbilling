@@ -1,91 +1,97 @@
 @extends('layouts.admin')
 
-@section('title', 'Router Action Logs')
+@section('title', 'Router action logs')
 
 @section('header')
-    <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Router Action Logs') }}
-        </h2>
-        <a href="{{ route('isp.dashboard') }}" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
-            Back to Dashboard
-        </a>
-    </div>
+    <x-isp-page-header
+        title="Router action logs"
+        module="Audit"
+        description="MikroTik API actions, sync jobs, and subscriber operations per router."
+        primaryLabel="Dashboard"
+        :primaryHref="route('isp.dashboard')"
+    />
 @endsection
 
 @section('content')
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-        <div class="p-6">
-            <form method="GET" action="{{ route('isp.logs.router-actions.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Router</label>
-                    <select name="router_id" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Routers</option>
-                        @foreach($routers as $r)
-                            <option value="{{ $r->id }}" {{ request('router_id') == $r->id ? 'selected' : '' }}>{{ $r->name }} ({{ $r->ip_address }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Action</label>
-                    <input type="text" name="action" value="{{ request('action') }}" placeholder="Filter by action"
-                           class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date From</label>
-                    <input type="date" name="date_from" value="{{ request('date_from') }}"
-                           class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date To</label>
-                    <input type="date" name="date_to" value="{{ request('date_to') }}"
-                           class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                </div>
-                <div class="md:col-span-4">
-                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Filter</button>
-                    <a href="{{ route('isp.logs.router-actions.index') }}" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 inline-block ml-2">Clear</a>
-                </div>
-            </form>
+<div class="space-y-6">
+    <x-filter-bar :action="route('isp.logs.router-actions.index')">
+        <div class="min-w-[200px] flex-1">
+            <label class="isp-form-label">Router</label>
+            <select name="router_id" class="isp-form-select">
+                <option value="">All routers</option>
+                @foreach($routers as $r)
+                    <option value="{{ $r->id }}" @selected((string) request('router_id') === (string) $r->id)>{{ $r->name }} ({{ $r->ip_address }})</option>
+                @endforeach
+            </select>
         </div>
-    </div>
+        <div class="min-w-[140px]">
+            <label class="isp-form-label">Action</label>
+            <input type="text" name="action" value="{{ request('action') }}" class="isp-form-input" placeholder="e.g. sync…">
+        </div>
+        <div class="min-w-[120px]">
+            <label class="isp-form-label">Status</label>
+            <select name="status" class="isp-form-select">
+                <option value="">All</option>
+                <option value="success" @selected(request('status') === 'success')>Success</option>
+                <option value="failed" @selected(request('status') === 'failed')>Failed</option>
+            </select>
+        </div>
+        <div class="min-w-[160px] flex-1">
+            <label class="isp-form-label">Search</label>
+            <input type="text" name="search" value="{{ request('search') }}" class="isp-form-input" placeholder="Description, error…">
+        </div>
+        <div class="min-w-[120px]">
+            <label class="isp-form-label">From</label>
+            <input type="date" name="date_from" value="{{ request('date_from') }}" class="isp-form-input">
+        </div>
+        <div class="min-w-[120px]">
+            <label class="isp-form-label">To</label>
+            <input type="date" name="date_to" value="{{ request('date_to') }}" class="isp-form-input">
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
+            <a href="{{ route('isp.logs.router-actions.index') }}" class="pb-btn">Reset</a>
+        </div>
+    </x-filter-bar>
 
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
+    @if($logs->isEmpty())
+        <div class="pb-card p-0">
+            <x-empty-state title="No router logs" message="No entries match the current filters." />
+        </div>
+    @else
+        <x-data-table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Router</th>
+                    <th>Action</th>
+                    <th>Status</th>
+                    <th>Description</th>
+                    <th class="text-right"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($logs as $log)
                     <tr>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Router</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Description</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase"></th>
+                        <td class="whitespace-nowrap text-sm">{{ $log->created_at->format('M j, Y H:i') }}</td>
+                        <td>{{ $log->router?->name ?? '—' }}</td>
+                        <td class="font-mono text-sm">{{ $log->action }}</td>
+                        <td>
+                            @if(($log->status ?? '') === 'success')
+                                <span class="pb-pill pb-pill-ok">Success</span>
+                            @else
+                                <span class="pb-pill pb-pill-bad">{{ $log->status ?? '—' }}</span>
+                            @endif
+                        </td>
+                        <td class="max-w-md truncate text-slate-600 dark:text-slate-300">{{ Str::limit($log->description ?? $log->error_message ?? '', 80) }}</td>
+                        <td class="text-right whitespace-nowrap">
+                            <a href="{{ route('isp.logs.router-actions.show', $log) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">View</a>
+                        </td>
                     </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    @forelse($logs as $log)
-                        <tr>
-                            <td class="px-4 py-2 text-sm text-gray-800 dark:text-gray-200">{{ $log->created_at->format('M d, Y H:i') }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-800 dark:text-gray-200">{{ $log->router?->name ?? '—' }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-800 dark:text-gray-200">{{ $log->action }}</td>
-                            <td class="px-4 py-2 text-sm">
-                                <span class="px-2 py-1 text-xs rounded {{ $log->status === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' }}">{{ $log->status ?? '—' }}</span>
-                            </td>
-                            <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 max-w-md truncate">{{ Str::limit($log->description ?? $log->error_message, 50) }}</td>
-                            <td class="px-4 py-2">
-                                <a href="{{ route('isp.logs.router-actions.show', $log) }}" class="text-blue-600 hover:underline">View</a>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No router action logs found.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        <div class="p-4">
-            {{ $logs->links() }}
-        </div>
-    </div>
+                @endforeach
+            </tbody>
+        </x-data-table>
+        <div class="pb-card p-4">{{ $logs->withQueryString()->links() }}</div>
+    @endif
+</div>
 @endsection

@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Central (apex) domain for tenant subdomains
+    |--------------------------------------------------------------------------
+    |
+    | Hostnames like "{slug}.{central_domain}" resolve to an ISP with a
+    | matching slug. Override when APP_URL is an IP or differs from DNS.
+    |
+    */
+
+    'central_domain' => env('APP_CENTRAL_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST) ?: 'localhost'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

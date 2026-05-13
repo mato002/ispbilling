@@ -2,15 +2,18 @@
 
 namespace App\Services;
 
+use App\Models\IspPaymentMethod;
 use App\Models\Payment;
 use App\Models\ISP;
+use App\Support\IspPaymentExperience;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
 class MpesaService
 {
-    protected $isp;
+    protected ?ISP $isp;
+
     protected $consumerKey;
     protected $consumerSecret;
     protected $passkey;
@@ -20,13 +23,39 @@ class MpesaService
     protected $callbackUrl;
     protected $timeoutUrl;
 
-    public function __construct(ISP $isp)
+    /**
+     * @param  ISP|null  $isp  When null, Daraja credentials are read only from config/services (platform / SaaS collections).
+     */
+    public function __construct(?ISP $isp = null)
     {
         $this->isp = $isp;
-        $settings = $isp->settings ?? [];
+
+        if ($isp) {
+            $daraja = IspPaymentMethod::query()
+                ->forIsp($isp->id)
+                ->byProvider('daraja')
+                ->where('active', true)
+                ->first();
+
+            if ($daraja) {
+                $c = $daraja->credentials;
+                $this->consumerKey = $c['consumer_key'] ?? config('services.mpesa.consumer_key');
+                $this->consumerSecret = $c['consumer_secret'] ?? config('services.mpesa.consumer_secret');
+                $this->passkey = $c['passkey'] ?? config('services.mpesa.passkey');
+                $this->shortcode = $c['shortcode'] ?? config('services.mpesa.shortcode');
+                $this->environment = $c['environment'] ?? config('services.mpesa.environment', 'sandbox');
+                $this->transactionType = $c['transaction_type'] ?? config('services.mpesa.transaction_type', 'CustomerPayBillOnline');
+                $this->callbackUrl = $daraja->callback_url ?: config('services.mpesa.callback_url');
+                $this->timeoutUrl = $this->callbackUrl ?: config('services.mpesa.timeout_url');
+
+                return;
+            }
+        }
+
+        $settings = $isp?->settings ?? [];
         $paymentGateways = $settings['payment_gateways'] ?? [];
         $mpesaSettings = $paymentGateways['mpesa'] ?? [];
-        
+
         $this->consumerKey = $mpesaSettings['consumer_key'] ?? config('services.mpesa.consumer_key');
         $this->consumerSecret = $mpesaSettings['consumer_secret'] ?? config('services.mpesa.consumer_secret');
         $this->passkey = $mpesaSettings['passkey'] ?? config('services.mpesa.passkey');
@@ -158,8 +187,10 @@ class MpesaService
                 'PhoneNumber' => $payment->phone_number,
                 'CallBackURL' => $callbackUrl,
                 'QueueTimeOutURL' => $timeoutUrl,
-                'AccountReference' => $payment->payment_reference,
-                'TransactionDesc' => 'ISP Billing Payment - ' . $payment->payment_reference,
+                'AccountReference' => IspPaymentExperience::stkAccountReference($payment),
+                'TransactionDesc' => (($payment->metadata['purpose'] ?? null) === 'platform_saas')
+                    ? 'PrimeBilling SaaS'
+                    : ('ISP Billing Payment - '.$payment->payment_reference),
             ];
 
             // Log request
@@ -185,7 +216,10 @@ class MpesaService
                     
                     $payment->update([
                         'transaction_id' => $checkoutRequestId,
-                        'metadata' => array_merge($payment->metadata ?? [], ['stk_push_response' => $responseData]),
+                        'metadata' => array_merge($payment->metadata ?? [], [
+                            'stk_push_response' => $responseData,
+                            'mpesa_checkout_request_id' => $checkoutRequestId,
+                        ]),
                     ]);
 
                     // Log successful initiation

@@ -1,26 +1,24 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', 'Ticket #' . $ticket->id)
 
+@section('header')
+    <x-isp-page-header
+        :title="'Ticket #'.$ticket->id"
+        module="Operations"
+        :description="$ticket->subject"
+    />
+@endsection
+
 @section('content')
-    <div class="max-w-5xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between mb-4">
-            <div>
-                <h1 class="text-2xl font-semibold text-gray-900">Ticket #{{ $ticket->id }}</h1>
-                <p class="mt-1 text-sm text-gray-500">{{ $ticket->subject }}</p>
-            </div>
-            <a href="{{ route('isp.tickets.index') }}"
-               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                Back to Tickets
-            </a>
-        </div>
+    <div class="space-y-4">
+        <a href="{{ route('isp.tickets.index') }}" class="pb-btn">Back to Tickets</a>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-6">
-                <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
+                <x-form-section title="Conversation">
                     <div class="flex items-center justify-between mb-2">
-                        <h2 class="text-lg font-medium text-gray-900">Conversation</h2>
-                        <span class="text-xs text-gray-400">Created {{ $ticket->created_at->diffForHumans() }}</span>
+                        <span class="text-xs text-slate-400">Created {{ $ticket->created_at->diffForHumans() }}</span>
                     </div>
 
                     <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 space-y-4">
@@ -68,49 +66,34 @@
                             </div>
                         @endforeach
                     </div>
-                </div>
+                </x-form-section>
 
-                <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
-                    <h2 class="text-lg font-medium text-gray-900 mb-4">Add Reply</h2>
+                <x-form-section title="Add Reply">
                     <form method="POST" action="{{ route('isp.tickets.reply', $ticket) }}" class="space-y-4">
                         @csrf
                         <div>
                             <textarea name="message" rows="4"
-                                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                      class="isp-form-textarea"
                                       placeholder="Write your reply here...">{{ old('message') }}</textarea>
                             @error('message')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
                         <div class="flex justify-end">
-                            <button type="submit"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
-                                Send Reply
-                            </button>
+                            <button type="submit" class="pb-btn pb-btn-primary">Send Reply</button>
                         </div>
                     </form>
-                </div>
+                </x-form-section>
             </div>
 
             <div class="space-y-6">
-                <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
-                    <h2 class="text-lg font-medium text-gray-900 mb-4">Ticket Details</h2>
+                <x-form-section title="Ticket Details">
 
                     <dl class="space-y-3 text-sm">
                         <div class="flex justify-between">
                             <dt class="text-gray-500">Status</dt>
                             <dd>
-                                @php
-                                    $statusColors = [
-                                        'open' => 'bg-blue-100 text-blue-800',
-                                        'in_progress' => 'bg-yellow-100 text-yellow-800',
-                                        'resolved' => 'bg-green-100 text-green-800',
-                                        'closed' => 'bg-gray-100 text-gray-800',
-                                    ];
-                                @endphp
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $statusColors[$ticket->status] ?? 'bg-gray-100 text-gray-800' }}">
-                                    {{ ucfirst(str_replace('_', ' ', $ticket->status)) }}
-                                </span>
+                                <x-status-badge :status="str_replace('_', ' ', $ticket->status)" />
                             </dd>
                         </div>
 
@@ -142,18 +125,16 @@
                             <dd class="text-gray-900 capitalize">{{ $ticket->channel }}</dd>
                         </div>
                     </dl>
-                </div>
+                </x-form-section>
 
-                <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
-                    <h2 class="text-lg font-medium text-gray-900 mb-4">Update Ticket</h2>
+                <x-form-section title="Update Ticket">
                     <form method="POST" action="{{ route('isp.tickets.update', $ticket) }}" class="space-y-4">
                         @csrf
                         @method('PUT')
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                            <select name="status"
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <label class="isp-form-label">Status</label>
+                            <select name="status" class="isp-form-select">
                                 @foreach (['open' => 'Open', 'in_progress' => 'In Progress', 'resolved' => 'Resolved', 'closed' => 'Closed'] as $value => $label)
                                     <option value="{{ $value }}" @selected($ticket->status === $value)>{{ $label }}</option>
                                 @endforeach
@@ -164,9 +145,8 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-                            <select name="priority"
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <label class="isp-form-label">Priority</label>
+                            <select name="priority" class="isp-form-select">
                                 @foreach (['low' => 'Low', 'normal' => 'Normal', 'high' => 'High'] as $value => $label)
                                     <option value="{{ $value }}" @selected($ticket->priority === $value)>{{ $label }}</option>
                                 @endforeach
@@ -177,22 +157,19 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Assigned To (User ID)</label>
+                            <label class="isp-form-label">Assigned To (User ID)</label>
                             <input type="number" name="assigned_to_user_id" value="{{ old('assigned_to_user_id', $ticket->assigned_to_user_id) }}"
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                   class="isp-form-input">
                             @error('assigned_to_user_id')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
                         <div class="flex justify-end">
-                            <button type="submit"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-800 hover:bg-gray-900">
-                                Save Changes
-                            </button>
+                            <button type="submit" class="pb-btn pb-btn-primary">Save Changes</button>
                         </div>
                     </form>
-                </div>
+                </x-form-section>
             </div>
         </div>
     </div>

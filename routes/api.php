@@ -28,6 +28,10 @@ Route::get('/status', function () {
 })->name('api.status');
 
 // Public payment webhooks (no auth required)
+Route::post('/payments/mpesa/callback/{webhook_token}', [PaymentController::class, 'mpesaCallback'])
+    ->where('webhook_token', '[A-Za-z0-9]{32,128}')
+    ->name('payments.mpesa.isp-callback');
+
 Route::post('/payments/mpesa/callback', [PaymentController::class, 'mpesaCallback'])
     ->name('payments.mpesa.callback');
     

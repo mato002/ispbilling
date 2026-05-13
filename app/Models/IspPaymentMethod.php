@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToIspTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Crypt;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Log;
 
 class IspPaymentMethod extends Model
 {
+    use BelongsToIspTenant;
+
     protected $table = 'isp_payment_methods';
 
     protected $fillable = [
@@ -16,6 +19,7 @@ class IspPaymentMethod extends Model
         'provider',
         'credentials',
         'callback_url',
+        'webhook_token',
         'active',
     ];
 

@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\ISP\Web;
 
+use App\Events\NewNotification;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Services\NotificationService;
-use App\Events\NewNotification;
-use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
@@ -17,14 +17,15 @@ class NotificationController extends Controller
     {
         $this->notificationService = $notificationService;
     }
+
     /**
      * Display notifications for the logged-in ISP
      */
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
-        if (!$ispId) {
+
+        if (! $ispId) {
             abort(403, 'Only ISP admins can access notifications');
         }
 
@@ -45,13 +46,13 @@ class NotificationController extends Controller
         // Filter by date range
         if ($request->has('date_from') && $request->date_from) {
             $startDate = Carbon::parse($request->date_from)->startOfDay();
-            $endDate = $request->has('date_to') && $request->date_to 
+            $endDate = $request->has('date_to') && $request->date_to
                 ? Carbon::parse($request->date_to)->endOfDay()
                 : Carbon::now()->endOfDay();
             $query->dateRange($startDate, $endDate);
         }
 
-        $notifications = $query->latest()->paginate(20);
+        $notifications = $query->latest()->paginate(20)->appends($request->query());
 
         // Get counts for filters
         $unreadCount = Notification::forIsp($ispId)->unread()->count();
@@ -66,8 +67,8 @@ class NotificationController extends Controller
     public function recent(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
-        if (!$ispId) {
+
+        if (! $ispId) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -96,8 +97,8 @@ class NotificationController extends Controller
     public function store(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
-        if (!$ispId) {
+
+        if (! $ispId) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -129,7 +130,7 @@ class NotificationController extends Controller
     public function destroy(Notification $notification)
     {
         $ispId = auth()->user()->isp_id;
-        
+
         if ($notification->isp_id !== $ispId) {
             abort(403, 'Unauthorized access');
         }
@@ -153,8 +154,8 @@ class NotificationController extends Controller
     public function stats(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
-        if (!$ispId) {
+
+        if (! $ispId) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -169,7 +170,7 @@ class NotificationController extends Controller
     public function markAsRead(Notification $notification)
     {
         $ispId = auth()->user()->isp_id;
-        
+
         if ($notification->isp_id !== $ispId) {
             abort(403, 'Unauthorized access');
         }
@@ -188,8 +189,8 @@ class NotificationController extends Controller
     public function markAllRead(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
-        if (!$ispId) {
+
+        if (! $ispId) {
             abort(403, 'Only ISP admins can access notifications');
         }
 

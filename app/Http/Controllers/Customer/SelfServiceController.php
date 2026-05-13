@@ -4,40 +4,108 @@ namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\HotspotSession;
 use App\Models\CustomerUsageStat;
+use App\Models\HotspotSession;
+use App\Models\ISP;
+use App\Models\Router;
+use App\Support\InvoiceTax;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\View\View;
 
 class SelfServiceController extends Controller
 {
     /**
      * Show customer login page
      */
-    public function login()
+    public function login(Request $request): View
     {
-        return view('customer.login');
+        return view('customer.login', [
+            'landingIsp' => $request->attributes->get('landing_isp'),
+        ]);
+    }
+
+    /**
+     * Self-registration (hotspot customer) — only on tenant subdomain.
+     */
+    public function register(Request $request): View
+    {
+        return view('customer.register', [
+            'landingIsp' => $request->attributes->get('landing_isp'),
+        ]);
+    }
+
+    public function registerStore(Request $request): RedirectResponse
+    {
+        /** @var ISP $isp */
+        $isp = $request->attributes->get('landing_isp');
+        if (! $isp instanceof ISP) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'full_name' => ['required', 'string', 'max:255'],
+            'phone_number' => ['required', 'string', 'max:32'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'username' => ['required', 'string', 'max:64', 'regex:/^[a-zA-Z0-9._-]+$/', 'unique:customers,username'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'location' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $routerId = Router::query()
+            ->where('isp_id', $isp->id)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->value('id');
+
+        $customer = Customer::create([
+            'isp_id' => $isp->id,
+            'router_id' => $routerId,
+            'full_name' => $validated['full_name'],
+            'phone_number' => $validated['phone_number'],
+            'email' => $validated['email'] ?? null,
+            'location' => $validated['location'] ?? '—',
+            'connection_type' => 'hotspot',
+            'username' => $validated['username'],
+            'password' => Hash::make($validated['password']),
+            'status' => 'inactive',
+            'installation_date' => now()->toDateString(),
+        ]);
+
+        session(['customer_id' => $customer->id]);
+
+        return redirect()
+            ->route('customer.checkout', ['customer' => $customer->id])
+            ->with('success', 'Account created. Choose a plan to get connected.');
     }
 
     /**
      * Authenticate customer
      */
-    public function authenticate(Request $request)
+    public function authenticate(Request $request): RedirectResponse
     {
         $request->validate([
             'username' => 'required|string',
             'password' => 'required|string',
         ]);
 
-        $customer = Customer::where('username', $request->username)
-            ->where('connection_type', 'hotspot')
-            ->first();
+        $landingIsp = $request->attributes->get('landing_isp');
 
-        if (!$customer || !Hash::check($request->password, $customer->password)) {
+        $query = Customer::query()
+            ->where('username', $request->username)
+            ->where('connection_type', 'hotspot');
+
+        if ($landingIsp instanceof ISP) {
+            $query->where('isp_id', $landingIsp->id);
+        }
+
+        $customer = $query->first();
+
+        if (! $customer || ! Hash::check($request->password, $customer->password)) {
             return back()->withErrors(['error' => 'Invalid credentials.']);
         }
 
-        // Store customer ID in session
         session(['customer_id' => $customer->id]);
 
         return redirect()->route('customer.dashboard');
@@ -49,8 +117,8 @@ class SelfServiceController extends Controller
     public function dashboard()
     {
         $customerId = session('customer_id');
-        
-        if (!$customerId) {
+
+        if (! $customerId) {
             return redirect()->route('customer.login');
         }
 
@@ -101,8 +169,8 @@ class SelfServiceController extends Controller
     public function usage()
     {
         $customerId = session('customer_id');
-        
-        if (!$customerId) {
+
+        if (! $customerId) {
             return redirect()->route('customer.login');
         }
 
@@ -121,8 +189,8 @@ class SelfServiceController extends Controller
     public function invoices()
     {
         $customerId = session('customer_id');
-        
-        if (!$customerId) {
+
+        if (! $customerId) {
             return redirect()->route('customer.login');
         }
 
@@ -141,8 +209,8 @@ class SelfServiceController extends Controller
     public function sessions()
     {
         $customerId = session('customer_id');
-        
-        if (!$customerId) {
+
+        if (! $customerId) {
             return redirect()->route('customer.login');
         }
 
@@ -161,8 +229,8 @@ class SelfServiceController extends Controller
     public function changePassword(Request $request)
     {
         $customerId = session('customer_id');
-        
-        if (!$customerId) {
+
+        if (! $customerId) {
             return redirect()->route('customer.login');
         }
 
@@ -173,7 +241,7 @@ class SelfServiceController extends Controller
 
         $customer = Customer::findOrFail($customerId);
 
-        if (!Hash::check($request->current_password, $customer->password)) {
+        if (! Hash::check($request->current_password, $customer->password)) {
             return back()->withErrors(['current_password' => 'Current password is incorrect.']);
         }
 
@@ -187,8 +255,8 @@ class SelfServiceController extends Controller
                 $mikrotik = new \App\Services\MikroTikService($customer->router);
                 if ($mikrotik->connect()) {
                     $connection = $mikrotik->getConnection();
-                    $path = $customer->connection_type === 'hotspot' 
-                        ? '/ip/hotspot/user/set' 
+                    $path = $customer->connection_type === 'hotspot'
+                        ? '/ip/hotspot/user/set'
                         : '/ppp/secret/set';
                     $connection->comm($path, [
                         '.id' => $customer->mikrotik_user_id,
@@ -197,7 +265,7 @@ class SelfServiceController extends Controller
                 }
             } catch (\Exception $e) {
                 // Log error but don't fail
-                \Log::error('Failed to update password on router: ' . $e->getMessage());
+                \Log::error('Failed to update password on router: '.$e->getMessage());
             }
         }
 
@@ -210,6 +278,7 @@ class SelfServiceController extends Controller
     public function logout()
     {
         session()->forget('customer_id');
+
         return redirect()->route('customer.login')->with('success', 'Logged out successfully.');
     }
 
@@ -220,8 +289,8 @@ class SelfServiceController extends Controller
     {
         $customerId = $request->input('customer') ?? session('customer_id');
         $paymentId = $request->input('payment');
-        
-        if (!$customerId) {
+
+        if (! $customerId) {
             return redirect()->route('hotspot.login')->with('error', 'Customer not found.');
         }
 
@@ -256,11 +325,14 @@ class SelfServiceController extends Controller
             ->where('is_active', true)
             ->get();
 
+        $paymentExperience = \App\Support\IspPaymentExperience::forIsp($customer->isp);
+
         return view('customer.checkout', compact(
             'customer',
             'pendingInvoices',
             'availablePlans',
-            'specificPayment'
+            'specificPayment',
+            'paymentExperience'
         ));
     }
 
@@ -308,11 +380,14 @@ class SelfServiceController extends Controller
             ->where('status', 'pending')
             ->first();
 
-        if (!$invoice) {
+        if (! $invoice) {
             // Generate invoice number
             $ispPrefix = strtoupper(substr($customer->isp->name ?? 'ISP', 0, 3));
             $invoiceCount = \App\Models\Invoice::where('isp_id', $customer->isp_id)->count() + 1;
-            $invoiceNumber = $ispPrefix . '-' . now()->format('Y') . '-' . str_pad($invoiceCount, 6, '0', STR_PAD_LEFT);
+            $invoiceNumber = $ispPrefix.'-'.now()->format('Y').'-'.str_pad($invoiceCount, 6, '0', STR_PAD_LEFT);
+
+            $amount = (float) $plan->price;
+            $lines = InvoiceTax::computeForAmount($amount, $customer->isp);
 
             // Create invoice
             $invoice = \App\Models\Invoice::create([
@@ -320,9 +395,9 @@ class SelfServiceController extends Controller
                 'customer_id' => $customer->id,
                 'subscription_id' => $subscription->id,
                 'invoice_number' => $invoiceNumber,
-                'amount' => $plan->price,
-                'tax' => 0,
-                'total_amount' => $plan->price,
+                'amount' => $lines['amount'],
+                'tax' => $lines['tax'],
+                'total_amount' => $lines['total_amount'],
                 'issue_date' => now(),
                 'due_date' => now()->addDays(7),
                 'status' => 'pending',
@@ -332,8 +407,7 @@ class SelfServiceController extends Controller
         // Redirect to checkout with invoice
         return redirect()->route('customer.checkout', [
             'customer' => $customer->id,
-            'invoice' => $invoice->id
+            'invoice' => $invoice->id,
         ])->with('success', 'Plan selected. Please complete payment to activate your subscription.');
     }
 }
-

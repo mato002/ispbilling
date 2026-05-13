@@ -16,11 +16,12 @@ class IpPoolController extends Controller
         $ispId = auth()->user()->isp_id;
         $ipPools = IpPool::forIsp($ispId)
             ->with('router')
-            ->when($request->has('is_active'), function ($query) use ($request) {
+            ->when($request->filled('is_active'), function ($query) use ($request) {
                 $query->where('is_active', $request->is_active);
             })
             ->orderBy('name')
-            ->paginate(10);
+            ->paginate(10)
+            ->appends($request->query());
 
         $routers = Router::forIsp($ispId)->active()->get();
 
@@ -50,7 +51,7 @@ class IpPoolController extends Controller
         ]);
 
         $router = Router::findOrFail($request->router_id);
-        
+
         // Verify router belongs to ISP
         if ($router->isp_id !== auth()->user()->isp_id) {
             return back()->with('error', 'Router not found');
@@ -86,19 +87,20 @@ class IpPoolController extends Controller
             }
 
         } catch (\Exception $e) {
-            Log::error('IP pool creation error: ' . $e->getMessage());
-            return back()->with('error', 'Failed to create IP pool: ' . $e->getMessage())->withInput();
+            Log::error('IP pool creation error: '.$e->getMessage());
+
+            return back()->with('error', 'Failed to create IP pool: '.$e->getMessage())->withInput();
         }
     }
 
     public function sync(Request $request)
     {
         $request->validate([
-            'router_id' => 'required|exists:routers,id'
+            'router_id' => 'required|exists:routers,id',
         ]);
 
         $router = Router::findOrFail($request->router_id);
-        
+
         // Verify router belongs to ISP
         if ($router->isp_id !== auth()->user()->isp_id) {
             return back()->with('error', 'Router not found');
@@ -111,15 +113,16 @@ class IpPoolController extends Controller
             if ($result['success']) {
                 $message = "Successfully synced {$result['total']} IP pools. ";
                 $message .= "Created: {$result['created']}, Updated: {$result['updated']}";
-                
+
                 return back()->with('success', $message);
             } else {
-                return back()->with('error', 'Failed to sync IP pools: ' . $result['message']);
+                return back()->with('error', 'Failed to sync IP pools: '.$result['message']);
             }
 
         } catch (\Exception $e) {
-            Log::error('IP pool sync error: ' . $e->getMessage());
-            return back()->with('error', 'Failed to sync IP pools: ' . $e->getMessage());
+            Log::error('IP pool sync error: '.$e->getMessage());
+
+            return back()->with('error', 'Failed to sync IP pools: '.$e->getMessage());
         }
     }
 
@@ -177,8 +180,9 @@ class IpPoolController extends Controller
             return redirect()->route('isp.ip-pools.index')->with('success', 'IP pool updated successfully');
 
         } catch (\Exception $e) {
-            Log::error('IP pool update error: ' . $e->getMessage());
-            return back()->with('error', 'Failed to update IP pool: ' . $e->getMessage())->withInput();
+            Log::error('IP pool update error: '.$e->getMessage());
+
+            return back()->with('error', 'Failed to update IP pool: '.$e->getMessage())->withInput();
         }
     }
 
@@ -238,7 +242,7 @@ class IpPoolController extends Controller
                     'total_ips' => $pool->total_ips,
                     'available_ips' => $pool->available_ips,
                     'router_name' => $pool->router->name,
-                    'display_name' => "{$pool->name} ({$pool->formatted_range}) - {$pool->router->name}"
+                    'display_name' => "{$pool->name} ({$pool->formatted_range}) - {$pool->router->name}",
                 ];
             });
 

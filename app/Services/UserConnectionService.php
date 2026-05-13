@@ -3,22 +3,19 @@
 namespace App\Services;
 
 use App\Models\Customer;
-use App\Models\Subscription;
-use App\Models\Payment;
-use App\Models\Invoice;
-use App\Models\Router;
-use App\Models\HotspotServer;
 use App\Models\IpPool;
-use App\Models\BandwidthProfile;
+use App\Models\Router;
+use App\Models\Subscription;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class UserConnectionService
 {
     protected $router;
+
     protected $mikrotikService;
 
-    public function __construct(Router $router = null)
+    public function __construct(?Router $router = null)
     {
         $this->router = $router;
         if ($router) {
@@ -32,8 +29,9 @@ class UserConnectionService
     public function createHotspotUser(Customer $customer, Subscription $subscription): bool
     {
         try {
-            if (!$customer->router || !$customer->hotspotServer) {
+            if (! $customer->router || ! $customer->hotspotServer) {
                 Log::error("Customer {$customer->id} missing router or hotspot server");
+
                 return false;
             }
 
@@ -63,14 +61,17 @@ class UserConnectionService
 
             if ($response->successful()) {
                 Log::info("Created hotspot user: {$customer->username}");
+
                 return true;
             }
 
-            Log::error("Failed to create hotspot user {$customer->username}: " . $response->body());
+            Log::error("Failed to create hotspot user {$customer->username}: ".$response->body());
+
             return false;
 
         } catch (\Exception $e) {
-            Log::error("Error creating hotspot user {$customer->username}: " . $e->getMessage());
+            Log::error("Error creating hotspot user {$customer->username}: ".$e->getMessage());
+
             return false;
         }
     }
@@ -81,8 +82,9 @@ class UserConnectionService
     public function createPPPoEUser(Customer $customer, Subscription $subscription): bool
     {
         try {
-            if (!$customer->router) {
+            if (! $customer->router) {
                 Log::error("Customer {$customer->id} missing router");
+
                 return false;
             }
 
@@ -114,14 +116,17 @@ class UserConnectionService
 
             if ($response->successful()) {
                 Log::info("Created PPPoE user: {$customer->username}");
+
                 return true;
             }
 
-            Log::error("Failed to create PPPoE user {$customer->username}: " . $response->body());
+            Log::error("Failed to create PPPoE user {$customer->username}: ".$response->body());
+
             return false;
 
         } catch (\Exception $e) {
-            Log::error("Error creating PPPoE user {$customer->username}: " . $e->getMessage());
+            Log::error("Error creating PPPoE user {$customer->username}: ".$e->getMessage());
+
             return false;
         }
     }
@@ -132,7 +137,7 @@ class UserConnectionService
     public function disconnectUser(Customer $customer): bool
     {
         try {
-            if (!$customer->router) {
+            if (! $customer->router) {
                 return false;
             }
 
@@ -150,8 +155,8 @@ class UserConnectionService
                         '.id' => $customer->username,
                     ]);
 
-                if (!$response->successful()) {
-                    Log::error("Failed to remove hotspot user {$customer->username}: " . $response->body());
+                if (! $response->successful()) {
+                    Log::error("Failed to remove hotspot user {$customer->username}: ".$response->body());
                     $success = false;
                 }
             }
@@ -164,8 +169,8 @@ class UserConnectionService
                     '.id' => $customer->username,
                 ]);
 
-            if (!$response->successful()) {
-                Log::error("Failed to remove PPPoE user {$customer->username}: " . $response->body());
+            if (! $response->successful()) {
+                Log::error("Failed to remove PPPoE user {$customer->username}: ".$response->body());
                 $success = false;
             }
 
@@ -176,7 +181,8 @@ class UserConnectionService
             return $success;
 
         } catch (\Exception $e) {
-            Log::error("Error disconnecting user {$customer->username}: " . $e->getMessage());
+            Log::error("Error disconnecting user {$customer->username}: ".$e->getMessage());
+
             return false;
         }
     }
@@ -187,7 +193,7 @@ class UserConnectionService
     public function suspendUser(Customer $customer): bool
     {
         try {
-            if (!$customer->router) {
+            if (! $customer->router) {
                 return false;
             }
 
@@ -206,8 +212,8 @@ class UserConnectionService
                         'disabled' => 'true',
                     ]);
 
-                if (!$response->successful()) {
-                    Log::error("Failed to suspend hotspot user {$customer->username}: " . $response->body());
+                if (! $response->successful()) {
+                    Log::error("Failed to suspend hotspot user {$customer->username}: ".$response->body());
                     $success = false;
                 }
             }
@@ -221,8 +227,8 @@ class UserConnectionService
                     'disabled' => 'true',
                 ]);
 
-            if (!$response->successful()) {
-                Log::error("Failed to suspend PPPoE user {$customer->username}: " . $response->body());
+            if (! $response->successful()) {
+                Log::error("Failed to suspend PPPoE user {$customer->username}: ".$response->body());
                 $success = false;
             }
 
@@ -233,7 +239,8 @@ class UserConnectionService
             return $success;
 
         } catch (\Exception $e) {
-            Log::error("Error suspending user {$customer->username}: " . $e->getMessage());
+            Log::error("Error suspending user {$customer->username}: ".$e->getMessage());
+
             return false;
         }
     }
@@ -244,7 +251,7 @@ class UserConnectionService
     public function reconnectUser(Customer $customer, Subscription $subscription): bool
     {
         try {
-            if (!$customer->router) {
+            if (! $customer->router) {
                 return false;
             }
 
@@ -263,8 +270,8 @@ class UserConnectionService
                         'disabled' => 'false',
                     ]);
 
-                if (!$response->successful()) {
-                    Log::error("Failed to reconnect hotspot user {$customer->username}: " . $response->body());
+                if (! $response->successful()) {
+                    Log::error("Failed to reconnect hotspot user {$customer->username}: ".$response->body());
                     $success = false;
                 }
             }
@@ -278,8 +285,8 @@ class UserConnectionService
                     'disabled' => 'false',
                 ]);
 
-            if (!$response->successful()) {
-                Log::error("Failed to reconnect PPPoE user {$customer->username}: " . $response->body());
+            if (! $response->successful()) {
+                Log::error("Failed to reconnect PPPoE user {$customer->username}: ".$response->body());
                 $success = false;
             }
 
@@ -290,7 +297,8 @@ class UserConnectionService
             return $success;
 
         } catch (\Exception $e) {
-            Log::error("Error reconnecting user {$customer->username}: " . $e->getMessage());
+            Log::error("Error reconnecting user {$customer->username}: ".$e->getMessage());
+
             return false;
         }
     }
@@ -302,12 +310,13 @@ class UserConnectionService
     {
         // This is a simplified implementation
         // In production, you'd need to check actual IP usage on the router
-        if (!empty($ipPool->ranges)) {
+        if (! empty($ipPool->ranges)) {
             $firstRange = $ipPool->ranges[0];
             if (isset($firstRange['start'])) {
                 return $firstRange['start'];
             }
         }
+
         return null;
     }
 
@@ -317,12 +326,12 @@ class UserConnectionService
     public function applyBandwidthLimits(Customer $customer, Subscription $subscription): bool
     {
         try {
-            if (!$customer->router || !$subscription->plan->bandwidth_profile_id) {
+            if (! $customer->router || ! $subscription->plan->bandwidth_profile_id) {
                 return false;
             }
 
             $bandwidthProfile = $subscription->plan->bandwidthProfile;
-            if (!$bandwidthProfile) {
+            if (! $bandwidthProfile) {
                 return false;
             }
 
@@ -334,16 +343,16 @@ class UserConnectionService
                 '/queue/simple/add' => '',
                 'name' => "queue_{$customer->username}",
                 'target' => $customer->username,
-                'max-limit' => ($bandwidthProfile->download_limit / 1000) . 'k/' . ($bandwidthProfile->upload_limit / 1000) . 'k',
+                'max-limit' => ($bandwidthProfile->download_limit / 1000).'k/'.($bandwidthProfile->upload_limit / 1000).'k',
                 'priority' => $bandwidthProfile->priority,
                 'comment' => "Customer ID: {$customer->id}",
             ];
 
             // Add burst settings if configured
             if ($bandwidthProfile->download_burst_limit && $bandwidthProfile->upload_burst_limit) {
-                $queueData['burst-limit'] = ($bandwidthProfile->download_burst_limit / 1000) . 'k/' . ($bandwidthProfile->upload_burst_limit / 1000) . 'k';
-                $queueData['burst-threshold'] = ($bandwidthProfile->download_burst_threshold / 1000) . 'k/' . ($bandwidthProfile->upload_burst_threshold / 1000) . 'k';
-                $queueData['burst-time'] = ($bandwidthProfile->download_burst_time ?? 10) . 's/' . ($bandwidthProfile->upload_burst_time ?? 10) . 's';
+                $queueData['burst-limit'] = ($bandwidthProfile->download_burst_limit / 1000).'k/'.($bandwidthProfile->upload_burst_limit / 1000).'k';
+                $queueData['burst-threshold'] = ($bandwidthProfile->download_burst_threshold / 1000).'k/'.($bandwidthProfile->upload_burst_threshold / 1000).'k';
+                $queueData['burst-time'] = ($bandwidthProfile->download_burst_time ?? 10).'s/'.($bandwidthProfile->upload_burst_time ?? 10).'s';
             }
 
             $response = Http::timeout(10)
@@ -352,14 +361,17 @@ class UserConnectionService
 
             if ($response->successful()) {
                 Log::info("Applied bandwidth limits for user: {$customer->username}");
+
                 return true;
             }
 
-            Log::error("Failed to apply bandwidth limits for {$customer->username}: " . $response->body());
+            Log::error("Failed to apply bandwidth limits for {$customer->username}: ".$response->body());
+
             return false;
 
         } catch (\Exception $e) {
-            Log::error("Error applying bandwidth limits for {$customer->username}: " . $e->getMessage());
+            Log::error("Error applying bandwidth limits for {$customer->username}: ".$e->getMessage());
+
             return false;
         }
     }
@@ -370,7 +382,7 @@ class UserConnectionService
     public function removeBandwidthLimits(Customer $customer): bool
     {
         try {
-            if (!$customer->router) {
+            if (! $customer->router) {
                 return false;
             }
 
@@ -386,14 +398,17 @@ class UserConnectionService
 
             if ($response->successful()) {
                 Log::info("Removed bandwidth limits for user: {$customer->username}");
+
                 return true;
             }
 
-            Log::error("Failed to remove bandwidth limits for {$customer->username}: " . $response->body());
+            Log::error("Failed to remove bandwidth limits for {$customer->username}: ".$response->body());
+
             return false;
 
         } catch (\Exception $e) {
-            Log::error("Error removing bandwidth limits for {$customer->username}: " . $e->getMessage());
+            Log::error("Error removing bandwidth limits for {$customer->username}: ".$e->getMessage());
+
             return false;
         }
     }
@@ -404,11 +419,15 @@ class UserConnectionService
     public function getUserConnectionStatus(Customer $customer): array
     {
         try {
-            if (!$customer->router) {
-                return ['status' => 'unknown', 'message' => 'No router configured'];
+            if (! $customer->router) {
+                return [
+                    'hotspot' => 'unknown',
+                    'pppoe' => 'unknown',
+                    'overall' => 'unknown',
+                    'message' => 'No router configured for this customer.',
+                ];
             }
 
-            $service = new MikroTikService($customer->router);
             $url = $customer->router->getApiUrl();
 
             // Check hotspot user status
@@ -430,19 +449,19 @@ class UserConnectionService
             $status = [
                 'hotspot' => 'not_found',
                 'pppoe' => 'not_found',
-                'overall' => 'disconnected'
+                'overall' => 'disconnected',
             ];
 
             if ($hotspotResponse->successful()) {
                 $hotspotData = $this->parseUserResponse($hotspotResponse->body());
-                if (!empty($hotspotData)) {
+                if (! empty($hotspotData)) {
                     $status['hotspot'] = $hotspotData[0]['disabled'] === 'true' ? 'disabled' : 'active';
                 }
             }
 
             if ($pppoeResponse->successful()) {
                 $pppoeData = $this->parseUserResponse($pppoeResponse->body());
-                if (!empty($pppoeData)) {
+                if (! empty($pppoeData)) {
                     $status['pppoe'] = $pppoeData[0]['disabled'] === 'true' ? 'disabled' : 'active';
                 }
             }
@@ -457,8 +476,14 @@ class UserConnectionService
             return $status;
 
         } catch (\Exception $e) {
-            Log::error("Error getting connection status for {$customer->username}: " . $e->getMessage());
-            return ['status' => 'error', 'message' => $e->getMessage()];
+            Log::error("Error getting connection status for {$customer->username}: ".$e->getMessage());
+
+            return [
+                'hotspot' => 'unknown',
+                'pppoe' => 'unknown',
+                'overall' => 'error',
+                'message' => $e->getMessage(),
+            ];
         }
     }
 
@@ -469,7 +494,7 @@ class UserConnectionService
     {
         $users = [];
         $lines = explode("\n", $response);
-        
+
         foreach ($lines as $line) {
             if (empty($line) || strpos($line, '!done') === 0) {
                 continue;
@@ -477,15 +502,15 @@ class UserConnectionService
 
             $data = [];
             $parts = explode(' ', $line);
-            
+
             foreach ($parts as $part) {
                 if (strpos($part, '=') !== false) {
-                    list($key, $value) = explode('=', $part, 2);
+                    [$key, $value] = explode('=', $part, 2);
                     $data[$key] = $value;
                 }
             }
 
-            if (!empty($data)) {
+            if (! empty($data)) {
                 $users[] = $data;
             }
         }

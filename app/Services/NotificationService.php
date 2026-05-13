@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\NewNotification;
 use App\Models\Notification;
 use App\Models\ISP;
 use App\Models\Customer;
@@ -121,6 +122,32 @@ class NotificationService
     {
         $title = 'System Maintenance';
         return $this->createNotification($ispId, $title, $message, 'system');
+    }
+
+    /**
+     * Payment recorded but RouterOS enable failed after all automatic retries.
+     */
+    public function provisioningRetriesExhausted(Customer $customer, ?int $paymentId = null): Notification
+    {
+        $title = 'Router provisioning failed';
+        $message = "Customer {$customer->full_name} ({$customer->username}): payment was recorded but MikroTik could not enable the user after automatic retries.";
+        if ($paymentId) {
+            $message .= " Payment #{$paymentId}.";
+        }
+        $message .= ' Check router connectivity and the user record on RouterOS; manual enable may be required.';
+
+        $notification = $this->createNotification($customer->isp_id, $title, $message, 'error');
+
+        try {
+            broadcast(new NewNotification($notification));
+        } catch (\Throwable $e) {
+            Log::warning('Could not broadcast provisioning failure notification', [
+                'notification_id' => $notification->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $notification;
     }
 
     /**

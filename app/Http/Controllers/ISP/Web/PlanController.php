@@ -11,7 +11,7 @@ class PlanController extends Controller
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        
+
         $query = Plan::where('isp_id', $ispId)->withCount('subscriptions');
 
         if ($request->has('access_type') && $request->access_type) {
@@ -22,7 +22,7 @@ class PlanController extends Controller
             $query->where('is_active', $request->is_active);
         }
 
-        $plans = $query->latest()->paginate(20);
+        $plans = $query->latest()->paginate(20)->appends($request->query());
 
         return view('isp.plans.index', compact('plans'));
     }
@@ -66,6 +66,7 @@ class PlanController extends Controller
             abort(403);
         }
         $plan->loadCount('subscriptions');
+
         return view('isp.plans.show', compact('plan'));
     }
 
@@ -74,6 +75,7 @@ class PlanController extends Controller
         if ($plan->isp_id !== auth()->user()->isp_id) {
             abort(403);
         }
+
         return view('isp.plans.edit', compact('plan'));
     }
 
@@ -115,10 +117,10 @@ class PlanController extends Controller
             abort(403);
         }
 
-        $plan->update(['is_active' => !$plan->is_active]);
+        $plan->update(['is_active' => ! $plan->is_active]);
 
-        $message = $plan->is_active 
-            ? 'Plan activated successfully.' 
+        $message = $plan->is_active
+            ? 'Plan activated successfully.'
             : 'Plan deactivated successfully.';
 
         return back()->with('success', $message);
@@ -152,4 +154,3 @@ class PlanController extends Controller
         return back()->with('success', 'Plan deactivated successfully.');
     }
 }
-

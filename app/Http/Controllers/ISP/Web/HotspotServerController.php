@@ -16,11 +16,12 @@ class HotspotServerController extends Controller
         $ispId = auth()->user()->isp_id;
         $hotspotServers = HotspotServer::forIsp($ispId)
             ->with('router')
-            ->when($request->has('is_active'), function ($query) use ($request) {
+            ->when($request->filled('is_active'), function ($query) use ($request) {
                 $query->where('is_active', $request->is_active);
             })
             ->orderBy('name')
-            ->paginate(10);
+            ->paginate(10)
+            ->appends($request->query());
 
         $routers = Router::forIsp($ispId)->active()->get();
 
@@ -30,11 +31,11 @@ class HotspotServerController extends Controller
     public function sync(Request $request)
     {
         $request->validate([
-            'router_id' => 'required|exists:routers,id'
+            'router_id' => 'required|exists:routers,id',
         ]);
 
         $router = Router::findOrFail($request->router_id);
-        
+
         // Verify router belongs to ISP
         if ($router->isp_id !== auth()->user()->isp_id) {
             return back()->with('error', 'Router not found');
@@ -47,15 +48,16 @@ class HotspotServerController extends Controller
             if ($result['success']) {
                 $message = "Successfully synced {$result['total']} hotspot servers. ";
                 $message .= "Created: {$result['created']}, Updated: {$result['updated']}";
-                
+
                 return back()->with('success', $message);
             } else {
-                return back()->with('error', 'Failed to sync hotspot servers: ' . $result['message']);
+                return back()->with('error', 'Failed to sync hotspot servers: '.$result['message']);
             }
 
         } catch (\Exception $e) {
-            Log::error('Hotspot sync error: ' . $e->getMessage());
-            return back()->with('error', 'Failed to sync hotspot servers: ' . $e->getMessage());
+            Log::error('Hotspot sync error: '.$e->getMessage());
+
+            return back()->with('error', 'Failed to sync hotspot servers: '.$e->getMessage());
         }
     }
 
@@ -180,7 +182,7 @@ class HotspotServerController extends Controller
                     'name' => $server->name,
                     'interface' => $server->interface,
                     'router_name' => $server->router->name,
-                    'display_name' => "{$server->name} ({$server->interface}) - {$server->router->name}"
+                    'display_name' => "{$server->name} ({$server->interface}) - {$server->router->name}",
                 ];
             });
 

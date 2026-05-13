@@ -16,11 +16,12 @@ class BandwidthProfileController extends Controller
         $ispId = auth()->user()->isp_id;
         $bandwidthProfiles = BandwidthProfile::forIsp($ispId)
             ->with('parentProfile')
-            ->when($request->has('is_active'), function ($query) use ($request) {
+            ->when($request->filled('is_active'), function ($query) use ($request) {
                 $query->where('is_active', $request->is_active);
             })
             ->orderBy('name')
-            ->paginate(10);
+            ->paginate(10)
+            ->appends($request->query());
 
         $routers = Router::forIsp($ispId)->active()->get();
 
@@ -77,8 +78,9 @@ class BandwidthProfileController extends Controller
             return redirect()->route('isp.bandwidth-profiles.index')->with('success', 'Bandwidth profile created successfully');
 
         } catch (\Exception $e) {
-            Log::error('Bandwidth profile creation error: ' . $e->getMessage());
-            return back()->with('error', 'Failed to create bandwidth profile: ' . $e->getMessage())->withInput();
+            Log::error('Bandwidth profile creation error: '.$e->getMessage());
+
+            return back()->with('error', 'Failed to create bandwidth profile: '.$e->getMessage())->withInput();
         }
     }
 
@@ -152,8 +154,9 @@ class BandwidthProfileController extends Controller
             return redirect()->route('isp.bandwidth-profiles.index')->with('success', 'Bandwidth profile updated successfully');
 
         } catch (\Exception $e) {
-            Log::error('Bandwidth profile update error: ' . $e->getMessage());
-            return back()->with('error', 'Failed to update bandwidth profile: ' . $e->getMessage())->withInput();
+            Log::error('Bandwidth profile update error: '.$e->getMessage());
+
+            return back()->with('error', 'Failed to update bandwidth profile: '.$e->getMessage())->withInput();
         }
     }
 
@@ -220,7 +223,7 @@ class BandwidthProfileController extends Controller
                     'name' => $profile->name,
                     'download_speed' => $profile->formatted_download_speed,
                     'upload_speed' => $profile->formatted_upload_speed,
-                    'display_name' => "{$profile->name} (↓{$profile->formatted_download_speed}/↑{$profile->formatted_upload_speed})"
+                    'display_name' => "{$profile->name} (↓{$profile->formatted_download_speed}/↑{$profile->formatted_upload_speed})",
                 ];
             });
 
@@ -237,11 +240,11 @@ class BandwidthProfileController extends Controller
         }
 
         $request->validate([
-            'router_id' => 'required|exists:routers,id'
+            'router_id' => 'required|exists:routers,id',
         ]);
 
         $router = Router::findOrFail($request->router_id);
-        
+
         // Verify router belongs to ISP
         if ($router->isp_id !== auth()->user()->isp_id) {
             return back()->with('error', 'Router not found');
@@ -249,7 +252,7 @@ class BandwidthProfileController extends Controller
 
         try {
             $mikrotikService = new MikroTikService($router);
-            
+
             $config = [
                 'name' => $bandwidthProfile->name,
                 'download_limit' => $bandwidthProfile->download_limit,
@@ -260,9 +263,9 @@ class BandwidthProfileController extends Controller
 
             // Add burst settings if configured
             if ($bandwidthProfile->download_burst_limit && $bandwidthProfile->upload_burst_limit) {
-                $config['burst_limit'] = $bandwidthProfile->download_burst_limit . '/' . $bandwidthProfile->upload_burst_limit;
-                $config['burst_threshold'] = ($bandwidthProfile->download_burst_threshold ?? ($bandwidthProfile->download_limit * 0.8)) . '/' . ($bandwidthProfile->upload_burst_threshold ?? ($bandwidthProfile->upload_limit * 0.8));
-                $config['burst_time'] = ($bandwidthProfile->download_burst_time ?? 10) . '/' . ($bandwidthProfile->upload_burst_time ?? 10);
+                $config['burst_limit'] = $bandwidthProfile->download_burst_limit.'/'.$bandwidthProfile->upload_burst_limit;
+                $config['burst_threshold'] = ($bandwidthProfile->download_burst_threshold ?? ($bandwidthProfile->download_limit * 0.8)).'/'.($bandwidthProfile->upload_burst_threshold ?? ($bandwidthProfile->upload_limit * 0.8));
+                $config['burst_time'] = ($bandwidthProfile->download_burst_time ?? 10).'/'.($bandwidthProfile->upload_burst_time ?? 10);
             }
 
             $result = false;
@@ -279,8 +282,9 @@ class BandwidthProfileController extends Controller
             }
 
         } catch (\Exception $e) {
-            Log::error('Bandwidth profile deployment error: ' . $e->getMessage());
-            return back()->with('error', 'Failed to deploy bandwidth profile: ' . $e->getMessage());
+            Log::error('Bandwidth profile deployment error: '.$e->getMessage());
+
+            return back()->with('error', 'Failed to deploy bandwidth profile: '.$e->getMessage());
         }
     }
 }

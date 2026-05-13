@@ -2,15 +2,16 @@
 
 namespace App\Services;
 
-use App\Models\Router;
 use App\Models\Customer;
 use App\Models\Plan;
-use Illuminate\Support\Facades\Log;
+use App\Models\Router;
 use Exception;
+use Illuminate\Support\Facades\Log;
 
 class MikroTikService
 {
     protected $router;
+
     protected $connection;
 
     public function __construct(Router $router)
@@ -28,7 +29,7 @@ class MikroTikService
             // Try different possible class names
             $routerOsClass = null;
             $routerOsConfigClass = null;
-            
+
             if (class_exists('\RouterOS\Client')) {
                 $routerOsClass = '\RouterOS\Client';
                 $routerOsConfigClass = class_exists('\RouterOS\Config') ? '\RouterOS\Config' : null;
@@ -38,7 +39,7 @@ class MikroTikService
                 $routerOsClass = '\PEAR2\Net\RouterOS\Client';
             }
 
-            if (!$routerOsClass) {
+            if (! $routerOsClass) {
                 // For testing without RouterOS package, log warning and return false
                 // Don't throw exception to allow testing without physical router
                 Log::warning('RouterOS API package not installed. Install with: composer require evgeny-rodionov/routeros-api-php', [
@@ -46,6 +47,7 @@ class MikroTikService
                     'router_ip' => $this->router->ip_address,
                 ]);
                 $this->connection = null;
+
                 return false;
             }
 
@@ -72,12 +74,20 @@ class MikroTikService
 
             return true;
         } catch (\Throwable $e) {
-            Log::error('MikroTik connection failed: ' . $e->getMessage(), [
+            Log::error('MikroTik connection failed: '.$e->getMessage(), [
                 'router_id' => $this->router->id,
                 'router_ip' => $this->router->ip_address,
                 'exception' => get_class($e),
             ]);
+            try {
+                \App\Services\ActivityLogService::logRouterApiConnectionFailed(
+                    $this->router,
+                    $e->getMessage()
+                );
+            } catch (\Throwable) {
+            }
             $this->connection = null;
+
             return false;
         }
     }
@@ -91,37 +101,208 @@ class MikroTikService
     }
 
     /**
-     * Create a Hotspot user
+     * Verify API connectivity and return hotspot server definitions for import.
+     *
+     * @return array{success: bool, error?: string, hotspot_servers: array<int, array<string, mixed>>, hotspot_servers_count: int, router_info?: array<string, mixed>}
      */
-    public function createHotspotUser(Customer $customer, Plan $plan): bool
+    public function testConnection(): array
     {
-        if (!$this->connect()) {
+        $empty = fn (string $error) => [
+            'success' => false,
+            'error' => $error,
+            'hotspot_servers' => [],
+            'hotspot_servers_count' => 0,
+            'router_info' => null,
+        ];
+
+        if (! $this->routerOsLibraryAvailable()) {
+            return $empty('RouterOS API PHP library is not installed. Run: composer require evgeny-rodionov/routeros-api-php');
+        }
+
+        if (! $this->connect()) {
+            return $empty('Could not open RouterOS API session. Check IP/hostname, API port (default 8728), username, password, and firewall rules.');
+        }
+
+        try {
+            $identityRows = $this->apiPrint('/system/identity/print');
+            $routerInfo = $identityRows[0] ?? ['name' => $this->router->ip_address];
+
+            $hotspotRows = $this->apiPrint('/ip/hotspot/print');
+            $hotspotServers = [];
+            foreach ($hotspotRows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $hotspotServers[] = $this->mapHotspotServerImportRow($row);
+            }
+
+            return [
+                'success' => true,
+                'hotspot_servers' => $hotspotServers,
+                'hotspot_servers_count' => count($hotspotServers),
+                'router_info' => $routerInfo,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik testConnection failed: '.$e->getMessage(), [
+                'router_id' => $this->router->id ?? null,
+                'ip' => $this->router->ip_address ?? null,
+            ]);
+
+            return $empty('RouterOS API error: '.$e->getMessage());
+        }
+    }
+
+    protected function routerOsLibraryAvailable(): bool
+    {
+        if (class_exists('\RouterOS\Client')) {
+            return true;
+        }
+        if (class_exists('\RouterOS\API')) {
+            return true;
+        }
+        if (class_exists('\PEAR2\Net\RouterOS\Client')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    protected function apiPrint(string $path): array
+    {
+        if (! $this->connection) {
+            return [];
+        }
+
+        if (method_exists($this->connection, 'comm')) {
+            $response = $this->connection->comm($path);
+
+            return is_array($response) ? $response : [];
+        }
+
+        if (method_exists($this->connection, 'query')) {
+            $query = new \RouterOS\Query($path);
+            $response = $this->connection->query($query)->read();
+
+            return is_array($response) ? $response : [];
+        }
+
+        return [];
+    }
+
+    /**
+     * Map a row from /ip/hotspot/print to the shape expected by RouterController::importHotspotServers().
+     *
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    protected function mapHotspotServerImportRow(array $row): array
+    {
+        $bool = fn ($v): bool => in_array((string) $v, ['true', 'yes', '1'], true);
+
+        return [
+            'name' => (string) ($row['name'] ?? 'hotspot'),
+            'interface' => (string) ($row['interface'] ?? 'unknown'),
+            'server_profile' => $row['profile'] ?? null,
+            'default_profile' => $row['profile'] ?? null,
+            'login_by' => $this->normalizeLoginBy((string) ($row['login-by'] ?? 'cookie')),
+            'use_radius' => $bool($row['use-radius'] ?? false),
+            'radius_accounting' => $bool($row['radius-accounting'] ?? false),
+            'mac_cookie_timeout' => $this->parseMtDurationToSeconds($row['http-cookie-lifetime'] ?? null) ?? 300,
+            'idle_timeout' => $this->parseMtDurationToSeconds($row['idle-timeout'] ?? null) ?? 300,
+            'keepalive_timeout' => $this->parseMtDurationToSeconds($row['keepalive-timeout'] ?? null) ?? 60,
+            'status_autologout' => $bool($row['status-autologout'] ?? false),
+            'allowed_users' => (int) ($row['addresses-per-mac'] ?? 0) ?: 0,
+            'shared_users' => (int) ($row['shared-users'] ?? 0) ?: 0,
+            'mac_format' => $row['mac-format'] ?? null,
+            'mac_password' => $row['mac-password'] ?? null,
+            'radius_mac_format' => $row['radius-mac-format'] ?? null,
+            'radius_mac_password' => $row['radius-mac-password'] ?? null,
+            'trial_uptime' => (int) ($row['trial-uptime-limit'] ?? 0),
+            'trial_uptime_reset' => (int) ($row['trial-uptime-reset'] ?? 0),
+            'trial_profile' => $row['trial-user-profile'] ?? null,
+            'trial_users' => (int) ($row['trial-users'] ?? 0),
+            'disabled' => $bool($row['disabled'] ?? false),
+            'running' => ! $bool($row['disabled'] ?? false),
+        ];
+    }
+
+    protected function normalizeLoginBy(string $loginBy): string
+    {
+        $loginBy = strtolower(trim(explode(',', $loginBy)[0] ?? 'cookie'));
+
+        return in_array($loginBy, ['cookie', 'http-chap', 'mac'], true) ? $loginBy : 'cookie';
+    }
+
+    protected function parseMtDurationToSeconds(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+        $s = (string) $value;
+        $seconds = 0;
+        if (preg_match('/(\d+)w/i', $s, $m)) {
+            $seconds += (int) $m[1] * 604800;
+        }
+        if (preg_match('/(\d+)d/i', $s, $m)) {
+            $seconds += (int) $m[1] * 86400;
+        }
+        if (preg_match('/(\d+)h/i', $s, $m)) {
+            $seconds += (int) $m[1] * 3600;
+        }
+        if (preg_match('/(\d+)m/i', $s, $m)) {
+            $seconds += (int) $m[1] * 60;
+        }
+        if (preg_match('/(\d+)s/i', $s, $m)) {
+            $seconds += (int) $m[1];
+        }
+
+        return $seconds > 0 ? $seconds : null;
+    }
+
+    /**
+     * Create a Hotspot user
+     *
+     * @param  string|null  $plainPassword  Plaintext password for the router (required when DB stores a hash)
+     */
+    public function createHotspotUser(Customer $customer, Plan $plan, ?string $plainPassword = null): bool
+    {
+        $passwordForApi = $plainPassword ?? $customer->password;
+
+        if (! $this->connect()) {
             // In local/testing environment, simulate success for testing
-            if (app()->environment(['local', 'testing']) && !$this->connection) {
+            if (app()->environment(['local', 'testing']) && ! $this->connection) {
                 Log::info('MikroTikService: Simulating hotspot user creation (RouterOS package not installed)', [
                     'customer_id' => $customer->id,
                     'username' => $customer->username,
                 ]);
                 // Simulate success by setting a fake mikrotik_user_id
-                $customer->update(['mikrotik_user_id' => 'sim-' . $customer->id]);
+                $customer->update(['mikrotik_user_id' => 'sim-'.$customer->id]);
+
                 return true;
             }
+
             return false;
         }
 
         try {
             $params = [
                 'name' => $customer->username,
-                'password' => $customer->password,
+                'password' => $passwordForApi,
                 'profile' => $plan->speed_profile ?? 'default',
             ];
-            
+
             if ($plan->billing_type === 'time' && $plan->time_limit_hours) {
-                $params['limit-uptime'] = $plan->time_limit_hours . 'h';
+                $params['limit-uptime'] = $plan->time_limit_hours.'h';
             }
-            
+
             if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
-                $params['limit-bytes-total'] = $plan->data_limit_mb . 'M';
+                $params['limit-bytes-total'] = $plan->data_limit_mb.'M';
             }
 
             // Check if connection has comm method (old API) or query method (new API)
@@ -136,22 +317,24 @@ class MikroTikService
             } else {
                 throw new Exception('Unknown RouterOS API method');
             }
-            
+
             if (isset($response[0]['.id'])) {
                 $customer->update(['mikrotik_user_id' => $response[0]['.id']]);
+
                 return true;
             }
 
             return false;
         } catch (Exception $e) {
-            Log::error('Failed to create hotspot user: ' . $e->getMessage());
+            Log::error('Failed to create hotspot user: '.$e->getMessage());
+
             return false;
         }
     }
 
     /**
      * Activate hotspot user for customer
-     * 
+     *
      * - Connects to MikroTik API using router credentials
      * - Disconnects any previous active sessions
      * - Creates user if doesn't exist (using customer_id, phone, or username)
@@ -165,11 +348,13 @@ class MikroTikService
     {
         if ($customer->connection_type !== 'hotspot') {
             $this->logAction('activate_hotspot_user', $customer, 'failed', 'Customer is not a hotspot user');
+
             return false;
         }
 
-        if (!$this->connect()) {
+        if (! $this->connect()) {
             $this->logAction('activate_hotspot_user', $customer, 'failed', 'Failed to connect to router');
+
             return false;
         }
 
@@ -181,8 +366,9 @@ class MikroTikService
             $subscription = $customer->activeSubscription();
             $plan = $subscription?->plan;
 
-            if (!$plan) {
+            if (! $plan) {
                 $this->logAction('activate_hotspot_user', $customer, 'failed', 'No active plan found for customer');
+
                 return false;
             }
 
@@ -190,7 +376,7 @@ class MikroTikService
             $username = $customer->username;
             if (empty($username)) {
                 // Use customer ID or phone as username
-                $username = $customer->phone_number ?: 'CUST' . $customer->id;
+                $username = $customer->phone_number ?: 'CUST'.$customer->id;
                 $customer->update(['username' => $username]);
             }
 
@@ -202,10 +388,11 @@ class MikroTikService
             }
 
             // Step 5: Create user on MikroTik if doesn't exist
-            if (!$customer->mikrotik_user_id) {
+            if (! $customer->mikrotik_user_id) {
                 $created = $this->createHotspotUserWithPlan($customer, $plan, $username, $password);
-                if (!$created) {
+                if (! $created) {
                     $this->logAction('activate_hotspot_user', $customer, 'failed', 'Failed to create user on router');
+
                     return false;
                 }
             } else {
@@ -215,20 +402,23 @@ class MikroTikService
 
             // Step 6: Enable user
             $enabled = $this->enableUser($customer);
-            
+
             if ($enabled) {
-                $this->logAction('activate_hotspot_user', $customer, 'success', 
+                $this->logAction('activate_hotspot_user', $customer, 'success',
                     "Hotspot user activated: {$username}, Plan: {$plan->name}, Duration: {$plan->duration_days} days");
+
                 return true;
             } else {
                 $this->logAction('activate_hotspot_user', $customer, 'failed', 'Failed to enable user on router');
+
                 return false;
             }
 
         } catch (Exception $e) {
-            $this->logAction('activate_hotspot_user', $customer, 'failed', 
-                'Exception: ' . $e->getMessage(), $e->getMessage());
-            Log::error('activateHotspotUser failed: ' . $e->getMessage());
+            $this->logAction('activate_hotspot_user', $customer, 'failed',
+                'Exception: '.$e->getMessage(), $e->getMessage());
+            Log::error('activateHotspotUser failed: '.$e->getMessage());
+
             return false;
         }
     }
@@ -239,7 +429,7 @@ class MikroTikService
     protected function disconnectPreviousSessions(Customer $customer): void
     {
         try {
-            if (!$this->connect()) {
+            if (! $this->connect()) {
                 return;
             }
 
@@ -248,22 +438,22 @@ class MikroTikService
                 '?user' => $customer->username,
             ]);
 
-            if (!empty($activeSessions)) {
+            if (! empty($activeSessions)) {
                 foreach ($activeSessions as $session) {
                     $sessionId = $session['.id'] ?? null;
                     if ($sessionId) {
                         $this->connection->comm('/ip/hotspot/active/remove', [
                             '.id' => $sessionId,
                         ]);
-                        $this->logAction('disconnect_session', $customer, 'success', 
+                        $this->logAction('disconnect_session', $customer, 'success',
                             "Disconnected previous session: {$sessionId}");
                     }
                 }
             }
         } catch (Exception $e) {
-            Log::error('Failed to disconnect previous sessions: ' . $e->getMessage());
-            $this->logAction('disconnect_session', $customer, 'failed', 
-                'Failed to disconnect: ' . $e->getMessage(), $e->getMessage());
+            Log::error('Failed to disconnect previous sessions: '.$e->getMessage());
+            $this->logAction('disconnect_session', $customer, 'failed',
+                'Failed to disconnect: '.$e->getMessage(), $e->getMessage());
         }
     }
 
@@ -278,46 +468,49 @@ class MikroTikService
                 'password' => $password,
                 'profile' => $plan->speed_profile ?? 'default',
             ];
-            
+
             // Set session expiry based on plan duration
             if ($plan->duration_days) {
-                $params['limit-uptime'] = ($plan->duration_days * 24) . 'h';
+                $params['limit-uptime'] = ($plan->duration_days * 24).'h';
             }
-            
+
             // Set time limit if specified
             if ($plan->billing_type === 'time' && $plan->time_limit_hours) {
-                $params['limit-uptime'] = $plan->time_limit_hours . 'h';
+                $params['limit-uptime'] = $plan->time_limit_hours.'h';
             }
-            
+
             // Set data limit if specified
             if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
-                $params['limit-bytes-total'] = $plan->data_limit_mb . 'M';
+                $params['limit-bytes-total'] = $plan->data_limit_mb.'M';
             }
 
             // Set speed limits if specified
             if ($plan->download_speed_kbps) {
-                $params['limit-bytes-out'] = ($plan->download_speed_kbps * 1024) . 'bps';
+                $params['limit-bytes-out'] = ($plan->download_speed_kbps * 1024).'bps';
             }
             if ($plan->upload_speed_kbps) {
-                $params['limit-bytes-in'] = ($plan->upload_speed_kbps * 1024) . 'bps';
+                $params['limit-bytes-in'] = ($plan->upload_speed_kbps * 1024).'bps';
             }
 
             $response = $this->connection->comm('/ip/hotspot/user/add', $params);
-            
+
             if (isset($response[0]['.id'])) {
                 $customer->update(['mikrotik_user_id' => $response[0]['.id']]);
-                $this->logAction('create_hotspot_user', $customer, 'success', 
+                $this->logAction('create_hotspot_user', $customer, 'success',
                     "Created user: {$username}", $params, $response[0] ?? []);
+
                 return true;
             }
 
-            $this->logAction('create_hotspot_user', $customer, 'failed', 
+            $this->logAction('create_hotspot_user', $customer, 'failed',
                 'Invalid response from router', $params, $response ?? []);
+
             return false;
         } catch (Exception $e) {
-            Log::error('Failed to create hotspot user: ' . $e->getMessage());
-            $this->logAction('create_hotspot_user', $customer, 'failed', 
-                'Exception: ' . $e->getMessage(), null, null, $e->getMessage());
+            Log::error('Failed to create hotspot user: '.$e->getMessage());
+            $this->logAction('create_hotspot_user', $customer, 'failed',
+                'Exception: '.$e->getMessage(), null, null, $e->getMessage());
+
             return false;
         }
     }
@@ -334,36 +527,38 @@ class MikroTikService
                 'password' => $password,
                 'profile' => $plan->speed_profile ?? 'default',
             ];
-            
+
             // Update session expiry
             if ($plan->duration_days) {
-                $params['limit-uptime'] = ($plan->duration_days * 24) . 'h';
+                $params['limit-uptime'] = ($plan->duration_days * 24).'h';
             }
-            
+
             if ($plan->billing_type === 'time' && $plan->time_limit_hours) {
-                $params['limit-uptime'] = $plan->time_limit_hours . 'h';
+                $params['limit-uptime'] = $plan->time_limit_hours.'h';
             }
-            
+
             if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
-                $params['limit-bytes-total'] = $plan->data_limit_mb . 'M';
+                $params['limit-bytes-total'] = $plan->data_limit_mb.'M';
             }
 
             // Update speed limits
             if ($plan->download_speed_kbps) {
-                $params['limit-bytes-out'] = ($plan->download_speed_kbps * 1024) . 'bps';
+                $params['limit-bytes-out'] = ($plan->download_speed_kbps * 1024).'bps';
             }
             if ($plan->upload_speed_kbps) {
-                $params['limit-bytes-in'] = ($plan->upload_speed_kbps * 1024) . 'bps';
+                $params['limit-bytes-in'] = ($plan->upload_speed_kbps * 1024).'bps';
             }
 
             $response = $this->connection->comm('/ip/hotspot/user/set', $params);
-            $this->logAction('update_hotspot_user', $customer, 'success', 
+            $this->logAction('update_hotspot_user', $customer, 'success',
                 "Updated user: {$username}", $params, $response ?? []);
+
             return true;
         } catch (Exception $e) {
-            Log::error('Failed to update hotspot user: ' . $e->getMessage());
-            $this->logAction('update_hotspot_user', $customer, 'failed', 
-                'Exception: ' . $e->getMessage(), null, null, $e->getMessage());
+            Log::error('Failed to update hotspot user: '.$e->getMessage());
+            $this->logAction('update_hotspot_user', $customer, 'failed',
+                'Exception: '.$e->getMessage(), null, null, $e->getMessage());
+
             return false;
         }
     }
@@ -395,40 +590,101 @@ class MikroTikService
             ]);
         } catch (\Exception $e) {
             // Don't fail if logging fails
-            Log::error('Failed to log router action: ' . $e->getMessage());
+            Log::error('Failed to log router action: '.$e->getMessage());
         }
     }
 
     /**
      * Create a PPPoE user
+     *
+     * @param  string|null  $plainPassword  Plaintext password for the router (required when DB stores a hash)
      */
-    public function createPppoeUser(Customer $customer, Plan $plan): bool
+    public function createPppoeUser(Customer $customer, Plan $plan, ?string $plainPassword = null): bool
     {
-        if (!$this->connect()) {
+        $passwordForApi = $plainPassword ?? $customer->password;
+
+        if (! $this->connect()) {
+            if (app()->environment(['local', 'testing']) && ! $this->connection) {
+                Log::info('MikroTikService: Simulating PPPoE user creation (RouterOS package not installed)', [
+                    'customer_id' => $customer->id,
+                    'username' => $customer->username,
+                ]);
+                $customer->update(['mikrotik_user_id' => 'sim-pppoe-'.$customer->id]);
+
+                return true;
+            }
+
             return false;
         }
 
         try {
             $params = [
                 'name' => $customer->username,
-                'password' => $customer->password,
+                'password' => $passwordForApi,
                 'profile' => $plan->speed_profile ?? 'default',
                 'service' => 'pppoe',
                 'remote-address' => $this->getNextIpAddress(),
             ];
 
             $response = $this->connection->comm('/ppp/secret/add', $params);
-            
+
             if (isset($response[0]['.id'])) {
                 $customer->update(['mikrotik_user_id' => $response[0]['.id']]);
+
                 return true;
             }
 
             return false;
         } catch (Exception $e) {
-            Log::error('Failed to create PPPoE user: ' . $e->getMessage());
+            Log::error('Failed to create PPPoE user: '.$e->getMessage());
+
             return false;
         }
+    }
+
+    /**
+     * Resolve RouterOS internal .id for this customer: match by username, then by comment "PB-ID:{customer.id}".
+     */
+    protected function resolveMikrotikInternalUserId(Customer $customer): ?string
+    {
+        if (! $this->connection) {
+            return null;
+        }
+
+        $tag = 'PB-ID:'.$customer->id;
+
+        try {
+            if ($customer->connection_type === 'hotspot') {
+                if ($customer->username) {
+                    $rows = $this->connection->comm('/ip/hotspot/user/print', ['?name' => $customer->username]);
+                    if (! empty($rows[0]['.id'])) {
+                        return (string) $rows[0]['.id'];
+                    }
+                }
+                $rows = $this->connection->comm('/ip/hotspot/user/print', ['?comment' => $tag]);
+                if (! empty($rows[0]['.id'])) {
+                    return (string) $rows[0]['.id'];
+                }
+            } else {
+                if ($customer->username) {
+                    $rows = $this->connection->comm('/ppp/secret/print', ['?name' => $customer->username]);
+                    if (! empty($rows[0]['.id'])) {
+                        return (string) $rows[0]['.id'];
+                    }
+                }
+                $rows = $this->connection->comm('/ppp/secret/print', ['?comment' => $tag]);
+                if (! empty($rows[0]['.id'])) {
+                    return (string) $rows[0]['.id'];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('resolveMikrotikInternalUserId: '.$e->getMessage(), [
+                'customer_id' => $customer->id,
+                'router_id' => $this->router->id,
+            ]);
+        }
+
+        return null;
     }
 
     /**
@@ -436,25 +692,41 @@ class MikroTikService
      */
     public function enableUser(Customer $customer): bool
     {
-        if (!$this->connect() || !$customer->mikrotik_user_id) {
-            $this->logAction('enable_user', $customer, 'failed', 'Failed to connect or user ID missing');
+        if (! $this->connect()) {
+            $this->logAction('enable_user', $customer, 'failed', 'Failed to connect to router');
+
             return false;
         }
 
+        $dotId = $this->resolveMikrotikInternalUserId($customer)
+            ?? ($customer->mikrotik_user_id ? (string) $customer->mikrotik_user_id : null);
+
+        if (! $dotId) {
+            $this->logAction('enable_user', $customer, 'failed', 'Could not resolve RouterOS .id');
+
+            return false;
+        }
+
+        if ((string) ($customer->mikrotik_user_id ?? '') !== $dotId) {
+            $customer->forceFill(['mikrotik_user_id' => $dotId])->saveQuietly();
+        }
+
         try {
-            $path = $customer->connection_type === 'hotspot' 
-                ? '/ip/hotspot/user/enable' 
+            $path = $customer->connection_type === 'hotspot'
+                ? '/ip/hotspot/user/enable'
                 : '/ppp/secret/enable';
 
-            $this->connection->comm($path, ['.id' => $customer->mikrotik_user_id]);
-            
-            $this->logAction('enable_user', $customer, 'success', 
+            $this->connection->comm($path, ['.id' => $dotId]);
+
+            $this->logAction('enable_user', $customer, 'success',
                 "Enabled {$customer->connection_type} user: {$customer->username}");
+
             return true;
         } catch (Exception $e) {
-            Log::error('Failed to enable user: ' . $e->getMessage());
-            $this->logAction('enable_user', $customer, 'failed', 
-                'Failed to enable user: ' . $e->getMessage(), null, null, $e->getMessage());
+            Log::error('Failed to enable user: '.$e->getMessage());
+            $this->logAction('enable_user', $customer, 'failed',
+                'Failed to enable user: '.$e->getMessage(), null, null, $e->getMessage());
+
             return false;
         }
     }
@@ -464,25 +736,41 @@ class MikroTikService
      */
     public function disableUser(Customer $customer): bool
     {
-        if (!$this->connect() || !$customer->mikrotik_user_id) {
-            $this->logAction('disable_user', $customer, 'failed', 'Failed to connect or user ID missing');
+        if (! $this->connect()) {
+            $this->logAction('disable_user', $customer, 'failed', 'Failed to connect to router');
+
             return false;
         }
 
+        $dotId = $this->resolveMikrotikInternalUserId($customer)
+            ?? ($customer->mikrotik_user_id ? (string) $customer->mikrotik_user_id : null);
+
+        if (! $dotId) {
+            $this->logAction('disable_user', $customer, 'failed', 'Could not resolve RouterOS .id');
+
+            return false;
+        }
+
+        if ((string) ($customer->mikrotik_user_id ?? '') !== $dotId) {
+            $customer->forceFill(['mikrotik_user_id' => $dotId])->saveQuietly();
+        }
+
         try {
-            $path = $customer->connection_type === 'hotspot' 
-                ? '/ip/hotspot/user/disable' 
+            $path = $customer->connection_type === 'hotspot'
+                ? '/ip/hotspot/user/disable'
                 : '/ppp/secret/disable';
 
-            $this->connection->comm($path, ['.id' => $customer->mikrotik_user_id]);
-            
-            $this->logAction('disable_user', $customer, 'success', 
+            $this->connection->comm($path, ['.id' => $dotId]);
+
+            $this->logAction('disable_user', $customer, 'success',
                 "Disabled {$customer->connection_type} user: {$customer->username}");
+
             return true;
         } catch (Exception $e) {
-            Log::error('Failed to disable user: ' . $e->getMessage());
-            $this->logAction('disable_user', $customer, 'failed', 
-                'Failed to disable user: ' . $e->getMessage(), null, null, $e->getMessage());
+            Log::error('Failed to disable user: '.$e->getMessage());
+            $this->logAction('disable_user', $customer, 'failed',
+                'Failed to disable user: '.$e->getMessage(), null, null, $e->getMessage());
+
             return false;
         }
     }
@@ -492,19 +780,21 @@ class MikroTikService
      */
     public function removeUser(Customer $customer): bool
     {
-        if (!$this->connect() || !$customer->mikrotik_user_id) {
+        if (! $this->connect() || ! $customer->mikrotik_user_id) {
             return false;
         }
 
         try {
-            $path = $customer->connection_type === 'hotspot' 
-                ? '/ip/hotspot/user/remove' 
+            $path = $customer->connection_type === 'hotspot'
+                ? '/ip/hotspot/user/remove'
                 : '/ppp/secret/remove';
 
             $this->connection->comm($path, ['.id' => $customer->mikrotik_user_id]);
+
             return true;
         } catch (Exception $e) {
-            Log::error('Failed to remove user: ' . $e->getMessage());
+            Log::error('Failed to remove user: '.$e->getMessage());
+
             return false;
         }
     }
@@ -514,8 +804,9 @@ class MikroTikService
      */
     public function disconnectSession(Customer $customer): bool
     {
-        if (!$this->connect()) {
+        if (! $this->connect()) {
             $this->logAction('disconnect_session', $customer, 'failed', 'Failed to connect to router');
+
             return false;
         }
 
@@ -526,13 +817,15 @@ class MikroTikService
                 $this->connection->comm('/ppp/active/remove', ['name' => $customer->username]);
             }
 
-            $this->logAction('disconnect_session', $customer, 'success', 
+            $this->logAction('disconnect_session', $customer, 'success',
                 "Disconnected active session for user: {$customer->username}");
+
             return true;
         } catch (Exception $e) {
-            Log::error('Failed to disconnect session: ' . $e->getMessage());
-            $this->logAction('disconnect_session', $customer, 'failed', 
-                'Failed to disconnect session: ' . $e->getMessage(), null, null, $e->getMessage());
+            Log::error('Failed to disconnect session: '.$e->getMessage());
+            $this->logAction('disconnect_session', $customer, 'failed',
+                'Failed to disconnect session: '.$e->getMessage(), null, null, $e->getMessage());
+
             return false;
         }
     }
@@ -542,22 +835,24 @@ class MikroTikService
      */
     public function updateUserProfile(Customer $customer, Plan $plan): bool
     {
-        if (!$this->connect() || !$customer->mikrotik_user_id) {
+        if (! $this->connect() || ! $customer->mikrotik_user_id) {
             return false;
         }
 
         try {
-            $path = $customer->connection_type === 'hotspot' 
-                ? '/ip/hotspot/user/set' 
+            $path = $customer->connection_type === 'hotspot'
+                ? '/ip/hotspot/user/set'
                 : '/ppp/secret/set';
 
             $this->connection->comm($path, [
                 '.id' => $customer->mikrotik_user_id,
                 'profile' => $plan->speed_profile ?? 'default',
             ]);
+
             return true;
         } catch (Exception $e) {
-            Log::error('Failed to update user profile: ' . $e->getMessage());
+            Log::error('Failed to update user profile: '.$e->getMessage());
+
             return false;
         }
     }
@@ -577,7 +872,7 @@ class MikroTikService
      */
     public function getUserStats(Customer $customer): array
     {
-        if (!$this->connect()) {
+        if (! $this->connect()) {
             return [];
         }
 
@@ -594,9 +889,31 @@ class MikroTikService
 
             return $response[0] ?? [];
         } catch (Exception $e) {
-            Log::error('Failed to get user stats: ' . $e->getMessage());
+            Log::error('Failed to get user stats: '.$e->getMessage());
+
             return [];
         }
+    }
+
+    /**
+     * Whether RouterOS reports the user as disabled. Null when unknown (offline, missing row, etc.).
+     */
+    public function getUserDisabledState(Customer $customer): ?bool
+    {
+        $row = $this->getUserStats($customer);
+        if ($row === []) {
+            return null;
+        }
+
+        $d = $row['disabled'] ?? null;
+        if ($d === true || $d === 'true' || $d === 'yes' || $d === '1') {
+            return true;
+        }
+        if ($d === false || $d === 'false' || $d === 'no' || $d === '0') {
+            return false;
+        }
+
+        return null;
     }
 
     /**
@@ -604,15 +921,17 @@ class MikroTikService
      */
     public function getActiveHotspotSessions(): array
     {
-        if (!$this->connect()) {
+        if (! $this->connect()) {
             return [];
         }
 
         try {
             $response = $this->connection->comm('/ip/hotspot/active/print');
+
             return $response ?? [];
         } catch (Exception $e) {
-            Log::error('Failed to get active hotspot sessions: ' . $e->getMessage());
+            Log::error('Failed to get active hotspot sessions: '.$e->getMessage());
+
             return [];
         }
     }
@@ -622,15 +941,17 @@ class MikroTikService
      */
     public function getActivePppoeSessions(): array
     {
-        if (!$this->connect()) {
+        if (! $this->connect()) {
             return [];
         }
 
         try {
             $response = $this->connection->comm('/ppp/active/print');
+
             return $response ?? [];
         } catch (Exception $e) {
-            Log::error('Failed to get active PPPoE sessions: ' . $e->getMessage());
+            Log::error('Failed to get active PPPoE sessions: '.$e->getMessage());
+
             return [];
         }
     }
@@ -640,17 +961,19 @@ class MikroTikService
      */
     public function syncActiveSessions(): int
     {
-        if (!$this->connect()) {
+        if (! $this->connect()) {
             return 0;
         }
 
         $synced = 0;
         try {
             $activeSessions = $this->getActiveHotspotSessions();
-            
+
             foreach ($activeSessions as $session) {
                 $username = $session['user'] ?? null;
-                if (!$username) continue;
+                if (! $username) {
+                    continue;
+                }
 
                 // Find customer
                 $customer = Customer::where('username', $username)
@@ -690,7 +1013,7 @@ class MikroTikService
                 ]);
 
         } catch (Exception $e) {
-            Log::error('Failed to sync active sessions: ' . $e->getMessage());
+            Log::error('Failed to sync active sessions: '.$e->getMessage());
         }
 
         return $synced;
@@ -702,21 +1025,302 @@ class MikroTikService
     protected function parseUptime(string $uptime): int
     {
         $seconds = 0;
-        
+
+        if (preg_match('/(\d+)w/', $uptime, $matches)) {
+            $seconds += (int) $matches[1] * 604800;
+        }
         if (preg_match('/(\d+)d/', $uptime, $matches)) {
-            $seconds += (int)$matches[1] * 86400;
+            $seconds += (int) $matches[1] * 86400;
         }
         if (preg_match('/(\d+)h/', $uptime, $matches)) {
-            $seconds += (int)$matches[1] * 3600;
+            $seconds += (int) $matches[1] * 3600;
         }
         if (preg_match('/(\d+)m/', $uptime, $matches)) {
-            $seconds += (int)$matches[1] * 60;
+            $seconds += (int) $matches[1] * 60;
         }
         if (preg_match('/(\d+)s/', $uptime, $matches)) {
-            $seconds += (int)$matches[1];
+            $seconds += (int) $matches[1];
         }
-        
+
         return $seconds;
     }
-}
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Live telemetry / NOC operations
+    // Used by PollRouterHealthJob and the routers detail page.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Pull /system/resource. Returns null on failure so callers can degrade gracefully.
+     *
+     * @return array{cpu_pct:?int,mem_pct:?int,uptime_seconds:?int,firmware:?string,board:?string}|null
+     */
+    public function getSystemResource(): ?array
+    {
+        if (! $this->connect()) {
+            return null;
+        }
+
+        try {
+            $rows = $this->apiPrint('/system/resource/print');
+            $row = $rows[0] ?? null;
+            if (! is_array($row)) {
+                return null;
+            }
+
+            $totalMem = (int) ($row['total-memory'] ?? 0);
+            $freeMem = (int) ($row['free-memory'] ?? 0);
+            $memPct = $totalMem > 0 ? (int) round((($totalMem - $freeMem) / $totalMem) * 100) : null;
+
+            return [
+                'cpu_pct' => isset($row['cpu-load']) ? max(0, min(100, (int) $row['cpu-load'])) : null,
+                'mem_pct' => $memPct,
+                'uptime_seconds' => isset($row['uptime']) ? $this->parseUptime((string) $row['uptime']) : null,
+                'firmware' => isset($row['version']) ? (string) $row['version'] : null,
+                'board' => isset($row['board-name']) ? (string) $row['board-name'] : null,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik getSystemResource failed: '.$e->getMessage(), [
+                'router_id' => $this->router->id ?? null,
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Interface up/total count.
+     *
+     * @return array{up:int,total:int}|null
+     */
+    public function getInterfaceCounts(): ?array
+    {
+        if (! $this->connect()) {
+            return null;
+        }
+
+        try {
+            $rows = $this->apiPrint('/interface/print');
+            if (! is_array($rows)) {
+                return null;
+            }
+            $bool = fn ($v): bool => in_array((string) $v, ['true', 'yes', '1'], true);
+            $total = count($rows);
+            $up = 0;
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                if ($bool($row['running'] ?? false) && ! $bool($row['disabled'] ?? false)) {
+                    $up++;
+                }
+            }
+
+            return ['up' => $up, 'total' => $total];
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik getInterfaceCounts failed: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * Count active hotspot users on the router.
+     */
+    public function countActiveHotspotUsers(): ?int
+    {
+        if (! $this->connect()) {
+            return null;
+        }
+        try {
+            $rows = $this->apiPrint('/ip/hotspot/active/print');
+
+            return is_array($rows) ? count($rows) : 0;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Count active PPP (PPPoE / L2TP / pptp) sessions.
+     */
+    public function countActivePppoeUsers(): ?int
+    {
+        if (! $this->connect()) {
+            return null;
+        }
+        try {
+            $rows = $this->apiPrint('/ppp/active/print');
+
+            return is_array($rows) ? count($rows) : 0;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Run a ping from the router. Returns avg round-trip ms or null if unreachable.
+     *
+     * @return array{avg_ms:?int,sent:int,received:int,raw:array<int,array<string,mixed>>}
+     */
+    public function ping(string $address, int $count = 4): array
+    {
+        $result = [
+            'avg_ms' => null,
+            'sent' => $count,
+            'received' => 0,
+            'raw' => [],
+        ];
+
+        if (! $this->connect()) {
+            return $result;
+        }
+
+        try {
+            $params = ['address' => $address, 'count' => (string) $count];
+            $rows = $this->commWithParams('/ping', $params);
+            if (! is_array($rows)) {
+                return $result;
+            }
+            $result['raw'] = $rows;
+            $received = 0;
+            $sumTime = 0.0;
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                if (isset($row['time'])) {
+                    $received++;
+                    $sumTime += $this->parseTimeMs((string) $row['time']);
+                }
+                if (isset($row['received'])) {
+                    $received = max($received, (int) $row['received']);
+                }
+                if (isset($row['avg-rtt'])) {
+                    $result['avg_ms'] = (int) round($this->parseTimeMs((string) $row['avg-rtt']));
+                }
+                if (isset($row['sent'])) {
+                    $result['sent'] = (int) $row['sent'];
+                }
+            }
+            $result['received'] = $received;
+            if ($result['avg_ms'] === null && $received > 0) {
+                $result['avg_ms'] = (int) round($sumTime / $received);
+            }
+
+            return $result;
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik ping failed: '.$e->getMessage());
+
+            return $result;
+        }
+    }
+
+    /**
+     * Reboot the router via /system/reboot. Non-blocking; the device drops the API session.
+     */
+    public function reboot(): bool
+    {
+        if (! $this->connect()) {
+            return false;
+        }
+        try {
+            $this->commWithParams('/system/reboot', []);
+
+            return true;
+        } catch (\Throwable $e) {
+            // /system/reboot typically closes the API socket which surfaces here.
+            // Treat that as a successful issue of the command — the router IS rebooting.
+            $msg = strtolower($e->getMessage());
+            if (str_contains($msg, 'closed') || str_contains($msg, 'reset') || str_contains($msg, 'eof')) {
+                return true;
+            }
+            Log::warning('MikroTik reboot failed: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * Pull the router's `/export` text (textual config). Big-but-bounded.
+     */
+    public function exportConfig(): ?string
+    {
+        if (! $this->connect()) {
+            return null;
+        }
+        try {
+            $rows = $this->apiPrint('/export');
+            if (! is_array($rows)) {
+                return null;
+            }
+            $lines = [];
+            foreach ($rows as $row) {
+                if (is_array($row) && isset($row['ret'])) {
+                    $lines[] = (string) $row['ret'];
+                } elseif (is_string($row)) {
+                    $lines[] = $row;
+                }
+            }
+
+            return $lines ? implode("\n", $lines) : null;
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik exportConfig failed: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * Send an API command with parameters, normalising the two client flavours.
+     *
+     * @param  array<string,string>  $params
+     * @return array<int,array<string,mixed>>
+     */
+    protected function commWithParams(string $path, array $params): array
+    {
+        if (! $this->connection) {
+            return [];
+        }
+
+        if (method_exists($this->connection, 'comm')) {
+            $response = $this->connection->comm($path, $params);
+
+            return is_array($response) ? $response : [];
+        }
+
+        if (method_exists($this->connection, 'query')) {
+            $query = new \RouterOS\Query($path);
+            foreach ($params as $k => $v) {
+                $query->equal($k, $v);
+            }
+            $response = $this->connection->query($query)->read();
+
+            return is_array($response) ? $response : [];
+        }
+
+        return [];
+    }
+
+    /**
+     * Convert MikroTik time strings ("12ms", "1m30s") to milliseconds.
+     */
+    protected function parseTimeMs(string $value): float
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return 0.0;
+        }
+        if (preg_match('/^([\d.]+)ms$/i', $value, $m)) {
+            return (float) $m[1];
+        }
+        if (preg_match('/^([\d.]+)us$/i', $value, $m)) {
+            return ((float) $m[1]) / 1000.0;
+        }
+        if (preg_match('/^([\d.]+)s$/i', $value, $m)) {
+            return ((float) $m[1]) * 1000.0;
+        }
+
+        return (float) $value;
+    }
+}

@@ -3,12 +3,11 @@
 namespace App\Http\Controllers\ISP\Web;
 
 use App\Http\Controllers\ISP\BaseController;
-use App\Models\Voucher;
-use App\Models\Router;
 use App\Models\Plan;
+use App\Models\Router;
+use App\Models\Voucher;
 use App\Services\VoucherService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class VoucherController extends BaseController
 {
@@ -25,7 +24,7 @@ class VoucherController extends BaseController
     public function index(Request $request)
     {
         $ispId = $this->getIspId();
-        
+
         $query = Voucher::where('isp_id', $ispId)
             ->with(['router', 'plan', 'creator', 'usedByCustomer'])
             ->latest();
@@ -50,7 +49,7 @@ class VoucherController extends BaseController
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('voucher_code', 'like', "%{$search}%")
-                  ->orWhere('notes', 'like', "%{$search}%");
+                    ->orWhere('notes', 'like', "%{$search}%");
             });
         }
 
@@ -62,7 +61,7 @@ class VoucherController extends BaseController
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $vouchers = $query->paginate(50);
+        $vouchers = $query->paginate(50)->appends($request->query());
 
         // Get routers for filter dropdown
         $routers = Router::where('isp_id', $ispId)->get();
@@ -104,7 +103,7 @@ class VoucherController extends BaseController
 
         $isp = auth()->user()->isp;
         $router = Router::findOrFail($request->router_id);
-        
+
         // Ensure router belongs to ISP
         $this->ensureIspAccess($router);
 
@@ -124,7 +123,7 @@ class VoucherController extends BaseController
                 'expires_at',
                 'notes',
             ]);
-            
+
             // Add assigned_to if provided
             if ($request->has('assigned_to') && $request->assigned_to) {
                 $customer = \App\Models\Customer::findOrFail($request->assigned_to);
@@ -144,7 +143,7 @@ class VoucherController extends BaseController
                 ->with('success', 'Voucher created successfully');
         } catch (\Exception $e) {
             return back()->withInput()
-                ->with('error', 'Failed to create voucher: ' . $e->getMessage());
+                ->with('error', 'Failed to create voucher: '.$e->getMessage());
         }
     }
 
@@ -154,7 +153,7 @@ class VoucherController extends BaseController
     public function show(Voucher $voucher)
     {
         $this->ensureIspAccess($voucher);
-        
+
         $voucher->load(['router', 'plan', 'creator', 'usedByCustomer', 'isp']);
 
         return view('isp.vouchers.show', compact('voucher'));
@@ -194,7 +193,7 @@ class VoucherController extends BaseController
 
         $isp = auth()->user()->isp;
         $router = Router::findOrFail($request->router_id);
-        
+
         // Ensure router belongs to ISP
         $this->ensureIspAccess($router);
 
@@ -224,7 +223,7 @@ class VoucherController extends BaseController
 
             if ($result['success_count'] > 0) {
                 return redirect()->route('isp.vouchers.index')
-                    ->with('success', "Successfully created {$result['success_count']} vouchers" . 
+                    ->with('success', "Successfully created {$result['success_count']} vouchers".
                         ($result['error_count'] > 0 ? ". {$result['error_count']} failed." : ''));
             } else {
                 return back()->withInput()
@@ -232,7 +231,7 @@ class VoucherController extends BaseController
             }
         } catch (\Exception $e) {
             return back()->withInput()
-                ->with('error', 'Failed to create vouchers: ' . $e->getMessage());
+                ->with('error', 'Failed to create vouchers: '.$e->getMessage());
         }
     }
 
@@ -243,15 +242,16 @@ class VoucherController extends BaseController
     {
         $this->ensureIspAccess($voucher);
 
-        if (!$voucher->isValid()) {
+        if (! $voucher->isValid()) {
             return back()->with('error', 'Voucher is not valid or has expired');
         }
 
         try {
             $this->voucherService->activate($voucher);
+
             return back()->with('success', 'Voucher activated successfully');
         } catch (\Exception $e) {
-            return back()->with('error', 'Failed to activate voucher: ' . $e->getMessage());
+            return back()->with('error', 'Failed to activate voucher: '.$e->getMessage());
         }
     }
 
@@ -265,13 +265,13 @@ class VoucherController extends BaseController
         try {
             // Delete from router if exists
             $this->voucherService->deleteFromRouter($voucher);
-            
+
             $voucher->delete();
 
             return redirect()->route('isp.vouchers.index')
                 ->with('success', 'Voucher deleted successfully');
         } catch (\Exception $e) {
-            return back()->with('error', 'Failed to delete voucher: ' . $e->getMessage());
+            return back()->with('error', 'Failed to delete voucher: '.$e->getMessage());
         }
     }
 
@@ -281,7 +281,7 @@ class VoucherController extends BaseController
     public function export(Request $request)
     {
         $ispId = $this->getIspId();
-        
+
         $query = Voucher::where('isp_id', $ispId);
 
         // Apply same filters as index
@@ -294,16 +294,16 @@ class VoucherController extends BaseController
 
         $vouchers = $query->with(['router', 'plan'])->get();
 
-        $filename = 'vouchers_' . date('Y-m-d_His') . '.csv';
-        
+        $filename = 'vouchers_'.date('Y-m-d_His').'.csv';
+
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
 
-        $callback = function() use ($vouchers) {
+        $callback = function () use ($vouchers) {
             $file = fopen('php://output', 'w');
-            
+
             // Header row
             fputcsv($file, [
                 'Voucher Code',
@@ -344,8 +344,3 @@ class VoucherController extends BaseController
         return response()->stream($callback, 200, $headers);
     }
 }
-
-
-
-
-

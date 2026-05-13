@@ -1,97 +1,137 @@
 @extends('layouts.admin')
 
-@section('title', 'Billing Settings')
+@section('title', 'Billing · ISP System Settings')
 
 @section('header')
-    <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-        {{ __('Settings') }}
-    </h2>
+    @include('isp.settings.partials.shell-header')
 @endsection
 
 @section('content')
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Settings Navigation -->
-        <div class="lg:col-span-1">
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Settings</h3>
-                    <nav class="space-y-2">
-                        <a href="{{ route('isp.settings.company') }}" class="block px-4 py-2 {{ request()->routeIs('isp.settings.company*') ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }} rounded-lg font-medium">
-                            Company Information
-                        </a>
-                        <a href="{{ route('isp.settings.payment') }}" class="block px-4 py-2 {{ request()->routeIs('isp.settings.payment*') ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }} rounded-lg">
-                            MPESA Daraja Settings
-                        </a>
-                        <a href="{{ route('isp.settings.notifications') }}" class="block px-4 py-2 {{ request()->routeIs('isp.settings.notifications*') ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }} rounded-lg">
-                            Notification Preferences
-                        </a>
-                        <a href="{{ route('isp.settings.users') }}" class="block px-4 py-2 {{ request()->routeIs('isp.settings.users*') ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }} rounded-lg">
-                            User Management
-                        </a>
-                        <a href="{{ route('isp.settings.billing') }}" class="block px-4 py-2 {{ request()->routeIs('isp.settings.billing*') ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }} rounded-lg">
-                            Billing Settings
-                        </a>
-                    </nav>
+    @php
+        $b = $isp->settings['billing'] ?? [];
+    @endphp
+
+    <x-isp-settings-workspace
+        meta-title="Tax &amp; invoicing"
+        meta-description="Invoice sequencing, automation, penalties, and default VAT-style rates applied to new invoices."
+    >
+        <form
+            method="POST"
+            action="{{ route('isp.settings.billing.update') }}"
+            class="space-y-4"
+            x-data="{ dirty: false, saving: false }"
+            @input="dirty = true"
+            @change="dirty = true"
+            @submit="saving = true"
+        >
+            @csrf
+
+            <div class="pb-card isp-settings-panel p-4 sm:p-6">
+                <div class="mb-5 border-b border-dashed border-[var(--pb-border)] pb-4">
+                    <h3 class="isp-settings-section-title">Invoice engine</h3>
+                    <p class="isp-settings-hint mt-1">Controls how documents are numbered and whether subscriptions spawn invoices automatically.</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <label class="isp-form-label" for="invoice_prefix">Invoice prefix</label>
+                        <input
+                            id="invoice_prefix"
+                            class="isp-form-input max-w-md"
+                            type="text"
+                            name="invoice_prefix"
+                            value="{{ old('invoice_prefix', $b['invoice_prefix'] ?? 'INV') }}"
+                            placeholder="INV"
+                        />
+                        <p class="isp-settings-hint mt-1">Example: INV-2026-0148</p>
+                    </div>
+                    <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--pb-border)] bg-slate-50/60 px-3 py-3 dark:bg-slate-900/30">
+                        <span>
+                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">Auto-generate invoices</span>
+                            <span class="isp-settings-hint block">Create invoices when subscription cycles renew.</span>
+                        </span>
+                        <input
+                            type="checkbox"
+                            name="auto_generate_invoices"
+                            value="1"
+                            class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
+                            {{ old('auto_generate_invoices', ! empty($b['auto_generate_invoices'])) ? 'checked' : '' }}
+                        />
+                    </label>
                 </div>
             </div>
-        </div>
 
-        <!-- Settings Content -->
-        <div class="lg:col-span-2">
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Billing Settings</h3>
-                    
-                    <form method="POST" action="{{ route('isp.settings.billing.update') }}" class="space-y-6">
-                        @csrf
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Invoice Number Prefix</label>
-                            <input type="text" name="invoice_prefix" value="{{ $isp->settings['billing']['invoice_prefix'] ?? 'INV' }}" 
-                                   class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                                   placeholder="INV">
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Prefix for invoice numbers (e.g., INV-2026-001)</p>
-                        </div>
-
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Auto Generate Invoices</label>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">Automatically generate invoices for active subscriptions</p>
-                            </div>
-                            <input type="checkbox" name="auto_generate_invoices" value="1" 
-                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Grace Period (Days)</label>
-                            <input type="number" name="grace_period_days" min="0" value="{{ $isp->settings['billing']['grace_period_days'] ?? 3 }}" 
-                                   class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Days before suspending service after invoice due date</p>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Penalty Rate (%)</label>
-                            <input type="number" name="penalty_rate" step="0.01" min="0" max="100" value="{{ $isp->settings['billing']['penalty_rate'] ?? 5 }}" 
-                                   class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Percentage penalty per day for overdue invoices</p>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tax Rate (%)</label>
-                            <input type="number" name="tax_rate" step="0.01" min="0" max="100" value="{{ $isp->settings['billing']['tax_rate'] ?? 0 }}" 
-                                   class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Default tax rate for invoices</p>
-                        </div>
-
-                        <div class="flex justify-end">
-                            <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                Save Changes
-                            </button>
-                        </div>
-                    </form>
+            <div class="pb-card isp-settings-panel p-4 sm:p-6">
+                <div class="mb-5 border-b border-dashed border-[var(--pb-border)] pb-4">
+                    <h3 class="isp-settings-section-title">Collections policy</h3>
+                    <p class="isp-settings-hint mt-1">Grace windows and penalties are advisory fields for finance automation.</p>
+                </div>
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+                    <div>
+                        <label class="isp-form-label" for="grace_period_days">Grace period (days)</label>
+                        <input
+                            id="grace_period_days"
+                            class="isp-form-input"
+                            type="number"
+                            name="grace_period_days"
+                            min="0"
+                            value="{{ old('grace_period_days', $b['grace_period_days'] ?? 3) }}"
+                        />
+                    </div>
+                    <div>
+                        <label class="isp-form-label" for="penalty_rate">Penalty rate (%)</label>
+                        <input
+                            id="penalty_rate"
+                            class="isp-form-input"
+                            type="number"
+                            name="penalty_rate"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value="{{ old('penalty_rate', $b['penalty_rate'] ?? 5) }}"
+                        />
+                    </div>
+                    <div>
+                        <label class="isp-form-label" for="tax_rate">Default tax rate (%)</label>
+                        @if (! empty($globalTaxEnforced))
+                            <input type="hidden" name="tax_rate" value="{{ $platformTaxRate }}" />
+                            <input
+                                id="tax_rate"
+                                class="isp-form-input bg-slate-100 dark:bg-slate-800/50"
+                                type="text"
+                                value="{{ number_format($platformTaxRate, 2) }}"
+                                disabled
+                            />
+                            <p class="isp-settings-hint mt-1">
+                                The platform administrator is enforcing this rate on all new invoices. ISP overrides are suspended until enforcement is turned off in
+                                <span class="font-mono text-[11px]">Super Admin → Integrations</span>.
+                            </p>
+                        @else
+                            <input
+                                id="tax_rate"
+                                class="isp-form-input"
+                                type="number"
+                                name="tax_rate"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                value="{{ old('tax_rate', $b['tax_rate'] ?? 0) }}"
+                            />
+                            <p class="isp-settings-hint mt-1">Applied when generating invoices unless the platform enforces a global VAT policy.</p>
+                        @endif
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
+
+            <div class="isp-settings-sticky-save">
+                <p class="mr-auto text-xs text-slate-500 dark:text-slate-400" x-show="dirty" x-cloak>
+                    <span class="font-semibold text-amber-700 dark:text-amber-300">Unsaved changes</span>
+                </p>
+                <button type="button" class="pb-btn" @click="window.location.reload()">Cancel</button>
+                <button type="submit" class="pb-btn pb-btn-primary" :disabled="!dirty || saving" :class="(!dirty || saving) ? 'opacity-50 pointer-events-none' : ''">
+                    <span x-show="!saving">Save billing policy</span>
+                    <span x-show="saving" x-cloak>Saving…</span>
+                </button>
+            </div>
+        </form>
+    </x-isp-settings-workspace>
 @endsection
-

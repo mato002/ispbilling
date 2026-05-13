@@ -3,19 +3,24 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>ISP Billing | Run Your Entire ISP From One Platform</title>
+        <x-landing-seo-meta :isp="$landingIsp" />
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700,800" rel="stylesheet" />
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
     </head>
-    <body class="bg-slate-50 text-slate-900 antialiased">
+    <body class="bg-slate-50 text-slate-900 antialiased"@if($landingIsp?->brandPrimaryHex()) style="--tenant-brand: {{ $landingIsp->brandPrimaryHex() }};"@endif>
         <div class="absolute inset-x-0 top-0 -z-10 h-[30rem] bg-gradient-to-br from-blue-600/10 via-violet-500/10 to-white"></div>
 
         <nav class="fixed top-0 inset-x-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
             <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-                <a href="{{ route('welcome') }}" class="text-xl font-extrabold tracking-tight text-blue-700">ISP Billing</a>
+                <a href="{{ route('welcome') }}" class="flex items-center gap-2 text-xl font-extrabold tracking-tight text-blue-700" @if($landingIsp?->brandPrimaryHex()) style="color: var(--tenant-brand)"@endif>
+                    @if($landingIsp && $landingIsp->logoPublicUrl())
+                        <img src="{{ $landingIsp->logoPublicUrl() }}" alt="{{ $landingIsp->name }}" class="h-9 w-auto max-w-[160px] object-contain">
+                    @endif
+                    <span>{{ $landingIsp->name ?? config('app.name', 'PrimeBilling') }}</span>
+                </a>
 
                 <div class="hidden items-center gap-7 md:flex">
                     <a href="#features" class="text-sm font-medium text-slate-600 hover:text-blue-700">Features</a>
@@ -27,9 +32,16 @@
                     @auth
                         <a href="{{ url('/dashboard') }}" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-blue-600 hover:text-blue-700">Dashboard</a>
                     @else
-                        <a href="{{ route('login') }}" class="text-sm font-semibold text-slate-700 hover:text-blue-700">Log in</a>
-                        @if (Route::has('register'))
-                            <a href="{{ route('register') }}" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Get Started</a>
+                        @if($landingIsp)
+                            <a href="{{ route('customer.login') }}" class="text-sm font-semibold text-slate-700 hover:text-blue-700">Customer log in</a>
+                            <a href="{{ route('customer.register') }}" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Join now</a>
+                        @else
+                            <a href="{{ route('login') }}" class="text-sm font-semibold text-slate-700 hover:text-blue-700">Operator log in</a>
+                            @if (Route::has('register.isp'))
+                                <a href="{{ route('register.isp') }}" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Register your ISP</a>
+                            @elseif (Route::has('register'))
+                                <a href="{{ route('register') }}" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Get Started</a>
+                            @endif
                         @endif
                     @endauth
                 </div>
@@ -52,9 +64,16 @@
                     @auth
                         <a href="{{ url('/dashboard') }}" class="text-sm font-semibold text-blue-700">Dashboard</a>
                     @else
-                        <a href="{{ route('login') }}" class="text-sm font-semibold text-slate-700">Log in</a>
-                        @if (Route::has('register'))
-                            <a href="{{ route('register') }}" class="inline-flex w-fit rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Get Started</a>
+                        @if($landingIsp)
+                            <a href="{{ route('customer.login') }}" class="text-sm font-semibold text-slate-700">Customer log in</a>
+                            <a href="{{ route('customer.register') }}" class="inline-flex w-fit rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Join now</a>
+                        @else
+                            <a href="{{ route('login') }}" class="text-sm font-semibold text-slate-700">Operator log in</a>
+                            @if (Route::has('register.isp'))
+                                <a href="{{ route('register.isp') }}" class="inline-flex w-fit rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Register your ISP</a>
+                            @elseif (Route::has('register'))
+                                <a href="{{ route('register') }}" class="inline-flex w-fit rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Get Started</a>
+                            @endif
                         @endif
                     @endauth
                 </div>
@@ -67,31 +86,54 @@
                     <div class="grid gap-10 lg:grid-cols-2 lg:items-center">
                         <div>
                             <div class="mb-5 flex flex-wrap gap-2">
-                                @foreach (['MikroTik Ready', 'M-Pesa Payments', 'Hotspot & PPPoE', 'Automated Billing', 'Built for ISPs'] as $badge)
-                                    <span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $badge }}</span>
-                                @endforeach
+                                @if($landingIsp)
+                                    @foreach (['Internet packages', 'Hotspot & billing', 'Local ISP', 'Self-service'] as $badge)
+                                        <span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $badge }}</span>
+                                    @endforeach
+                                @else
+                                    @foreach (['MikroTik Ready', 'M-Pesa Payments', 'Hotspot & PPPoE', 'Automated Billing', 'Built for ISPs'] as $badge)
+                                        <span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $badge }}</span>
+                                    @endforeach
+                                @endif
                             </div>
 
                             <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                                Run Your Entire ISP From One Platform
+                                @if($landingIsp)
+                                    {{ $landingIsp->name }} — internet you can manage online
+                                @else
+                                    Run Your Entire ISP From One Platform
+                                @endif
                             </h1>
 
                             <p class="mt-5 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-                                Billing, MikroTik automation, M-Pesa payments, and customer management in one system built for African and local ISPs.
+                                @if($landingIsp)
+                                    Choose a package, pay securely, and sign in to view usage and invoices. For technical support, contact {{ $landingIsp->name }} directly.
+                                @else
+                                    Billing, MikroTik automation, M-Pesa payments, and customer management in one system built for African and local ISPs.
+                                @endif
                             </p>
                             <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-                                Move from manual chaos to automated operations: manage subscriptions, automate invoices, monitor collections, trigger suspensions/reconnections, and track business outcomes without juggling spreadsheets, router scripts, and manual follow-ups.
+                                @unless($landingIsp)
+                                    Move from manual chaos to automated operations: manage subscriptions, automate invoices, monitor collections, trigger suspensions/reconnections, and track business outcomes without juggling spreadsheets, router scripts, and manual follow-ups.
+                                @endunless
                             </p>
 
                             <div class="mt-8 flex flex-col gap-3 sm:flex-row">
                                 @auth
                                     <a href="{{ url('/dashboard') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-700">Go to Dashboard</a>
                                 @else
-                                    @if (Route::has('register'))
-                                        <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-700">Start Free Trial</a>
+                                    @if($landingIsp)
+                                        <a href="{{ route('customer.register') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-700">Join now</a>
+                                        <a href="{{ route('customer.login') }}" class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-6 py-3 text-sm font-bold text-slate-700 hover:border-blue-600 hover:text-blue-700">Customer log in</a>
+                                    @else
+                                        @if (Route::has('register.isp'))
+                                            <a href="{{ route('register.isp') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-700">Register your ISP</a>
+                                        @elseif (Route::has('register'))
+                                            <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-700">Start free trial</a>
+                                        @endif
+                                        <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-6 py-3 text-sm font-bold text-slate-700 hover:border-blue-600 hover:text-blue-700">Operator log in</a>
+                                        <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-xl px-2 py-3 text-sm font-semibold text-blue-700 hover:text-blue-800">Talk to sales</a>
                                     @endif
-                                    <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-6 py-3 text-sm font-bold text-slate-700 hover:border-blue-600 hover:text-blue-700">Watch Demo</a>
-                                    <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-xl px-2 py-3 text-sm font-semibold text-blue-700 hover:text-blue-800">Talk to Sales</a>
                                 @endauth
                             </div>
                         </div>
@@ -387,20 +429,65 @@
 
             <section id="pricing" class="px-4 py-16 sm:px-6 lg:px-8">
                 <div class="mx-auto max-w-7xl">
-                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Pricing (Editable)</h2>
-                    <p class="mt-3 text-slate-600">Use these placeholders now and adjust plan limits/pricing later.</p>
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                        @if($landingIsp)
+                            Packages from {{ $landingIsp->name }}
+                        @else
+                            Platform pricing (editable)
+                        @endif
+                    </h2>
+                    <p class="mt-3 text-slate-600">
+                        @if($landingIsp && $landingPlans->isNotEmpty())
+                            Active hotspot and access plans configured by your provider.
+                        @elseif($landingIsp)
+                            No public plans are published yet. Please contact {{ $landingIsp->name }} for availability.
+                        @else
+                            Use these placeholders now and adjust plan limits and pricing later.
+                        @endif
+                    </p>
                     <div class="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                        @foreach (['Starter', 'Growth', 'Enterprise'] as $plan)
-                            <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                                <h3 class="text-lg font-bold text-slate-900">{{ $plan }}</h3>
-                                <p class="mt-2 text-sm text-slate-500">Price: <span class="font-semibold">[Editable]</span></p>
-                                <ul class="mt-4 space-y-2 text-sm text-slate-600">
-                                    <li>- Plan limits configurable</li>
-                                    <li>- Billing cycle configurable</li>
-                                    <li>- Feature scope configurable</li>
-                                </ul>
-                            </div>
-                        @endforeach
+                        @if($landingIsp && $landingPlans->isNotEmpty())
+                            @foreach ($landingPlans as $plan)
+                                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                                    <h3 class="text-lg font-bold text-slate-900">{{ $plan->name }}</h3>
+                                    @if($plan->description)
+                                        <p class="mt-2 text-sm text-slate-600">{{ \Illuminate\Support\Str::limit($plan->description, 120) }}</p>
+                                    @endif
+                                    <p class="mt-3 text-2xl font-extrabold text-slate-900">
+                                        {{ $landingIsp->currency }} {{ number_format((float) $plan->price, 2) }}
+                                        <span class="text-sm font-normal text-slate-500">/ {{ $plan->duration_days }} days</span>
+                                    </p>
+                                    <ul class="mt-4 space-y-1 text-sm text-slate-600">
+                                        @if($plan->access_type)
+                                            <li>Access: {{ strtoupper($plan->access_type) }}</li>
+                                        @endif
+                                        @if($plan->download_speed_kbps)
+                                            <li>Down: {{ $plan->formatted_speed ?? $plan->download_speed_kbps.' Kbps' }}</li>
+                                        @endif
+                                        @if($plan->billing_type)
+                                            <li>Billing: {{ $plan->billing_type }}</li>
+                                        @endif
+                                    </ul>
+                                    @guest
+                                        @if($landingIsp)
+                                            <a href="{{ route('customer.register') }}" class="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Join now</a>
+                                        @endif
+                                    @endguest
+                                </div>
+                            @endforeach
+                        @else
+                            @foreach (['Starter', 'Growth', 'Enterprise'] as $plan)
+                                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                                    <h3 class="text-lg font-bold text-slate-900">{{ $plan }}</h3>
+                                    <p class="mt-2 text-sm text-slate-500">Price: <span class="font-semibold">[Editable]</span></p>
+                                    <ul class="mt-4 space-y-2 text-sm text-slate-600">
+                                        <li>- Plan limits configurable</li>
+                                        <li>- Billing cycle configurable</li>
+                                        <li>- Feature scope configurable</li>
+                                    </ul>
+                                </div>
+                            @endforeach
+                        @endif
                     </div>
                 </div>
             </section>
@@ -452,10 +539,19 @@
                     <h2 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Ready To Run Your ISP With Automation And Control?</h2>
                     <p class="mt-3 max-w-3xl text-blue-100">Stop managing subscribers manually. Start running billing, payments, and network access from one operating system.</p>
                     <div class="mt-7 flex flex-col gap-3 sm:flex-row">
-                        @if (Route::has('register'))
-                            <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50">Start Free Trial</a>
-                        @endif
-                        <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-xl border border-white/60 px-6 py-3 text-sm font-bold text-white hover:bg-white/10">Book Demo</a>
+                        @guest
+                            @if($landingIsp)
+                                <a href="{{ route('customer.register') }}" class="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50">Join now</a>
+                                <a href="{{ route('customer.login') }}" class="inline-flex items-center justify-center rounded-xl border border-white/60 px-6 py-3 text-sm font-bold text-white hover:bg-white/10">Customer log in</a>
+                            @else
+                                @if (Route::has('register.isp'))
+                                    <a href="{{ route('register.isp') }}" class="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50">Register your ISP</a>
+                                @elseif (Route::has('register'))
+                                    <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50">Start free trial</a>
+                                @endif
+                                <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-xl border border-white/60 px-6 py-3 text-sm font-bold text-white hover:bg-white/10">Operator log in</a>
+                            @endif
+                        @endguest
                     </div>
                 </div>
             </section>
@@ -465,8 +561,14 @@
             <div class="mx-auto max-w-7xl text-sm text-slate-600">
                 <div class="grid grid-cols-1 gap-8 md:grid-cols-5">
                     <div>
-                        <p class="font-semibold text-slate-800">ISP Billing</p>
-                        <p class="mt-2 text-xs text-slate-500">The operating system for modern ISP operations.</p>
+                        <p class="font-semibold text-slate-800">{{ $landingIsp->name ?? config('app.name', 'PrimeBilling') }}</p>
+                        <p class="mt-2 text-xs text-slate-500">
+                            @if($landingIsp)
+                                Customer portal powered by {{ config('app.name', 'PrimeBilling') }}.
+                            @else
+                                The operating system for modern ISP operations.
+                            @endif
+                        </p>
                     </div>
                     <div>
                         <p class="font-semibold text-slate-800">Product</p>
@@ -495,13 +597,25 @@
                     <div>
                         <p class="font-semibold text-slate-800">Support</p>
                         <div class="mt-2 flex flex-col gap-2">
-                            <a href="{{ route('login') }}" class="hover:text-blue-700">Contact Sales</a>
-                            <a href="{{ route('login') }}" class="hover:text-blue-700">WhatsApp</a>
-                            <a href="{{ route('login') }}" class="hover:text-blue-700">Email Support</a>
+                            @if($landingIsp)
+                                @if($landingIsp->phone)
+                                    <a href="tel:{{ preg_replace('/\s+/', '', $landingIsp->phone) }}" class="hover:text-blue-700">Call {{ $landingIsp->name }}</a>
+                                @endif
+                                @if($landingIsp->email)
+                                    <a href="mailto:{{ $landingIsp->email }}" class="hover:text-blue-700">Email {{ $landingIsp->name }}</a>
+                                @endif
+                                <a href="{{ route('customer.login') }}" class="hover:text-blue-700">Customer log in</a>
+                            @else
+                                <a href="{{ route('login') }}" class="hover:text-blue-700">Contact sales</a>
+                                <a href="{{ route('login') }}" class="hover:text-blue-700">Operator log in</a>
+                                @if(config('mail.from.address'))
+                                    <a href="mailto:{{ config('mail.from.address') }}" class="hover:text-blue-700">Email platform</a>
+                                @endif
+                            @endif
                         </div>
                     </div>
                 </div>
-                <p class="mt-4">&copy; {{ date('Y') }} ISP Billing. All rights reserved.</p>
+                <p class="mt-4">&copy; {{ date('Y') }} {{ $landingIsp->name ?? config('app.name', 'PrimeBilling') }}. All rights reserved.</p>
             </div>
         </footer>
 

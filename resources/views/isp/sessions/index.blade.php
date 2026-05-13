@@ -1,137 +1,87 @@
-@extends('layouts.dashboard')
+@extends('layouts.admin')
+
+@section('title', 'Session Monitoring')
+
+@section('header')
+    <x-isp-page-header
+        title="Session Monitoring"
+        module="Network Operations"
+        description="Track live hotspot and PPPoE sessions, data usage, uptime, and disconnection actions from one NOC view."
+    />
+@endsection
 
 @section('content')
-<div class="py-6">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Hotspot Sessions</h2>
-                    <div class="flex gap-2">
-                        <a href="{{ route('isp.sessions.index', ['status' => 'active']) }}" 
-                           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                            Active Sessions
-                        </a>
-                        <a href="{{ route('isp.sessions.index', ['status' => 'ended']) }}" 
-                           class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
-                            History
-                        </a>
-                    </div>
-                </div>
+<div class="space-y-6">
+    <section class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <x-dashboard.kpi-card title="Active Sessions" :value="number_format($stats['active_sessions'] ?? 0)" subtext="Live subscribers" iconBg="from-indigo-500 to-cyan-500">
+            <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12a10 10 0 0 1 20 0"/></svg></x-slot:icon>
+        </x-dashboard.kpi-card>
+        <x-dashboard.kpi-card title="Sessions Today" :value="number_format($stats['total_today'] ?? 0)" subtext="Daily traffic" iconBg="from-emerald-500 to-teal-500">
+            <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/></svg></x-slot:icon>
+        </x-dashboard.kpi-card>
+        <x-dashboard.kpi-card title="Bandwidth Today" :value="number_format(($stats['total_bandwidth_today'] ?? 0) / 1024 / 1024, 2).' GB'" subtext="Aggregate transfer" iconBg="from-violet-500 to-indigo-500">
+            <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3 9 4-18 3 9h4"/></svg></x-slot:icon>
+        </x-dashboard.kpi-card>
+    </section>
 
-                <!-- Stats -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Active Sessions</p>
-                        <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ $stats['active_sessions'] ?? 0 }}</p>
-                    </div>
-                    <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Sessions Today</p>
-                        <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['total_today'] ?? 0 }}</p>
-                    </div>
-                    <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Bandwidth Today</p>
-                        <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                            {{ number_format(($stats['total_bandwidth_today'] ?? 0) / 1024 / 1024, 2) }} GB
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Filters -->
-                <form method="GET" class="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                        <select name="router_id" class="w-full border-gray-300 rounded-lg">
-                            <option value="">All Routers</option>
-                            @foreach($routers as $router)
-                                <option value="{{ $router->id }}" {{ request('router_id') == $router->id ? 'selected' : '' }}>
-                                    {{ $router->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <input type="text" name="search" placeholder="Search..." 
-                               value="{{ request('search') }}"
-                               class="w-full border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <input type="date" name="date_from" value="{{ request('date_from') }}"
-                               class="w-full border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-                            Filter
-                        </button>
-                    </div>
-                </form>
-
-                <!-- Sessions Table -->
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Username</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Customer</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Router</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">IP Address</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Data Used</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Uptime</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Started</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            @forelse($sessions as $session)
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                        {{ $session->username }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $session->customer->full_name ?? 'Voucher User' }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $session->router->name }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $session->ip_address }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $session->formatted_total_bytes }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $session->uptime_formatted }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $session->started_at->format('M d, H:i') }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <a href="{{ route('isp.sessions.show', $session) }}" 
-                                           class="text-blue-600 hover:text-blue-900">View</a>
-                                        @if($session->status === 'active')
-                                            <form method="POST" action="{{ route('isp.sessions.disconnect', $session) }}" class="inline">
-                                                @csrf
-                                                <button type="submit" class="text-red-600 hover:text-red-900 ml-2">Disconnect</button>
-                                            </form>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">
-                                        No sessions found
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="mt-4">
-                    {{ $sessions->links() }}
-                </div>
-            </div>
+    <x-filter-bar :action="route('isp.sessions.index')">
+        <div class="min-w-[180px] flex-1">
+            <label class="isp-form-label">Router</label>
+            <select name="router_id" class="isp-form-select">
+                <option value="">All Routers</option>
+                @foreach($routers as $router)
+                    <option value="{{ $router->id }}" @selected(request('router_id') == $router->id)>{{ $router->name }}</option>
+                @endforeach
+            </select>
         </div>
-    </div>
+        <div class="min-w-[200px] flex-1">
+            <label class="isp-form-label">Search</label>
+            <input type="text" name="search" value="{{ request('search') }}" class="isp-form-input" placeholder="Username, customer, IP">
+        </div>
+        <div class="min-w-[150px]">
+            <label class="isp-form-label">Date From</label>
+            <input type="date" name="date_from" value="{{ request('date_from') }}" class="isp-form-input">
+        </div>
+        <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
+        <a href="{{ route('isp.sessions.index') }}" class="pb-btn">Reset</a>
+    </x-filter-bar>
+
+    @if($sessions->isEmpty())
+        <div class="pb-card">
+            <x-empty-state title="No sessions found" message="No hotspot or PPPoE sessions match the current filters." />
+        </div>
+    @else
+        <x-data-table>
+            <thead>
+                <tr>
+                    <th>Username</th><th>Customer</th><th>Router</th><th>IP Address</th><th>Data Used</th><th>Uptime</th><th>Started</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($sessions as $session)
+                    <tr>
+                        <td>{{ $session->username }}</td>
+                        <td>{{ $session->customer->full_name ?? 'Voucher User' }}</td>
+                        <td>{{ $session->router->name }}</td>
+                        <td class="font-mono text-xs">{{ $session->ip_address }}</td>
+                        <td>{{ $session->formatted_total_bytes }}</td>
+                        <td>{{ $session->uptime_formatted }}</td>
+                        <td>{{ $session->started_at->format('M d, H:i') }}</td>
+                        <td class="whitespace-nowrap">
+                            <a href="{{ route('isp.sessions.show', $session) }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-semibold">View</a>
+                            @if($session->status === 'active')
+                                <form method="POST" action="{{ route('isp.sessions.disconnect', $session) }}" class="inline ml-2">
+                                    @csrf
+                                    <button type="submit" class="text-rose-600 hover:text-rose-700 text-sm font-semibold">Disconnect</button>
+                                </form>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </x-data-table>
+        <div class="pb-card p-4">{{ $sessions->links() }}</div>
+    @endif
 </div>
 @endsection
 

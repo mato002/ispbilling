@@ -1,22 +1,24 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', 'New Support Ticket')
 
-@section('content')
-    <div class="max-w-3xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div class="mb-6">
-            <h1 class="text-2xl font-semibold text-gray-900">New Support Ticket</h1>
-            <p class="mt-1 text-sm text-gray-500">Create a ticket on behalf of a customer or for internal tracking.</p>
-        </div>
+@section('header')
+    <x-isp-page-header
+        title="Create Ticket"
+        module="Operations"
+        description="Create a support issue for customer or internal follow-up."
+    />
+@endsection
 
-        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
+@section('content')
+    <div class="max-w-3xl">
+        <x-form-section>
             <form method="POST" action="{{ route('isp.tickets.store') }}" class="space-y-6">
                 @csrf
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Customer (optional)</label>
-                    <select name="customer_id"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    <label class="isp-form-label">Customer (optional)</label>
+                    <select name="customer_id" class="isp-form-select">
                         <option value="">-- No specific customer --</option>
                         @foreach($customers as $customer)
                             <option value="{{ $customer->id }}"
@@ -31,18 +33,17 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Subject</label>
+                    <label class="isp-form-label">Subject</label>
                     <input type="text" name="subject" value="{{ old('subject') }}"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                           class="isp-form-input">
                     @error('subject')
                     <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-                    <select name="priority"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    <label class="isp-form-label">Priority</label>
+                    <select name="priority" class="isp-form-select">
                         @foreach (['low' => 'Low', 'normal' => 'Normal', 'high' => 'High'] as $value => $label)
                             <option value="{{ $value }}" @selected(old('priority', 'normal') === $value)>{{ $label }}</option>
                         @endforeach
@@ -53,26 +54,20 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Message</label>
+                    <label class="isp-form-label">Message</label>
                     <textarea name="message" rows="6"
-                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ old('message') }}</textarea>
+                              class="isp-form-textarea">{{ old('message') }}</textarea>
                     @error('message')
                     <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
 
                 <div class="flex justify-end space-x-3">
-                    <a href="{{ route('isp.tickets.index') }}"
-                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                        Cancel
-                    </a>
-                    <button type="submit"
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
-                        Create Ticket
-                    </button>
+                    <a href="{{ route('isp.tickets.index') }}" class="pb-btn">Cancel</a>
+                    <button type="submit" class="pb-btn pb-btn-primary">Create Ticket</button>
                 </div>
             </form>
-        </div>
+        </x-form-section>
     </div>
 @endsection
 

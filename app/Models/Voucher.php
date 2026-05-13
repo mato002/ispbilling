@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToIspTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
@@ -9,6 +10,8 @@ use Carbon\Carbon;
 
 class Voucher extends Model
 {
+    use BelongsToIspTenant;
+
     protected $fillable = [
         'isp_id',
         'plan_id',

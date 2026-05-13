@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\ISP;
+use App\Services\ActivityLogService;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -44,12 +46,45 @@ class LoginRequest extends FormRequest
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
+            try {
+                ActivityLogService::logFailedLogin(
+                    (string) $this->string('email'),
+                    $this->ip(),
+                    $this->userAgent()
+                );
+            } catch (\Throwable) {
+                // Never block login flow on audit persistence
+            }
+
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
             ]);
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        $user = Auth::user();
+
+        if ($user && ! $user->isSuperAdmin()) {
+            if (! $user->is_active) {
+                Auth::logout();
+                RateLimiter::hit($this->throttleKey());
+                throw ValidationException::withMessages([
+                    'email' => 'This account has been deactivated. Contact PrimeBilling support if you believe this is an error.',
+                ]);
+            }
+
+            if ($user->isp_id) {
+                $isp = ISP::query()->find($user->isp_id);
+                if (! $isp || ! $isp->is_active) {
+                    Auth::logout();
+                    RateLimiter::hit($this->throttleKey());
+                    throw ValidationException::withMessages([
+                        'email' => 'This organisation is not active. Please contact PrimeBilling support.',
+                    ]);
+                }
+            }
+        }
     }
 
     /**

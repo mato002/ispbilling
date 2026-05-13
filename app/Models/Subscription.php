@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\IspTenant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +11,26 @@ use Carbon\Carbon;
 
 class Subscription extends Model
 {
+    protected static function booted(): void
+    {
+        static::addGlobalScope('isp_tenant_subscription', function (Builder $builder) {
+            if (! IspTenant::shouldScopeQueries()) {
+                return;
+            }
+
+            $builder->whereHas('customer');
+        });
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeWithoutIspTenant(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('isp_tenant_subscription');
+    }
+
     protected $fillable = [
         'customer_id',
         'plan_id',

@@ -19,6 +19,7 @@ class TicketController extends Controller
 
         $query = Ticket::with(['customer', 'assignedTo'])
             ->where('isp_id', $isp->id)
+            ->customerTickets()
             ->latest();
 
         if ($status = $request->get('status')) {
@@ -31,8 +32,8 @@ class TicketController extends Controller
 
         if ($search = $request->get('q')) {
             $query->where(function ($q) use ($search) {
-                $q->where('subject', 'like', '%' . $search . '%')
-                    ->orWhere('message', 'like', '%' . $search . '%');
+                $q->where('subject', 'like', '%'.$search.'%')
+                    ->orWhere('message', 'like', '%'.$search.'%');
             });
         }
 
@@ -82,6 +83,7 @@ class TicketController extends Controller
             'status' => Ticket::STATUS_OPEN,
             'priority' => $data['priority'],
             'channel' => 'portal',
+            'ticket_kind' => Ticket::KIND_CUSTOMER,
         ]);
 
         return redirect()
@@ -139,7 +141,6 @@ class TicketController extends Controller
     {
         $isp = Auth::user()->isp;
 
-        abort_unless($isp && $ticket->isp_id === $isp->id, 403);
+        abort_unless($isp && $ticket->isp_id === $isp->id && $ticket->isCustomerTicket(), 404);
     }
 }
-

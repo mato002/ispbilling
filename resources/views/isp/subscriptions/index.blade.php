@@ -3,126 +3,113 @@
 @section('title', 'Subscriptions')
 
 @section('header')
-    <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Subscriptions') }}
-        </h2>
-        <a href="{{ route('isp.subscriptions.create') }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            Create Subscription
-        </a>
-    </div>
+    <x-isp-page-header
+        title="Subscriptions"
+        module="Billing &amp; plans"
+        description="Active and historical subscriber plans, renewal windows, and billing alignment."
+        primaryLabel="Create subscription"
+        :primaryHref="route('isp.subscriptions.create')"
+    />
 @endsection
 
 @section('content')
-    <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-        <div class="p-6">
-            <form method="GET" action="{{ route('isp.subscriptions.index') }}" class="flex gap-4">
-                <div>
-                    <select name="status" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Statuses</option>
-                        <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
-                        <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Expired</option>
-                        <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                    </select>
-                </div>
-                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                    Filter
-                </button>
-                @if(request()->has('status'))
-                    <a href="{{ route('isp.subscriptions.index') }}" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
-                        Clear
-                    </a>
-                @endif
-            </form>
+<div class="space-y-6">
+    <x-filter-bar :action="route('isp.subscriptions.index')">
+        <div class="min-w-[200px] flex-1">
+            <label class="isp-form-label">Search</label>
+            <input type="search" name="search" value="{{ request('search') }}" class="isp-form-input" placeholder="Customer, phone, username, plan…">
         </div>
-    </div>
-
-    <!-- Subscriptions Table -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-        <div class="p-6">
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Customer</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Plan</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Start Date</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">End Date</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Auto Renew</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        @forelse($subscriptions as $subscription)
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $subscription->customer->full_name }}</div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ $subscription->customer->phone_number }}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $subscription->plan->name }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $subscription->start_date->format('M d, Y') }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $subscription->end_date->format('M d, Y') }}
-                                    @if($subscription->end_date < now() && $subscription->status === 'active')
-                                        <span class="text-red-600 dark:text-red-400 text-xs">(Expired)</span>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    @if($subscription->auto_renew)
-                                        <span class="text-green-600 dark:text-green-400">Yes</span>
-                                    @else
-                                        <span class="text-gray-400">No</span>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    @if($subscription->status === 'active')
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                                            Active
-                                        </span>
-                                    @elseif($subscription->status === 'expired')
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
-                                            Expired
-                                        </span>
-                                    @else
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100">
-                                            {{ ucfirst($subscription->status) }}
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <div class="flex space-x-2">
-                                        <a href="{{ route('isp.subscriptions.show', $subscription->id) }}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400">View</a>
-                                        @if($subscription->status === 'active' || $subscription->status === 'expired')
-                                            <form method="POST" action="{{ route('isp.subscriptions.renew', $subscription->id) }}" class="inline" onsubmit="confirmFormSubmit(event, {title: 'Renew Subscription', text: 'Are you sure you want to renew this subscription for {{ $subscription->customer->full_name }}?', icon: 'question', confirmButtonText: 'Yes, renew'}); return false;">
-                                                @csrf
-                                                <button type="submit" class="text-green-600 hover:text-green-900 dark:text-green-400">
-                                                    Renew
-                                                </button>
-                                            </form>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                                    No subscriptions found
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mt-4">
-                {{ $subscriptions->links() }}
-            </div>
+        <div class="min-w-[140px]">
+            <label class="isp-form-label">Status</label>
+            <select name="status" class="isp-form-select">
+                <option value="">All</option>
+                <option value="active" @selected(request('status') === 'active')>Active</option>
+                <option value="expired" @selected(request('status') === 'expired')>Expired</option>
+                <option value="cancelled" @selected(request('status') === 'cancelled')>Cancelled</option>
+            </select>
         </div>
-    </div>
+        <div class="min-w-[180px] flex-1">
+            <label class="isp-form-label">Plan</label>
+            <select name="plan_id" class="isp-form-select">
+                <option value="">All plans</option>
+                @foreach($plans as $p)
+                    <option value="{{ $p->id }}" @selected((string) request('plan_id') === (string) $p->id)>{{ $p->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
+            <a href="{{ route('isp.subscriptions.index') }}" class="pb-btn">Reset</a>
+        </div>
+    </x-filter-bar>
+
+    @if($subscriptions->isEmpty())
+        <div class="pb-card p-0">
+            <x-empty-state
+                title="No subscriptions match"
+                message="Adjust filters or create a subscription for a customer."
+                ctaLabel="Create subscription"
+                :ctaHref="route('isp.subscriptions.create')"
+            />
+        </div>
+    @else
+        <x-data-table>
+            <thead>
+                <tr>
+                    <th>Customer</th>
+                    <th>Plan</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Auto renew</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($subscriptions as $subscription)
+                    <tr>
+                        <td>
+                            <div class="font-semibold text-slate-900 dark:text-white">{{ $subscription->customer->full_name }}</div>
+                            <div class="text-slate-500 dark:text-slate-400">{{ $subscription->customer->phone_number }}</div>
+                        </td>
+                        <td>{{ $subscription->plan->name }}</td>
+                        <td class="whitespace-nowrap">{{ $subscription->start_date->format('M j, Y') }}</td>
+                        <td class="whitespace-nowrap">
+                            {{ $subscription->end_date->format('M j, Y') }}
+                            @if($subscription->end_date < now() && $subscription->status === 'active')
+                                <span class="ml-1 text-xs font-semibold text-rose-600 dark:text-rose-400">(Expired)</span>
+                            @endif
+                        </td>
+                        <td>
+                            @if($subscription->auto_renew)
+                                <span class="text-emerald-600 dark:text-emerald-400 font-medium">Yes</span>
+                            @else
+                                <span class="text-slate-400">No</span>
+                            @endif
+                        </td>
+                        <td>
+                            @if($subscription->status === 'active')
+                                <x-status-badge status="active" />
+                            @elseif($subscription->status === 'expired')
+                                <x-status-badge status="expired" />
+                            @else
+                                <x-status-badge :status="ucfirst($subscription->status)" />
+                            @endif
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            <a href="{{ route('isp.subscriptions.show', $subscription) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">View</a>
+                            @if($subscription->status === 'active' || $subscription->status === 'expired')
+                                <form method="POST" action="{{ route('isp.subscriptions.renew', $subscription) }}" class="inline ml-3" onsubmit="confirmFormSubmit(event, {title: 'Renew subscription', text: 'Renew this subscription for {{ $subscription->customer->full_name }}?', icon: 'question', confirmButtonText: 'Yes, renew'}); return false;">
+                                    @csrf
+                                    <button type="submit" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">Renew</button>
+                                </form>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </x-data-table>
+        <div class="pb-card p-4">{{ $subscriptions->withQueryString()->links() }}</div>
+    @endif
+</div>
 @endsection

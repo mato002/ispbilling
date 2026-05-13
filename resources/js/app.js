@@ -7,11 +7,20 @@ window.Alpine = Alpine;
 // Create a global store for sidebar state
 Alpine.store('sidebar', {
     collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+    mobileOpen: false,
     
     toggle() {
         this.collapsed = !this.collapsed;
         localStorage.setItem('sidebarCollapsed', this.collapsed);
         window.dispatchEvent(new Event('sidebarToggle'));
+    },
+
+    openMobile() {
+        this.mobileOpen = true;
+    },
+
+    closeMobile() {
+        this.mobileOpen = false;
     },
     
     init() {
@@ -25,6 +34,13 @@ Alpine.store('sidebar', {
         // Listen for custom toggle events
         window.addEventListener('sidebarToggle', () => {
             this.collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        });
+
+        // Ensure mobile drawer closes on desktop resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 1024) {
+                this.mobileOpen = false;
+            }
         });
     }
 });

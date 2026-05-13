@@ -3,105 +3,48 @@
 @section('title', 'Reports')
 
 @section('header')
-    <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-        {{ __('Reports') }}
-    </h2>
+    <x-isp-page-header
+        title="Reports"
+        module="Analytics"
+        description="Summary KPIs and report widgets for finance and operations."
+    />
 @endsection
 
 @section('content')
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Customers</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ number_format($stats['total_customers']) }}</p>
-                        <p class="text-xs text-green-600 dark:text-green-400 mt-1">{{ $stats['active_customers'] }} active, {{ $stats['suspended_customers'] ?? 0 }} suspended</p>
-                    </div>
-                </div>
-            </div>
+<div class="space-y-6">
+    @if (! ($saasAdvancedAnalytics ?? true))
+        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
+            Advanced analytics widgets are not included in your current PrimeBilling plan. Upgrade in <a href="{{ route('isp.platform-subscription.index') }}" class="font-semibold underline">PrimeBilling subscription</a> to unlock the full analytics suite.
         </div>
+    @endif
+    <section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <x-dashboard.kpi-card title="Total customers" :value="number_format($stats['total_customers'])" :subtext="($stats['active_customers'] ?? 0).' active · '.($stats['suspended_customers'] ?? 0).' suspended'" iconBg="from-indigo-500 to-cyan-500">
+            <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></x-slot:icon>
+        </x-dashboard.kpi-card>
+        <x-dashboard.kpi-card title="Total revenue" :value="'KES '.number_format($stats['total_revenue'], 0)" subtext="All time" iconBg="from-emerald-500 to-teal-500">
+            <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></x-slot:icon>
+        </x-dashboard.kpi-card>
+        <x-dashboard.kpi-card title="Active subscriptions" :value="number_format($stats['active_subscriptions'])" subtext="Currently active" iconBg="from-amber-500 to-orange-500">
+            <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></x-slot:icon>
+        </x-dashboard.kpi-card>
+        <x-dashboard.kpi-card title="Pending invoices" :value="number_format($stats['pending_invoices'])" :subtext="($stats['overdue_invoices'] ?? 0).' overdue'" iconBg="from-rose-500 to-red-600">
+            <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></x-slot:icon>
+        </x-dashboard.kpi-card>
+    </section>
 
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
-                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">KES {{ number_format($stats['total_revenue'], 2) }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">All time</p>
-                    </div>
-                </div>
-            </div>
+    <x-filter-bar :action="route('isp.reports.index')">
+        <div class="min-w-[140px]">
+            <label class="isp-form-label">Start date</label>
+            <input type="date" name="start_date" value="{{ $startDate }}" class="isp-form-input">
         </div>
-
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 bg-yellow-500 rounded-md p-3">
-                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Active Subscriptions</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ number_format($stats['active_subscriptions']) }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Currently active</p>
-                    </div>
-                </div>
-            </div>
+        <div class="min-w-[140px]">
+            <label class="isp-form-label">End date</label>
+            <input type="date" name="end_date" value="{{ $endDate }}" class="isp-form-input">
         </div>
-
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 bg-red-500 rounded-md p-3">
-                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Invoices</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ number_format($stats['pending_invoices']) }}</p>
-                        <p class="text-xs text-red-500 dark:text-red-400 mt-1">{{ $stats['overdue_invoices'] }} overdue</p>
-                    </div>
-                </div>
-            </div>
+        <div class="flex items-end">
+            <button type="submit" class="pb-btn pb-btn-primary">Apply range</button>
         </div>
-    </div>
-
-    <!-- Date Range Filter -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-        <div class="p-6">
-            <form method="GET" action="{{ route('isp.reports.index') }}" class="flex gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
-                    <input type="date" name="start_date" value="{{ $startDate }}" 
-                           class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
-                    <input type="date" name="end_date" value="{{ $endDate }}" 
-                           class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                </div>
-                <div class="flex items-end">
-                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                        Generate Report
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+    </x-filter-bar>
 
     <!-- Report Sections -->
     <div class="space-y-6">
@@ -265,6 +208,7 @@
             </div>
         </div>
     </div>
+</div>
 
     <script>
         // Load Customer Status Report

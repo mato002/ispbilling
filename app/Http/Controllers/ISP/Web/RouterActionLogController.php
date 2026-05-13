@@ -11,7 +11,7 @@ class RouterActionLogController extends BaseController
     public function index(Request $request)
     {
         $ispId = $this->getIspId();
-        
+
         $query = RouterActionLog::where('isp_id', $ispId)
             ->with(['router', 'customer', 'user'])
             ->latest();
@@ -41,8 +41,8 @@ class RouterActionLogController extends BaseController
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('description', 'like', "%{$search}%")
-                  ->orWhere('action', 'like', "%{$search}%")
-                  ->orWhere('error_message', 'like', "%{$search}%");
+                    ->orWhere('action', 'like', "%{$search}%")
+                    ->orWhere('error_message', 'like', "%{$search}%");
             });
         }
 
@@ -54,7 +54,7 @@ class RouterActionLogController extends BaseController
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $logs = $query->paginate(50);
+        $logs = $query->paginate(50)->appends($request->query());
 
         // Get routers for filter dropdown
         $routers = \App\Models\Router::where('isp_id', $ispId)->get();
@@ -71,8 +71,3 @@ class RouterActionLogController extends BaseController
         return view('isp.logs.router-action-show', compact('routerActionLog'));
     }
 }
-
-
-
-
-

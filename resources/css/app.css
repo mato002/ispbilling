@@ -1,4 +1,5 @@
 @import './mobile-optimizations.css';
+@import './isp-ui.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

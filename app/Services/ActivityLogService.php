@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
+use App\Models\Router;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
@@ -136,9 +138,46 @@ class ActivityLogService
     ): ActivityLog {
         return self::log($action, $description, null, null, null, $metadata);
     }
+
+    /**
+     * Record a failed web login (invalid credentials). Not tied to an authenticated user.
+     */
+    public static function logFailedLogin(string $email, ?string $ip = null, ?string $userAgent = null): ActivityLog
+    {
+        $email = trim($email);
+        $account = User::query()->where('email', $email)->first();
+
+        return ActivityLog::create([
+            'isp_id' => $account?->isp_id,
+            'user_id' => $account?->id,
+            'action' => 'login_failed',
+            'description' => 'Failed login attempt — invalid credentials for '.$email,
+            'ip_address' => $ip ?? request()->ip(),
+            'user_agent' => $userAgent ?? request()->userAgent(),
+            'metadata' => [
+                'attempted_email' => $email,
+            ],
+        ]);
+    }
+
+    /**
+     * Router API session could not be opened (wrong credentials, firewall, or unreachable host).
+     */
+    public static function logRouterApiConnectionFailed(Router $router, string $message): ActivityLog
+    {
+        return ActivityLog::create([
+            'isp_id' => $router->isp_id,
+            'user_id' => Auth::id(),
+            'action' => 'router_api_connection_failed',
+            'model_type' => Router::class,
+            'model_id' => $router->id,
+            'description' => 'Router API connection failed: '.$router->name.' ('.$router->ip_address.') — '.$message,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'metadata' => [
+                'router_id' => $router->id,
+                'error' => $message,
+            ],
+        ]);
+    }
 }
-
-
-
-
-

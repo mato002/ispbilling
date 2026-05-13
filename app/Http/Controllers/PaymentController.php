@@ -5,19 +5,24 @@ namespace App\Http\Controllers;
 use App\Models\Payment;
 use App\Models\Invoice;
 use App\Models\Customer;
-use App\Models\ISP;
-use App\Models\Subscription;
+use App\Models\IspPaymentMethod;
 use App\Models\PaymentTransactionLog;
 use App\Services\MpesaService;
+use App\Services\PaymentCompletionService;
 use App\Services\SelcomService;
 use App\Services\MikroTikService;
-use App\Notifications\PaymentReceived;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
+    public function __construct(
+        protected PaymentCompletionService $paymentCompletionService
+    ) {
+    }
+
     /**
      * Initiate payment
      */
@@ -130,7 +135,7 @@ class PaymentController extends Controller
     /**
      * MPesa callback webhook - Secure webhook handler
      */
-    public function mpesaCallback(Request $request)
+    public function mpesaCallback(Request $request, ?string $webhook_token = null)
     {
         try {
             $data = $request->all();
@@ -199,7 +204,7 @@ class PaymentController extends Controller
                 return response()->json(['error' => 'Invalid callback'], 400);
             }
 
-            $payment = Payment::where('transaction_id', $checkoutRequestId)->first();
+            $payment = Payment::findByMpesaCheckoutRequestId($checkoutRequestId);
 
             if (!$payment) {
                 Log::warning('Payment not found for checkout request: ' . $checkoutRequestId);
@@ -212,6 +217,29 @@ class PaymentController extends Controller
                     'error_message' => 'Payment not found for checkout request: ' . $checkoutRequestId,
                 ]);
                 return response()->json(['error' => 'Payment not found'], 404);
+            }
+
+            if ($webhook_token !== null && $webhook_token !== '') {
+                $tokenValid = IspPaymentMethod::query()
+                    ->where('isp_id', $payment->isp_id)
+                    ->where('provider', 'daraja')
+                    ->where('webhook_token', $webhook_token)
+                    ->exists();
+
+                if (! $tokenValid) {
+                    PaymentTransactionLog::log([
+                        'payment_id' => $payment->id,
+                        'isp_id' => $payment->isp_id,
+                        'transaction_type' => 'webhook',
+                        'payment_method' => 'mpesa',
+                        'status' => 'failed',
+                        'request_data' => $data,
+                        'ip_address' => $ipAddress,
+                        'error_message' => 'Callback token does not match this ISP payment method',
+                    ]);
+
+                    return response()->json(['error' => 'Forbidden'], 403);
+                }
             }
 
             // Log webhook received for this payment
@@ -243,6 +271,23 @@ class PaymentController extends Controller
                     }
                 }
 
+                if (! $mpesaReceiptNumber) {
+                    \App\Models\PaymentTransactionLog::log([
+                        'payment_id' => $payment->id,
+                        'isp_id' => $payment->isp_id,
+                        'transaction_type' => 'webhook',
+                        'payment_method' => 'mpesa',
+                        'payment_reference' => $payment->payment_reference,
+                        'transaction_id' => $checkoutRequestId,
+                        'status' => 'failed',
+                        'amount' => $payment->amount,
+                        'request_data' => $data,
+                        'error_message' => 'Missing MpesaReceiptNumber in callback metadata',
+                    ]);
+
+                    return response()->json(['error' => 'Invalid callback metadata'], 400);
+                }
+
                 // Verify amount matches
                 if ($amountPaid && abs($amountPaid - $payment->amount) > 0.01) {
                     \App\Models\PaymentTransactionLog::log([
@@ -260,38 +305,92 @@ class PaymentController extends Controller
                     return response()->json(['error' => 'Amount mismatch'], 400);
                 }
 
-                DB::transaction(function () use ($payment, $mpesaReceiptNumber, $data) {
-                    // 1. Update payment with MPesa receipt number
-                    $payment->update([
-                        'transaction_id' => $mpesaReceiptNumber,
-                        'status' => 'completed',
-                        'processed_at' => now(),
-                        'metadata' => array_merge($payment->metadata ?? [], [
+                $finalizedInTransaction = false;
+
+                try {
+                    DB::transaction(function () use ($payment, $mpesaReceiptNumber, $checkoutRequestId, $data, &$finalizedInTransaction) {
+                        $locked = Payment::query()->lockForUpdate()->find($payment->id);
+
+                        if (! $locked) {
+                            return;
+                        }
+
+                        if ($locked->status === 'completed') {
+                            Log::info('MPesa STK callback ignored: payment already completed', [
+                                'payment_id' => $locked->id,
+                                'checkout_request_id' => $checkoutRequestId,
+                            ]);
+
+                            return;
+                        }
+
+                        $locked->update([
+                            'transaction_id' => $mpesaReceiptNumber,
+                            'metadata' => array_merge($locked->metadata ?? [], [
+                                'mpesa_checkout_request_id' => $checkoutRequestId,
+                                'mpesa_receipt' => $mpesaReceiptNumber,
+                                'webhook_data' => $data,
+                                'webhook_received_at' => now()->toIso8601String(),
+                            ]),
+                        ]);
+
+                        $locked->markAsCompleted();
+
+                        \App\Models\PaymentTransactionLog::log([
+                            'payment_id' => $locked->id,
+                            'isp_id' => $locked->isp_id,
+                            'transaction_type' => 'webhook',
+                            'payment_method' => 'mpesa',
+                            'payment_reference' => $locked->payment_reference,
+                            'transaction_id' => $mpesaReceiptNumber,
+                            'status' => 'completed',
+                            'amount' => $locked->amount,
+                            'response_data' => ['message' => 'Payment processed successfully'],
+                        ]);
+
+                        $finalizedInTransaction = true;
+                    });
+                } catch (QueryException $e) {
+                    $mysqlErr = $e->errorInfo[1] ?? null;
+                    $sqlState = $e->errorInfo[0] ?? null;
+                    $isDuplicate = $mysqlErr === 1062
+                        || $sqlState === '23000'
+                        || stripos((string) $e->getMessage(), 'duplicate') !== false;
+
+                    if ($isDuplicate) {
+                        Log::warning('MPesa callback: duplicate transaction_id (idempotent)', [
+                            'checkout_request_id' => $checkoutRequestId,
                             'mpesa_receipt' => $mpesaReceiptNumber,
-                            'webhook_data' => $data,
-                            'webhook_received_at' => now()->toIso8601String(),
-                        ]),
-                    ]);
+                            'payment_id' => $payment->id,
+                        ]);
 
-                    // 2. Mark invoice as paid
-                    $payment->markAsCompleted();
+                        PaymentTransactionLog::log([
+                            'payment_id' => $payment->id,
+                            'isp_id' => $payment->isp_id,
+                            'transaction_type' => 'webhook',
+                            'payment_method' => 'mpesa',
+                            'payment_reference' => $payment->payment_reference,
+                            'transaction_id' => $mpesaReceiptNumber,
+                            'status' => 'completed',
+                            'amount' => $payment->amount,
+                            'request_data' => $data,
+                            'error_message' => 'Duplicate MpesaReceiptNumber ignored (unique constraint)',
+                        ]);
 
-                    // 3. Reactivate customer and process payment success
-                    $this->processPaymentSuccess($payment);
+                        return response()->json(['success' => true]);
+                    }
 
-                    // 4. Log successful completion
-                    \App\Models\PaymentTransactionLog::log([
-                        'payment_id' => $payment->id,
-                        'isp_id' => $payment->isp_id,
-                        'transaction_type' => 'webhook',
-                        'payment_method' => 'mpesa',
-                        'payment_reference' => $payment->payment_reference,
-                        'transaction_id' => $mpesaReceiptNumber,
-                        'status' => 'completed',
-                        'amount' => $payment->amount,
-                        'response_data' => ['message' => 'Payment processed successfully'],
-                    ]);
-                });
+                    throw $e;
+                }
+
+                if ($finalizedInTransaction) {
+                    $fresh = $payment->fresh();
+                    if ($fresh && $fresh->isPlatformSaasPayment()) {
+                        app(\App\Services\PlatformSaasBillingService::class)->onMpesaPaymentSucceeded($fresh);
+                    } elseif ($fresh) {
+                        $this->paymentCompletionService->processTenantPaymentSuccess($fresh);
+                    }
+                }
 
                 return response()->json(['success' => true]);
             } else {
@@ -365,9 +464,9 @@ class PaymentController extends Controller
             $checkoutRequestId = $data['Body']['stkCallback']['CheckoutRequestID'] ?? null;
             
             if ($checkoutRequestId) {
-                $payment = Payment::where('transaction_id', $checkoutRequestId)->first();
+                $payment = Payment::findByMpesaCheckoutRequestId($checkoutRequestId);
                 
-                if ($payment) {
+                if ($payment && $payment->status === 'pending') {
                     $payment->update([
                         'status' => 'failed',
                         'metadata' => array_merge($payment->metadata ?? [], [
@@ -375,7 +474,7 @@ class PaymentController extends Controller
                             'timeout_at' => now()->toIso8601String(),
                         ]),
                     ]);
-                    
+
                     Log::info("Payment {$payment->id} marked as failed due to timeout");
                 }
             }
@@ -418,21 +517,29 @@ class PaymentController extends Controller
             }
 
             if ($status === 'COMPLETED' || $status === 'PAID') {
-                DB::transaction(function () use ($payment, $data) {
-                    // 1. Verify transaction (already verified by Selcom signature)
-                    $payment->update([
+                $finalized = false;
+
+                DB::transaction(function () use ($payment, $data, &$finalized) {
+                    $locked = Payment::query()->lockForUpdate()->find($payment->id);
+
+                    if (! $locked || $locked->status === 'completed') {
+                        return;
+                    }
+
+                    $locked->update([
                         'transaction_id' => $data['transaction_id'] ?? $data['order_id'] ?? null,
-                        'status' => 'completed',
-                        'processed_at' => now(),
-                        'metadata' => $data,
+                        'metadata' => array_merge($locked->metadata ?? [], [
+                            'selcom_webhook' => $data,
+                        ]),
                     ]);
 
-                    // 2. Mark invoice as paid
-                    $payment->markAsCompleted();
-
-                    // 3. Reactivate MikroTik user and renew subscription if needed
-                    $this->processPaymentSuccess($payment);
+                    $locked->markAsCompleted();
+                    $finalized = true;
                 });
+
+                if ($finalized) {
+                    $this->paymentCompletionService->processTenantPaymentSuccess($payment->fresh());
+                }
 
                 return response()->json(['success' => true]);
             } else {
@@ -446,84 +553,11 @@ class PaymentController extends Controller
     }
 
     /**
-     * Process payment success - Complete automation workflow
-     * 1. Verify transaction (already done in webhook)
-     * 2. Mark invoice paid (via markAsCompleted)
-     * 3. Reactivate MikroTik user
-     * 4. Renew subscription if needed
-     * 5. Notify customer
-     */
-    protected function processPaymentSuccess(Payment $payment): void
-    {
-        $customer = $payment->customer;
-        $invoice = $payment->invoice;
-
-        try {
-            // 3. Reactivate MikroTik user
-            if ($customer->router && $customer->mikrotik_user_id) {
-                $mikrotik = new MikroTikService($customer->router);
-                
-                // Enable user on router
-                $mikrotik->enableUser($customer);
-                
-                Log::info("Reactivated MikroTik user for customer {$customer->id}");
-            }
-
-            // Activate customer if suspended
-            if ($customer->status !== 'active') {
-                $customer->activate();
-            }
-
-            // 4. Activate or renew subscription
-            if ($invoice && $invoice->subscription_id) {
-                $subscription = Subscription::find($invoice->subscription_id);
-                
-                if ($subscription) {
-                    // For hotspot: Activate subscription immediately when payment is successful
-                    // This enables pay-as-you-go model where payment grants immediate access
-                    if ($customer->connection_type === 'hotspot') {
-                        // Activate subscription if it's suspended or expired
-                        if ($subscription->status === 'suspended' || $subscription->isExpired()) {
-                            $subscription->update([
-                                'status' => 'active',
-                                'start_date' => now(),
-                                'end_date' => now()->addDays($subscription->plan->duration_days ?? 30),
-                                'renewal_date' => now()->addDays($subscription->plan->duration_days ?? 30),
-                            ]);
-                            Log::info("Activated hotspot subscription {$subscription->id} for customer {$customer->id} after payment");
-                        }
-                    } else {
-                        // For PPPoE: Renew if expired or about to expire
-                        if ($subscription->isExpired() || $subscription->end_date <= now()->addDays(7)) {
-                            $subscription->renew();
-                            Log::info("Renewed subscription {$subscription->id} for customer {$customer->id}");
-                        }
-                    }
-                }
-            }
-
-            // 5. Notify customer
-            if ($customer->email || $customer->phone_number) {
-                try {
-                    $customer->notify(new PaymentReceived($payment));
-                    Log::info("Payment notification sent to customer {$customer->id}");
-                } catch (\Exception $e) {
-                    Log::error("Failed to send payment notification to customer {$customer->id}: " . $e->getMessage());
-                }
-            }
-
-        } catch (\Exception $e) {
-            Log::error("Error processing payment success for payment {$payment->id}: " . $e->getMessage());
-            // Don't throw - payment is already marked as completed
-        }
-    }
-
-    /**
      * Activate customer on router after payment (legacy method, kept for compatibility)
      */
     protected function activateCustomerOnRouter(Customer $customer): void
     {
-        if (!$customer->router || !$customer->mikrotik_user_id) {
+        if (! $customer->router || (! $customer->mikrotik_user_id && ! $customer->username)) {
             return;
         }
 
@@ -547,11 +581,13 @@ class PaymentController extends Controller
 
         if ($request->confirm) {
             DB::transaction(function () use ($payment) {
-                $payment->markAsCompleted();
-                // Process payment success to activate customer and subscription
-                $this->processPaymentSuccess($payment);
-                $this->processPaymentSuccess($payment);
+                $locked = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+                if ($locked->status !== 'completed') {
+                    $locked->markAsCompleted();
+                }
             });
+
+            $this->paymentCompletionService->processTenantPaymentSuccess($payment->fresh(), true);
 
             return response()->json([
                 'success' => true,

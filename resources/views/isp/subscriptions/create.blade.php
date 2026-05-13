@@ -14,6 +14,12 @@
 @endsection
 
 @section('content')
+    @php
+        $firstPlan = $plans->first();
+        $startDefault = old('start_date', now()->format('Y-m-d'));
+        $endDefault = old('end_date', $firstPlan ? \Illuminate\Support\Carbon::parse($startDefault)->addDays((int) $firstPlan->duration_days)->format('Y-m-d') : now()->addDays(30)->format('Y-m-d'));
+        $preselectCustomer = old('customer_id', $selectedCustomerId ?? null);
+    @endphp
     <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
         <div class="p-6">
             <form method="POST" action="{{ route('isp.subscriptions.store') }}" class="space-y-6">
@@ -26,7 +32,7 @@
                                 class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                             <option value="">Select Customer</option>
                             @foreach($customers as $customer)
-                                <option value="{{ $customer->id }}">{{ $customer->full_name }} ({{ $customer->phone_number }})</option>
+                                <option value="{{ $customer->id }}" @selected((string) $preselectCustomer === (string) $customer->id)>{{ $customer->full_name }} ({{ $customer->phone_number }})</option>
                             @endforeach
                         </select>
                     </div>
@@ -37,7 +43,7 @@
                                 class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                             <option value="">Select Plan</option>
                             @foreach($plans as $plan)
-                                <option value="{{ $plan->id }}" data-duration="{{ $plan->duration_days }}">
+                                <option value="{{ $plan->id }}" data-duration="{{ $plan->duration_days }}" @selected((string) old('plan_id', $firstPlan?->id) === (string) $plan->id)>
                                     {{ $plan->name }} - KES {{ number_format($plan->price, 2) }}
                                 </option>
                             @endforeach
@@ -46,13 +52,13 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Date *</label>
-                        <input type="date" name="start_date" required id="start_date"
+                        <input type="date" name="start_date" required id="start_date" value="{{ $startDefault }}"
                                class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Date *</label>
-                        <input type="date" name="end_date" required id="end_date"
+                        <input type="date" name="end_date" required id="end_date" value="{{ $endDefault }}"
                                class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                     </div>
 
@@ -60,13 +66,14 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status *</label>
                         <select name="status" required
                                 class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                            <option value="active">Active</option>
-                            <option value="suspended">Suspended</option>
+                            <option value="active" @selected(old('status', 'active') === 'active')>Active</option>
+                            <option value="suspended" @selected(old('status') === 'suspended')>Suspended</option>
                         </select>
                     </div>
 
                     <div class="flex items-center">
-                        <input type="checkbox" name="auto_renew" value="1" checked
+                        <input type="hidden" name="auto_renew" value="0">
+                        <input type="checkbox" name="auto_renew" value="1" @checked(old('auto_renew', '1') == '1')
                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                         <label class="ml-2 text-sm text-gray-700 dark:text-gray-300">Auto Renew</label>
                     </div>

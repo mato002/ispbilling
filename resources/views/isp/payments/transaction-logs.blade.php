@@ -1,186 +1,148 @@
 @extends('layouts.admin')
 
-@section('title', 'Transaction Logs')
+@section('title', 'Transaction logs')
 
 @section('header')
-    <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Transaction Logs') }}
-        </h2>
-        <a href="{{ route('isp.payments.index') }}" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
-            Back to Payments
-        </a>
-    </div>
+    <x-isp-page-header
+        title="Transaction logs"
+        module="Billing"
+        description="Gateway request and webhook audit trail for payment flows."
+        primaryLabel="Payments"
+        :primaryHref="route('isp.payments.index')"
+    />
 @endsection
 
 @section('content')
-    <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-        <div class="p-6">
-            <form method="GET" action="{{ route('isp.payments.transaction-logs') }}" class="flex gap-4">
-                <div class="flex-1">
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by reference, transaction ID..." 
-                           class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                </div>
-                <div>
-                    <select name="status" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Statuses</option>
-                        <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Completed</option>
-                        <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
-                        <option value="failed" {{ request('status') == 'failed' ? 'selected' : '' }}>Failed</option>
-                    </select>
-                </div>
-                <div>
-                    <select name="transaction_type" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Types</option>
-                        <option value="initiated" {{ request('transaction_type') == 'initiated' ? 'selected' : '' }}>Initiated</option>
-                        <option value="webhook" {{ request('transaction_type') == 'webhook' ? 'selected' : '' }}>Webhook</option>
-                    </select>
-                </div>
-                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                    Filter
+@php
+    $logDetailBase = url('/isp/payments/transaction-logs');
+@endphp
+<div class="space-y-6">
+    <x-filter-bar :action="route('isp.payments.transaction-logs')">
+        <div class="min-w-[200px] flex-1">
+            <label class="isp-form-label">Search</label>
+            <input type="text" name="search" value="{{ request('search') }}" class="isp-form-input" placeholder="Reference, transaction ID…">
+        </div>
+        <div class="min-w-[130px]">
+            <label class="isp-form-label">Status</label>
+            <select name="status" class="isp-form-select">
+                <option value="">All</option>
+                <option value="completed" @selected(request('status') === 'completed')>Completed</option>
+                <option value="pending" @selected(request('status') === 'pending')>Pending</option>
+                <option value="failed" @selected(request('status') === 'failed')>Failed</option>
+            </select>
+        </div>
+        <div class="min-w-[130px]">
+            <label class="isp-form-label">Type</label>
+            <select name="transaction_type" class="isp-form-select">
+                <option value="">All</option>
+                <option value="initiated" @selected(request('transaction_type') === 'initiated')>Initiated</option>
+                <option value="webhook" @selected(request('transaction_type') === 'webhook')>Webhook</option>
+            </select>
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
+            <a href="{{ route('isp.payments.transaction-logs') }}" class="pb-btn">Reset</a>
+        </div>
+    </x-filter-bar>
+
+    @if($logs->isEmpty())
+        <div class="pb-card p-0">
+            <x-empty-state title="No transaction logs" message="No rows match the current filters." />
+        </div>
+    @else
+        <x-data-table>
+            <thead>
+                <tr>
+                    <th>Date / time</th>
+                    <th>Type</th>
+                    <th>Reference</th>
+                    <th>Transaction ID</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>IP</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($logs as $log)
+                    <tr>
+                        <td class="whitespace-nowrap text-sm">{{ $log->created_at->format('M j, Y H:i:s') }}</td>
+                        <td><span class="pb-pill pb-pill-info text-xs">{{ ucfirst($log->transaction_type) }}</span></td>
+                        <td class="font-mono text-sm">{{ $log->payment_reference ?? '—' }}</td>
+                        <td class="font-mono text-sm">{{ $log->transaction_id ?? '—' }}</td>
+                        <td class="font-mono font-semibold whitespace-nowrap">
+                            @if($log->amount)
+                                KES {{ number_format($log->amount, 2) }}
+                            @else
+                                —
+                            @endif
+                        </td>
+                        <td>
+                            @if($log->status === 'completed')
+                                <x-status-badge status="paid" />
+                            @elseif($log->status === 'pending')
+                                <x-status-badge status="pending" />
+                            @else
+                                <span class="pb-pill pb-pill-bad">Failed</span>
+                            @endif
+                        </td>
+                        <td class="font-mono text-xs">{{ $log->ip_address ?? '—' }}</td>
+                        <td class="text-right whitespace-nowrap">
+                            <button type="button" onclick="showLogDetails({{ $log->id }})" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">Details</button>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </x-data-table>
+        <div class="pb-card p-4">{{ $logs->withQueryString()->links() }}</div>
+    @endif
+</div>
+
+<div id="logModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm" onclick="if(event.target===this) closeLogModal()">
+        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900" onclick="event.stopPropagation()">
+            <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white">Log details</h3>
+                <button type="button" onclick="closeLogModal()" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
-                @if(request()->has('search') || request()->has('status') || request()->has('transaction_type'))
-                    <a href="{{ route('isp.payments.transaction-logs') }}" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
-                        Clear
-                    </a>
-                @endif
-            </form>
+            </div>
+            <div id="logDetails" class="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-300"></div>
         </div>
     </div>
+</div>
 
-    <!-- Transaction Logs Table -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-        <div class="p-6">
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date/Time</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Reference</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Transaction ID</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">IP Address</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        @forelse($logs as $log)
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $log->created_at->format('M d, Y H:i:s') }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    <span class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                                        {{ ucfirst($log->transaction_type) }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $log->payment_reference ?? 'N/A' }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
-                                    {{ $log->transaction_id ?? 'N/A' }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                    @if($log->amount)
-                                        KES {{ number_format($log->amount, 2) }}
-                                    @else
-                                        N/A
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    @if($log->status === 'completed')
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                                            Completed
-                                        </span>
-                                    @elseif($log->status === 'pending')
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">
-                                            Pending
-                                        </span>
-                                    @else
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
-                                            Failed
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
-                                    {{ $log->ip_address ?? 'N/A' }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <button onclick="showLogDetails({{ $log->id }})" class="text-blue-600 hover:text-blue-900 dark:text-blue-400">
-                                        View Details
-                                    </button>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                                    No transaction logs found
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+<script>
+    const logDetailBase = @json($logDetailBase);
 
-            <div class="mt-4">
-                {{ $logs->links() }}
-            </div>
-        </div>
-    </div>
+    function showLogDetails(logId) {
+        fetch(logDetailBase + '/' + logId, { headers: { 'Accept': 'application/json' } })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('logDetails').innerHTML = `
+                    <div><span class="font-semibold text-slate-500">Type</span> · ${escapeHtml(data.transaction_type)}</div>
+                    <div><span class="font-semibold text-slate-500">Status</span> · ${escapeHtml(data.status)}</div>
+                    <div><span class="font-semibold text-slate-500">Amount</span> · ${data.amount ? 'KES ' + parseFloat(data.amount).toFixed(2) : 'N/A'}</div>
+                    <div><span class="font-semibold text-slate-500">IP</span> · ${escapeHtml(data.ip_address || 'N/A')}</div>
+                    ${data.error_message ? '<div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"><strong>Error</strong><br>' + escapeHtml(data.error_message) + '</div>' : ''}
+                    <div>
+                        <p class="mb-1 font-semibold text-slate-500">Request</p>
+                        <pre class="max-h-40 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-950">${escapeHtml(JSON.stringify(data.request_data || {}, null, 2))}</pre>
+                    </div>
+                    ${data.response_data ? `<div><p class="mb-1 font-semibold text-slate-500">Response</p><pre class="max-h-40 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-950">${escapeHtml(JSON.stringify(data.response_data, null, 2))}</pre></div>` : ''}
+                `;
+                document.getElementById('logModal').classList.remove('hidden');
+            })
+            .catch(() => alert('Could not load log details.'));
+    }
 
-    <!-- Log Details Modal -->
-    <div id="logModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800">
-            <div class="mt-3">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Transaction Log Details</h3>
-                    <button onclick="closeLogModal()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-                <div id="logDetails" class="space-y-4">
-                    <!-- Details will be loaded here -->
-                </div>
-            </div>
-        </div>
-    </div>
+    function closeLogModal() {
+        document.getElementById('logModal').classList.add('hidden');
+    }
 
-    <script>
-        function showLogDetails(logId) {
-            fetch(`/isp/payments/transaction-logs/${logId}`)
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('logDetails').innerHTML = `
-                        <div class="space-y-2">
-                            <div><strong>Type:</strong> ${data.transaction_type}</div>
-                            <div><strong>Status:</strong> ${data.status}</div>
-                            <div><strong>Amount:</strong> KES ${data.amount ? parseFloat(data.amount).toFixed(2) : 'N/A'}</div>
-                            <div><strong>IP Address:</strong> ${data.ip_address || 'N/A'}</div>
-                            ${data.error_message ? `<div class="text-red-600"><strong>Error:</strong> ${data.error_message}</div>` : ''}
-                            <div class="mt-4">
-                                <strong>Request Data:</strong>
-                                <pre class="bg-gray-100 dark:bg-gray-900 p-2 rounded text-xs overflow-auto max-h-40">${JSON.stringify(data.request_data || {}, null, 2)}</pre>
-                            </div>
-                            ${data.response_data ? `
-                                <div>
-                                    <strong>Response Data:</strong>
-                                    <pre class="bg-gray-100 dark:bg-gray-900 p-2 rounded text-xs overflow-auto max-h-40">${JSON.stringify(data.response_data, null, 2)}</pre>
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
-                    document.getElementById('logModal').classList.remove('hidden');
-                });
-        }
-
-        function closeLogModal() {
-            document.getElementById('logModal').classList.add('hidden');
-        }
-    </script>
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+</script>
 @endsection
-

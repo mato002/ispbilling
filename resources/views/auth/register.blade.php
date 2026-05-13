@@ -1,113 +1,150 @@
+@php($title = 'Create operator account · PrimeBilling')
+
 <x-guest-layout>
-    <div>
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Create Account</h2>
-        <p class="text-sm text-gray-600 dark:text-gray-400">Get started with your free account today</p>
+    <div class="mb-7">
+        <div class="mb-1 inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
+            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+            </svg>
+            Onboard your ISP
+        </div>
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-[26px]">
+            Create your operator account
+        </h2>
+        <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+            Get started in under 5 minutes. Connect MikroTik, M-Pesa and your subscriber base.
+        </p>
     </div>
 
-    <form method="POST" action="{{ route('register') }}" class="mt-6 space-y-5">
+    <form
+        method="POST"
+        action="{{ route('register') }}"
+        x-data="{ showPassword: false, loading: false }"
+        @submit="loading = true"
+        class="space-y-4"
+    >
         @csrf
 
-        <!-- Name -->
         <div>
-            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Full Name
+            <label for="name" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                Full name
             </label>
-            <input id="name" 
-                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition duration-150" 
-                   type="text" 
-                   name="name" 
-                   value="{{ old('name') }}" 
-                   required 
-                   autofocus 
-                   autocomplete="name"
-                   placeholder="Enter your full name">
+            <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                    </svg>
+                </span>
+                <input id="name" name="name" type="text" value="{{ old('name') }}" required autofocus autocomplete="name"
+                       placeholder="Jane Operator"
+                       class="pb-input @error('name') !border-rose-400 @enderror">
+            </div>
             @error('name')
-                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                <p class="mt-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
             @enderror
         </div>
 
-        <!-- Email Address -->
         <div>
-            <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email Address
+            <label for="email" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                Work email
             </label>
-            <input id="email" 
-                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition duration-150" 
-                   type="email" 
-                   name="email" 
-                   value="{{ old('email') }}" 
-                   required 
-                   autocomplete="username"
-                   placeholder="Enter your email">
+            <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>
+                    </svg>
+                </span>
+                <input id="email" name="email" type="email" value="{{ old('email') }}" required autocomplete="username"
+                       placeholder="you@yourisp.co.ke"
+                       class="pb-input @error('email') !border-rose-400 @enderror">
+            </div>
             @error('email')
-                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                <p class="mt-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
             @enderror
         </div>
 
-        <!-- Password -->
         <div>
-            <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label for="password" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                 Password
             </label>
-            <input id="password" 
-                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition duration-150" 
-                   type="password" 
-                   name="password" 
-                   required 
-                   autocomplete="new-password"
-                   placeholder="Create a password">
+            <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                </span>
+                <input id="password" name="password" :type="showPassword ? 'text' : 'password'" required autocomplete="new-password"
+                       placeholder="Create a strong password"
+                       class="pb-input pr-12 @error('password') !border-rose-400 @enderror">
+                <button type="button" @click="showPassword = !showPassword"
+                        class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 transition hover:text-indigo-600">
+                    <svg x-show="!showPassword" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <svg x-show="showPassword" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 4.06-4.94"/>
+                        <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c6.5 0 10 7 10 7a18.42 18.42 0 0 1-2.16 3.19"/>
+                        <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88"/><path d="M1 1l22 22"/>
+                    </svg>
+                </button>
+            </div>
             @error('password')
-                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                <p class="mt-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
             @enderror
         </div>
 
-        <!-- Confirm Password -->
         <div>
-            <label for="password_confirmation" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Confirm Password
+            <label for="password_confirmation" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                Confirm password
             </label>
-            <input id="password_confirmation" 
-                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition duration-150" 
-                   type="password" 
-                   name="password_confirmation" 
-                   required 
-                   autocomplete="new-password"
-                   placeholder="Confirm your password">
+            <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+                    </svg>
+                </span>
+                <input id="password_confirmation" name="password_confirmation" :type="showPassword ? 'text' : 'password'" required autocomplete="new-password"
+                       placeholder="Repeat your password"
+                       class="pb-input @error('password_confirmation') !border-rose-400 @enderror">
+            </div>
             @error('password_confirmation')
-                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                <p class="mt-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
             @enderror
         </div>
 
-        <!-- Terms & Conditions -->
-        <div class="flex items-start">
-            <input id="terms" 
-                   type="checkbox" 
-                   class="mt-1 rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:ring-blue-500 dark:bg-gray-700" 
-                   required>
-            <label for="terms" class="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                I agree to the 
-                <a href="#" class="text-blue-600 hover:text-blue-500 dark:text-blue-400">Terms of Service</a> 
-                and 
-                <a href="#" class="text-blue-600 hover:text-blue-500 dark:text-blue-400">Privacy Policy</a>
-            </label>
-        </div>
+        <label for="terms" class="flex cursor-pointer items-start gap-2.5 select-none">
+            <input id="terms" type="checkbox" required class="pb-check mt-0.5">
+            <span class="text-sm text-slate-600 dark:text-slate-300">
+                I agree to PrimeBilling's
+                <a href="#" class="font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300">Terms of Service</a>
+                and
+                <a href="#" class="font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300">Privacy Policy</a>.
+            </span>
+        </label>
 
-        <!-- Submit Button -->
-        <div>
-            <button type="submit" 
-                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150">
-                Create Account
-            </button>
-        </div>
+        <button type="submit" :disabled="loading" class="pb-cta w-full text-sm">
+            <span x-show="!loading" class="inline-flex items-center gap-2">
+                Create operator account
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                </svg>
+            </span>
+            <span x-show="loading" x-cloak class="inline-flex items-center gap-2">
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25" stroke-width="3"/>
+                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+                Creating your account…
+            </span>
+        </button>
 
-        <!-- Login Link -->
-        <div class="text-center">
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-                Already have an account?
-                <a href="{{ route('login') }}" class="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition">
-                    Sign in
-                </a>
-            </p>
-        </div>
+        <p class="text-center text-sm text-slate-500 dark:text-slate-400">
+            Need an ISP workspace?
+            <a href="{{ route('register.isp') }}" class="font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300">Register your ISP</a>
+            ·
+            Already with us?
+            <a href="{{ route('login') }}" class="font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300">Sign in</a>
+        </p>
     </form>
 </x-guest-layout>
