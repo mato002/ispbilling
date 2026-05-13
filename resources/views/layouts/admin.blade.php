@@ -376,7 +376,7 @@
 <body class="pb-canvas isp-page antialiased overflow-x-hidden">
     @include('layouts.admin-header')
 
-    <div class="min-h-screen">
+    <div id="pb-admin-shell" class="min-h-screen">
         @include('layouts.admin-sidebar')
 
         {{-- Mobile sidebar overlay --}}
@@ -395,8 +395,8 @@
 
         <main
             id="pb-main"
-            :class="$store.sidebar.collapsed ? 'md:ml-16' : 'md:ml-64'"
-            class="min-h-screen pt-16 transition-all duration-300 ease-in-out"
+            class="min-h-screen pt-16 transition-all duration-300 ease-in-out md:ml-64"
+            :class="$store.sidebar.collapsed ? 'md:!ml-16' : ''"
         >
                 <div class="px-4 py-6 sm:px-6 lg:px-8 overflow-x-hidden">
                     <x-system-announcements-banner :announcements="$systemAnnouncements ?? collect()" />

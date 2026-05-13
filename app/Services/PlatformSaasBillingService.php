@@ -54,7 +54,7 @@ class PlatformSaasBillingService
             }
         }
 
-        $trialDays = max(14, (int) $plan->trial_days);
+        $trialDays = max(0, (int) $plan->trial_days);
         $trialEnds = now()->addDays($trialDays);
 
         $settings = $isp->settings ?? [];

@@ -13,6 +13,7 @@ use App\Models\PlatformSaasPlan;
 use App\Models\Router;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SaasOnboardingWizardService
@@ -20,6 +21,67 @@ class SaasOnboardingWizardService
     public function __construct(
         private readonly PlatformSaasBillingService $platformBilling,
     ) {}
+
+    /**
+     * If a SaaS onboarding verification payment is already completed but the ISP flag was never set
+     * (e.g. partial failure after the callback), align the ISP row.
+     */
+    public function syncSaasPaymentVerifiedAtIfOnboardingPaymentCompleted(ISP $isp): bool
+    {
+        if ($isp->saas_payment_verified_at) {
+            return false;
+        }
+
+        $exists = Payment::query()
+            ->where('isp_id', $isp->id)
+            ->where('metadata->purpose', 'saas_onboarding_verification')
+            ->where('status', 'completed')
+            ->exists();
+
+        if (! $exists) {
+            return false;
+        }
+
+        $isp->update(['saas_payment_verified_at' => now()]);
+
+        return true;
+    }
+
+    /**
+     * Local only: complete the latest pending onboarding verification payment as if the STK callback succeeded.
+     */
+    public function completePendingSaasOnboardingMpesaVerificationAsSimulated(ISP $isp): bool
+    {
+        if (! app()->environment('local')) {
+            return false;
+        }
+
+        $payment = Payment::query()
+            ->where('isp_id', $isp->id)
+            ->where('status', 'pending')
+            ->where('metadata->purpose', 'saas_onboarding_verification')
+            ->latest('id')
+            ->first();
+
+        if (! $payment) {
+            return false;
+        }
+
+        DB::transaction(function () use ($payment, $isp): void {
+            $payment->update([
+                'transaction_id' => 'DEV-'.now()->format('YmdHis'),
+                'metadata' => array_merge($payment->metadata ?? [], [
+                    'dev_simulated_verification' => true,
+                    'simulated_at' => now()->toIso8601String(),
+                ]),
+            ]);
+            $payment->markAsCompleted();
+
+            $isp->update(['saas_payment_verified_at' => now()]);
+        });
+
+        return true;
+    }
 
     public function processIspWizard(ISP $isp, Request $request): RedirectResponse
     {
@@ -52,9 +114,63 @@ class SaasOnboardingWizardService
 
     protected function stepBusinessAndBilling(ISP $isp, Request $request): RedirectResponse
     {
+        if ($request->input('wizard_action') === 'local_dev_skip_mpesa_verify') {
+            abort_unless(app()->environment('local'), 403);
+
+            if ($isp->saas_billing_method !== 'mpesa') {
+                return back()->with('info', 'M-Pesa is not selected as your platform billing method.');
+            }
+
+            if ($isp->saas_payment_verified_at) {
+                $isp->update(['saas_onboarding_step' => 3]);
+
+                return redirect()->route('isp.saas-onboarding.show')->with('success', 'Already verified. Continue with network setup.');
+            }
+
+            if (! $this->completePendingSaasOnboardingMpesaVerificationAsSimulated($isp)) {
+                return back()->with(
+                    'error',
+                    'No pending KES verification payment found. Save this step with M-Pesa first (that sends the STK), then use “Skip STK callback”, or run: php artisan mpesa:simulate-onboarding-verification '.$isp->id.' --force'
+                );
+            }
+
+            $isp->refresh();
+            $isp->update(['saas_onboarding_step' => 3]);
+
+            return redirect()->route('isp.saas-onboarding.show')->with(
+                'success',
+                'Local dev only: M-Pesa verification was completed without a Daraja callback. Next: connect your router.'
+            );
+        }
+
         if ($request->input('wizard_action') === 'continue_after_verify') {
             if ($isp->saas_billing_method === 'mpesa' && ! $isp->saas_payment_verified_at) {
-                return back()->with('error', 'Approve the M-Pesa verification prompt on your phone first, then try again.');
+                $this->syncSaasPaymentVerifiedAtIfOnboardingPaymentCompleted($isp);
+                $isp->refresh();
+
+                if (! $isp->saas_payment_verified_at) {
+                    $hasPendingVerification = Payment::query()
+                        ->where('isp_id', $isp->id)
+                        ->where('status', 'pending')
+                        ->where('metadata->purpose', 'saas_onboarding_verification')
+                        ->exists();
+
+                    $amount = max(1, (int) ceil((float) config('services.mpesa.saas_onboarding_verification_amount', 1)));
+
+                    $base = 'PrimeBilling still has no successful M-Pesa callback for your KES '.$amount.' verification, so your account is not marked as verified yet. '
+                        .($hasPendingVerification
+                            ? 'A verification payment is still pending in the database — approving on your phone is not enough until Safaricom can POST to your public callback URL. '
+                            : '');
+
+                    $fix = 'Fix the callback: keep ngrok pointed at your app, run scripts\\sync-ngrok-env.ps1, then php artisan config:clear, and submit step 2 again so a new STK uses the updated URLs. Check http://127.0.0.1:4040 for POST /api/payments/mpesa/callback. '
+                        .'Or choose Bank or Card above to skip platform M-Pesa.';
+
+                    if (app()->environment('local')) {
+                        $fix .= ' On APP_ENV=local you can also click Skip STK callback (local only) next to Continue, or run: php artisan mpesa:simulate-onboarding-verification '.$isp->id.' --force';
+                    }
+
+                    return back()->with('error', $base.$fix);
+                }
             }
 
             $isp->update(['saas_onboarding_step' => 3]);

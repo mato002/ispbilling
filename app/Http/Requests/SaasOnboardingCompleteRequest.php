@@ -58,6 +58,12 @@ class SaasOnboardingCompleteRequest extends FormRequest
             ]);
         }
 
+        if ($step === 2 && $this->input('wizard_action') === 'local_dev_skip_mpesa_verify') {
+            return array_merge($base, [
+                'wizard_action' => ['required', 'in:local_dev_skip_mpesa_verify'],
+            ]);
+        }
+
         return match ($step) {
             1 => array_merge($base, [
                 'platform_saas_plan_id' => ['required', 'exists:platform_saas_plans,id'],
@@ -80,7 +86,7 @@ class SaasOnboardingCompleteRequest extends FormRequest
             ]),
             3 => array_merge($base, [
                 'router_name' => ['required', 'string', 'max:255'],
-                'router_ip_address' => ['required', 'ip'],
+                'router_ip_address' => ['required', 'string', 'max:255'],
                 'router_port' => ['required', 'integer', 'min:1', 'max:65535'],
                 'router_username' => ['required', 'string', 'max:255'],
                 'router_password' => ['required', 'string', 'max:255'],
@@ -125,7 +131,7 @@ class SaasOnboardingCompleteRequest extends FormRequest
                 return;
             }
 
-            if ((int) $this->input('wizard_step') === 2 && $this->input('wizard_action') !== 'continue_after_verify') {
+            if ((int) $this->input('wizard_step') === 2 && ! in_array($this->input('wizard_action'), ['continue_after_verify', 'local_dev_skip_mpesa_verify'], true)) {
                 if ($this->input('saas_billing_method') === 'mpesa') {
                     $raw = (string) $this->input('saas_billing_phone', '');
                     if (! PlatformSaasBillingService::normalizeKenyanMsisdn($raw)) {

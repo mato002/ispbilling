@@ -8,7 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('platform_settings') && Schema::hasColumn('platform_settings', 'slug')) {
+        // Only rename legacy integrations table: do not touch key/value `platform_settings`
+        // (id, key, value) used by PlatformSetting — it must never have a `slug` column.
+        if (Schema::hasTable('platform_settings')
+            && Schema::hasColumn('platform_settings', 'slug')
+            && ! Schema::hasColumn('platform_settings', 'key')) {
             Schema::rename('platform_settings', 'platform_integrations');
 
             return;

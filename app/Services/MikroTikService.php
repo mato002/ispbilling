@@ -42,7 +42,7 @@ class MikroTikService
             if (! $routerOsClass) {
                 // For testing without RouterOS package, log warning and return false
                 // Don't throw exception to allow testing without physical router
-                Log::warning('RouterOS API package not installed. Install with: composer require evgeny-rodionov/routeros-api-php', [
+                Log::warning('RouterOS API package not installed. Run: composer require evilfreelancer/routeros-api-php', [
                     'router_id' => $this->router->id,
                     'router_ip' => $this->router->ip_address,
                 ]);
@@ -52,7 +52,7 @@ class MikroTikService
             }
 
             // Using RouterOS API PHP library
-            // Package: evgeny-rodionov/routeros-api-php
+            // Package: evilfreelancer/routeros-api-php
             if ($routerOsClass === '\RouterOS\Client' && $routerOsConfigClass) {
                 // Newer version uses Client with Config
                 $config = new $routerOsConfigClass([
@@ -116,7 +116,7 @@ class MikroTikService
         ];
 
         if (! $this->routerOsLibraryAvailable()) {
-            return $empty('RouterOS API PHP library is not installed. Run: composer require evgeny-rodionov/routeros-api-php');
+            return $empty('RouterOS API PHP library is not installed. Run: composer require evilfreelancer/routeros-api-php. On XAMPP/Windows, enable extension=sockets in php.ini and restart Apache.');
         }
 
         if (! $this->connect()) {

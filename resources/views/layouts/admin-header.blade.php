@@ -22,8 +22,8 @@
     @keydown.window.cmd.k.prevent="searchOpen = true"
     @keydown.window.ctrl.k.prevent="searchOpen = true"
     @keydown.window.escape="searchOpen = false; quickActionsOpen = false; profileOpen = false; $store.sidebar.closeMobile()"
-    :class="$store.sidebar.collapsed ? 'md:left-16' : 'md:left-64'"
-    class="pb-topbar fixed top-0 left-0 right-0 z-30 h-16 transition-all duration-300 ease-in-out"
+    class="pb-topbar fixed top-0 right-0 z-30 h-16 transition-all duration-300 ease-in-out left-0 md:left-64"
+    :class="$store.sidebar.collapsed ? 'md:!left-16' : ''"
 >
     <div class="flex h-full items-center gap-2 px-3 sm:gap-4 sm:px-6">
 

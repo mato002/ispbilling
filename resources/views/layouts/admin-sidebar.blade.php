@@ -19,10 +19,10 @@
 
 <aside
     :class="[
-        $store.sidebar.collapsed ? 'md:w-16' : 'md:w-64',
-        $store.sidebar.mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        $store.sidebar.collapsed ? 'md:!w-16' : '',
+        $store.sidebar.mobileOpen ? '!translate-x-0' : '',
     ]"
-    class="pb-sidebar fixed top-0 bottom-0 left-0 z-40 flex w-72 flex-col transition-all duration-300 ease-in-out"
+    class="pb-sidebar fixed top-0 bottom-0 left-0 z-40 flex w-64 -translate-x-full flex-col transition-all duration-300 ease-in-out md:translate-x-0"
 >
     {{-- Brand (ISP logo + workspace title when configured) --}}
     @php

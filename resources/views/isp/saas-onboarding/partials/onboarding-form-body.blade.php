@@ -28,8 +28,7 @@
 
 @if ($current === 1)
     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Step 1 — Access plan</h2>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Pick how you use PrimeBilling. Your trial is at least 14 days (see plan details).</p>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Step 1 — Plan</h2>
         <div class="mt-4 space-y-3">
             @foreach ($plans as $plan)
                 <label class="flex cursor-pointer gap-3 rounded-xl border border-slate-200 p-4 hover:border-indigo-300 dark:border-slate-700 dark:hover:border-indigo-500/50 has-[:checked]:border-indigo-500 has-[:checked]:ring-2 has-[:checked]:ring-indigo-500/30">
@@ -39,13 +38,15 @@
                             <span class="font-semibold text-slate-900 dark:text-white">{{ $plan->name }}</span>
                             <span class="text-sm font-medium text-indigo-600 dark:text-indigo-400">KES {{ number_format($plan->monthly_price, 0) }} / mo</span>
                         </div>
-                        @if ($plan->description)
-                            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ $plan->description }}</p>
-                        @endif
-                        <ul class="mt-2 list-inside list-disc text-xs text-slate-500 dark:text-slate-400">
-                            <li>{{ $plan->max_customers ? 'Up to '.number_format($plan->max_customers).' subscribers' : 'Unlimited subscribers' }}</li>
-                            <li>{{ max(14, (int) $plan->trial_days) }}-day trial (minimum 14 days)</li>
-                        </ul>
+                        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                            {{ $plan->max_customers ? 'Up to '.number_format($plan->max_customers).' subscribers' : 'Unlimited subscribers' }}
+                            ·
+                            @if ((int) $plan->trial_days <= 0)
+                                No trial
+                            @else
+                                {{ (int) $plan->trial_days }}d trial
+                            @endif
+                        </p>
                     </div>
                 </label>
             @endforeach
@@ -61,21 +62,10 @@
 
 @if ($current === 2)
     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 space-y-6">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Step 2 — Business &amp; platform billing</h2>
-        <p class="text-sm text-slate-500 dark:text-slate-400">Address and support contacts appear on customer-facing pages. Platform billing is how <strong>you</strong> pay PrimeBilling.</p>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Step 2 — Business &amp; billing</h2>
 
         @if ($pending)
-            <p class="text-sm text-indigo-700 dark:text-indigo-300">Selected plan: <strong>{{ $pending->name }}</strong> · KES {{ number_format($pending->monthly_price, 0) }}/mo</p>
-        @endif
-
-        @if ($isp->saas_billing_method === 'mpesa' && ! $isp->saas_payment_verified_at)
-            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
-                <p class="font-medium">M-Pesa payment check</p>
-                <p class="mt-1">If you already approved the KES {{ $verifyAmount }} prompt on your phone, continue to the next step.</p>
-                <div class="mt-3">
-                    <button type="submit" formnovalidate name="wizard_action" value="continue_after_verify" class="pb-btn pb-btn-primary text-sm">Continue to network setup</button>
-                </div>
-            </div>
+            <p class="text-sm text-indigo-700 dark:text-indigo-300"><strong>{{ $pending->name }}</strong> · KES {{ number_format($pending->monthly_price, 0) }}/mo</p>
         @endif
 
         <div class="grid gap-4 sm:grid-cols-2">
@@ -102,11 +92,11 @@
         </div>
 
         <div>
-            <span class="text-sm font-medium text-slate-700 dark:text-slate-200">How you pay PrimeBilling</span>
+            <span class="text-sm font-medium text-slate-700 dark:text-slate-200">How you pay us</span>
             <div class="mt-2 flex flex-wrap gap-4">
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                     <input type="radio" name="saas_billing_method" value="mpesa" class="rounded border-slate-300" {{ $methodOld === 'mpesa' ? 'checked' : '' }}>
-                    M-Pesa (STK on billing day)
+                    M-Pesa
                 </label>
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                     <input type="radio" name="saas_billing_method" value="bank" class="rounded border-slate-300" {{ $methodOld === 'bank' ? 'checked' : '' }}>
@@ -114,17 +104,34 @@
                 </label>
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                     <input type="radio" name="saas_billing_method" value="card" class="rounded border-slate-300" {{ $methodOld === 'card' ? 'checked' : '' }}>
-                    Card / invoice link
+                    Card / invoice
                 </label>
             </div>
             @error('saas_billing_method')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
         </div>
 
         <div class="space-y-4" id="pb-onboarding-pay-mpesa" data-billing-panel="mpesa">
-            <label class="isp-form-label">M-Pesa billing number (platform invoices)</label>
+            <label class="isp-form-label">M-Pesa number</label>
             <input type="text" name="saas_billing_phone" value="{{ old('saas_billing_phone', $isp->saas_billing_phone ?? $isp->phone) }}" class="isp-form-input" placeholder="2547XXXXXXXX" autocomplete="tel">
             @error('saas_billing_phone')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
-            <p class="text-xs text-slate-500 dark:text-slate-400">We send a one-time KES {{ $verifyAmount }} STK push to confirm this number can pay.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">One-time KES {{ $verifyAmount }} STK to verify this number.</p>
+
+            @if ($isp->saas_billing_method === 'mpesa' && ! $isp->saas_payment_verified_at)
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
+                    <p class="font-medium">After you approve the KES {{ $verifyAmount }} STK</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <button type="submit" formnovalidate name="wizard_action" value="continue_after_verify" class="pb-btn pb-btn-primary text-sm">Continue</button>
+                        @if (app()->environment('local'))
+                            <button type="submit" formnovalidate name="wizard_action" value="local_dev_skip_mpesa_verify" class="rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-950 shadow-sm hover:bg-amber-100 dark:border-amber-500 dark:bg-slate-900 dark:text-amber-100 dark:hover:bg-slate-800">
+                                Skip callback (local)
+                            </button>
+                        @endif
+                    </div>
+                    @if (app()->environment('local'))
+                        <p class="mt-2 text-xs text-amber-900/90 dark:text-amber-100/90">Local: needs reachable <code class="rounded bg-white/60 px-0.5 dark:bg-slate-900/60">MPESA_CALLBACK_URL</code> (e.g. ngrok) or use Skip.</p>
+                    @endif
+                </div>
+            @endif
         </div>
 
         <div class="hidden space-y-4" id="pb-onboarding-pay-bank" data-billing-panel="bank">
@@ -172,7 +179,7 @@
 
         <label class="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
             <input type="checkbox" name="saas_white_label_opt_in" value="1" class="mt-1 rounded border-slate-300" {{ old('saas_white_label_opt_in', $isp->saas_white_label_opt_in) ? 'checked' : '' }}>
-            <span>Optional white-label setup (billed once on first invoice after trial).</span>
+            <span>White-label (one-time on first invoice)</span>
         </label>
 
         <div class="flex justify-end gap-3">
@@ -183,8 +190,7 @@
 
 @if ($current === 3)
     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 space-y-6">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Step 3 — Connect MikroTik &amp; plans</h2>
-        <p class="text-sm text-slate-500 dark:text-slate-400">We test the RouterOS API immediately. Winbox uses the same host; the API port is usually <strong>8728</strong>.</p>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Step 3 — Router</h2>
 
         <div class="grid gap-4 sm:grid-cols-2">
             <div class="sm:col-span-2">
@@ -204,24 +210,24 @@
             </div>
             <div>
                 <label class="isp-form-label">API username</label>
-                <input type="text" name="router_username" value="{{ old('router_username') }}" required class="isp-form-input" autocomplete="username">
+                <input type="text" name="router_username" value="{{ old('router_username') }}" required class="isp-form-input" autocomplete="username" placeholder="RouterOS API user (e.g. admin)">
                 @error('router_username')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
             <div>
                 <label class="isp-form-label">API password</label>
-                <input type="password" name="router_password" value="{{ old('router_password') }}" required class="isp-form-input" autocomplete="new-password">
+                <input type="password" name="router_password" value="{{ old('router_password') }}" required class="isp-form-input" autocomplete="new-password" placeholder="API user password">
                 @error('router_password')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
         </div>
 
         <div>
-            <label class="isp-form-label">Import hotspot user profiles (optional)</label>
-            <textarea name="import_profile_names_csv" rows="3" class="isp-form-input font-mono text-sm" placeholder="default, 5Mbps, Premium (comma or newline separated — must match MikroTik profile names)">{{ old('import_profile_names_csv') }}</textarea>
+            <label class="isp-form-label">Hotspot profiles to import (optional)</label>
+            <textarea name="import_profile_names_csv" rows="2" class="isp-form-input font-mono text-sm" placeholder="Comma or newline, MikroTik names">{{ old('import_profile_names_csv') }}</textarea>
             @error('import_profile_names_csv')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
         </div>
 
         <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
-            <p class="text-sm font-medium text-slate-800 dark:text-slate-200">Create a plan manually (optional)</p>
+            <p class="text-sm font-medium text-slate-800 dark:text-slate-200">Add a plan (optional)</p>
             <div class="mt-3 grid gap-3 sm:grid-cols-3">
                 <div>
                     <label class="isp-form-label text-xs">Plan name</label>
@@ -248,8 +254,7 @@
 
 @if ($current === 4)
     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 space-y-6">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Step 4 — Customer M-Pesa (Paybill / Till)</h2>
-        <p class="text-sm text-slate-500 dark:text-slate-400">Daraja credentials for <strong>your</strong> customers’ payments. On save we call Safaricom <code class="text-xs">registerURL</code> so C2B callbacks hit this platform.</p>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Step 4 — Customer M-Pesa</h2>
 
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
@@ -258,7 +263,7 @@
                 @error('mpesa_shortcode')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
             <div>
-                <label class="isp-form-label">Passkey (STK / Lipa na M-Pesa)</label>
+                <label class="isp-form-label">Passkey</label>
                 <input type="text" name="mpesa_passkey" value="{{ old('mpesa_passkey') }}" required class="isp-form-input" autocomplete="off">
                 @error('mpesa_passkey')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
@@ -283,7 +288,7 @@
             <div class="flex items-end">
                 <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                     <input type="checkbox" name="mpesa_active" value="1" class="rounded border-slate-300" {{ old('mpesa_active', true) ? 'checked' : '' }}>
-                    Activate for customer checkout
+                    Active
                 </label>
             </div>
         </div>
@@ -308,5 +313,87 @@
         r.addEventListener('change', syncPanels);
     });
     syncPanels();
+
+    var form = document.getElementById('pb-saas-onboarding-form');
+    if (!form || !form.dataset.draftIsp) {
+        return;
+    }
+    var draftKey = 'pb-saas-onboarding/v1/' + form.dataset.draftIsp + '/' + form.dataset.draftStep;
+
+    function setControlValue(name, value) {
+        var ctrl = form.elements.namedItem(name);
+        if (!ctrl) {
+            return;
+        }
+        if (window.RadioNodeList && ctrl instanceof RadioNodeList) {
+            for (var i = 0; i < ctrl.length; i++) {
+                ctrl[i].checked = String(ctrl[i].value) === String(value);
+            }
+            return;
+        }
+        if (ctrl.type === 'checkbox') {
+            ctrl.checked = value === true || value === 1 || value === '1' || value === 'on';
+            return;
+        }
+        ctrl.value = value == null ? '' : String(value);
+    }
+
+    function collectDraft() {
+        var data = {};
+        var list = form.querySelectorAll('input, select, textarea');
+        for (var i = 0; i < list.length; i++) {
+            var el = list[i];
+            if (!el.name || el.name === '_token') {
+                continue;
+            }
+            if (el.type === 'checkbox') {
+                data[el.name] = el.checked ? (el.value || '1') : '';
+                continue;
+            }
+            if (el.type === 'radio') {
+                if (el.checked) {
+                    data[el.name] = el.value;
+                }
+                continue;
+            }
+            data[el.name] = el.value;
+        }
+        return data;
+    }
+
+    function saveDraft() {
+        try {
+            localStorage.setItem(draftKey, JSON.stringify(collectDraft()));
+        } catch (e) {}
+    }
+
+    var saveTimer;
+    function scheduleSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveDraft, 350);
+    }
+    form.addEventListener('input', scheduleSave);
+    form.addEventListener('change', scheduleSave);
+
+    if (form.dataset.draftSkipRestore !== '1') {
+        try {
+            var raw = localStorage.getItem(draftKey);
+            if (raw) {
+                var parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object') {
+                    Object.keys(parsed).forEach(function (name) {
+                        setControlValue(name, parsed[name]);
+                    });
+                    syncPanels();
+                }
+            }
+        } catch (e) {}
+    }
+
+    form.addEventListener('submit', function () {
+        try {
+            localStorage.setItem(draftKey, JSON.stringify(collectDraft()));
+        } catch (e) {}
+    });
 })();
 </script>

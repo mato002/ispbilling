@@ -42,6 +42,7 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Trial days</label>
                 <input type="number" name="trial_days" value="{{ old('trial_days', 14) }}" required min="0" max="90" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Days until the first platform SaaS invoice after onboarding completes. Use 0 for no trial (first invoice on the next billing run).</p>
             </div>
             <div class="flex gap-6">
                 <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">

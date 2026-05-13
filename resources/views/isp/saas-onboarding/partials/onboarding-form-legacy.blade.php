@@ -4,7 +4,7 @@
 
 <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
     <h2 class="text-lg font-semibold text-slate-900 dark:text-white">1. Access plan</h2>
-    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Includes a free trial before your first platform invoice (M-Pesa STK is used on billing day when that method is selected).</p>
+    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Each plan shows how long until your first platform invoice (M-Pesa STK is used on billing day when that method is selected).</p>
     <div class="mt-4 space-y-3">
         @foreach ($plans as $plan)
             <label class="flex cursor-pointer gap-3 rounded-xl border border-slate-200 p-4 hover:border-indigo-300 dark:border-slate-700 dark:hover:border-indigo-500/50 has-[:checked]:border-indigo-500 has-[:checked]:ring-2 has-[:checked]:ring-indigo-500/30">
@@ -19,7 +19,13 @@
                     @endif
                     <ul class="mt-2 list-inside list-disc text-xs text-slate-500 dark:text-slate-400">
                         <li>{{ $plan->max_customers ? 'Up to '.number_format($plan->max_customers).' subscribers' : 'Unlimited subscribers' }}</li>
-                        <li>{{ $plan->trial_days }}-day trial</li>
+                        <li>
+                            @if ((int) $plan->trial_days <= 0)
+                                No trial — first invoice on the next billing cycle after onboarding
+                            @else
+                                {{ (int) $plan->trial_days }} {{ \Illuminate\Support\Str::plural('day', (int) $plan->trial_days) }} before first platform invoice
+                            @endif
+                        </li>
                         @if ($plan->hasFeature('advanced_analytics'))
                             <li>Advanced analytics</li>
                         @endif

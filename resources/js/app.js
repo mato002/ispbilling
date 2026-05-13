@@ -15,6 +15,13 @@ document.addEventListener('turbo:before-render', (event) => {
     if (!newBody || !window.Alpine) {
         return;
     }
+    // Init the whole shell so sidebar / overlay / main all bind to $store (not only <main>).
+    const shell = newBody.querySelector('#pb-admin-shell');
+    if (shell) {
+        window.Alpine.initTree(shell);
+
+        return;
+    }
     const main = newBody.querySelector('main');
     if (main) {
         window.Alpine.initTree(main);
@@ -26,12 +33,32 @@ document.addEventListener('turbo:load', () => {
     processPbFlashPayload();
 });
 
+document.addEventListener('DOMContentLoaded', () => {
+    syncCsrfFromMeta();
+    processPbFlashPayload();
+});
+
 function processPbFlashPayload() {
-    if (!window.Swal) {
-        return;
-    }
     const el = document.getElementById('pb-flash-payload');
     if (!el) {
+        return;
+    }
+    if (!window.Swal) {
+        let payload = {};
+        try {
+            payload = JSON.parse(el.textContent || '{}');
+        } catch {
+            el.remove();
+
+            return;
+        }
+        el.remove();
+        if (payload.validation_errors?.length) {
+            window.alert(payload.validation_errors.join('\n'));
+        } else if (payload.error) {
+            window.alert(payload.error);
+        }
+
         return;
     }
     let payload = {};
