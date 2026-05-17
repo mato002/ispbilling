@@ -20,7 +20,8 @@ class EnsureIspPlatformAccess
             return $next($request);
         }
 
-        $isp = ISP::query()->find($user->isp_id);
+        $isp = $request->attributes->get(LoadTenantIsp::ATTRIBUTE)
+            ?? ISP::query()->find($user->isp_id);
 
         if ($isp && $isp->platform_access_locked) {
             if ($request->routeIs('isp.platform-subscription.*')) {

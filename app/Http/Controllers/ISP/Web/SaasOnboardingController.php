@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ISP\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\LoadTenantIsp;
 use App\Http\Requests\SaasOnboardingCompleteRequest;
 use App\Models\ISP;
 use App\Models\PlatformSaasPlan;
@@ -18,7 +19,12 @@ class SaasOnboardingController extends Controller
         abort_unless($user->isp_id, 403);
         abort_unless($user->isIspAdmin(), 403);
 
-        $isp = ISP::query()->with(['saasPlan', 'pendingSaasPlan', 'routers'])->findOrFail($user->isp_id);
+        $isp = request()->attributes->get(LoadTenantIsp::ATTRIBUTE);
+        if ($isp instanceof ISP) {
+            $isp->loadMissing(['saasPlan', 'pendingSaasPlan', 'routers']);
+        } else {
+            $isp = ISP::query()->with(['saasPlan', 'pendingSaasPlan', 'routers'])->findOrFail($user->isp_id);
+        }
 
         if (! $isp->needsSaasOnboarding()) {
             return redirect()->route('isp.dashboard');

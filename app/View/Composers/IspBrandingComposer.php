@@ -2,6 +2,7 @@
 
 namespace App\View\Composers;
 
+use App\Http\Middleware\LoadTenantIsp;
 use App\Models\ISP;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -17,7 +18,10 @@ class IspBrandingComposer
             return;
         }
 
-        $isp = ISP::query()->find($user->isp_id);
+        $isp = request()->attributes->get(LoadTenantIsp::ATTRIBUTE);
+        if (! $isp instanceof ISP) {
+            $isp = ISP::query()->find($user->isp_id);
+        }
         if (! $isp) {
             $view->with('ispBranding', null);
 
@@ -28,12 +32,12 @@ class IspBrandingComposer
         $b = $settings['branding'] ?? [];
 
         $logoUrl = null;
-        if (! empty($isp->logo) && Storage::disk('public')->exists($isp->logo)) {
+        if (! empty($isp->logo)) {
             $logoUrl = Storage::disk('public')->url($isp->logo);
         }
 
         $faviconUrl = null;
-        if (! empty($b['favicon_path']) && Storage::disk('public')->exists($b['favicon_path'])) {
+        if (! empty($b['favicon_path'])) {
             $faviconUrl = Storage::disk('public')->url($b['favicon_path']);
         }
 

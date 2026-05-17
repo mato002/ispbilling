@@ -1,5 +1,13 @@
 <?php
 
+use App\Http\Middleware\CustomerSession;
+use App\Http\Middleware\EnsureIspPlatformAccess;
+use App\Http\Middleware\EnsureLandingIspPresent;
+use App\Http\Middleware\EnsureSaasOnboardingComplete;
+use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\LoadTenantIsp;
+use App\Http\Middleware\ResolveLandingIspFromSubdomain;
+use App\Http\Middleware\ValidateIsp;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -13,16 +21,17 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(prepend: [
-            \App\Http\Middleware\ResolveLandingIspFromSubdomain::class,
+            ResolveLandingIspFromSubdomain::class,
         ]);
 
         $middleware->alias([
-            'customer.session' => \App\Http\Middleware\CustomerSession::class,
-            'validate.isp' => \App\Http\Middleware\ValidateIsp::class,
-            'ensure.isp.platform' => \App\Http\Middleware\EnsureIspPlatformAccess::class,
-            'ensure.saas.onboarding' => \App\Http\Middleware\EnsureSaasOnboardingComplete::class,
-            'ensure.landing.isp' => \App\Http\Middleware\EnsureLandingIspPresent::class,
-            'ensure.superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+            'customer.session' => CustomerSession::class,
+            'validate.isp' => ValidateIsp::class,
+            'ensure.isp.platform' => EnsureIspPlatformAccess::class,
+            'ensure.saas.onboarding' => EnsureSaasOnboardingComplete::class,
+            'ensure.landing.isp' => EnsureLandingIspPresent::class,
+            'ensure.superadmin' => EnsureSuperAdmin::class,
+            'load.tenant.isp' => LoadTenantIsp::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -3,6 +3,7 @@
 namespace App\View\Composers;
 
 use App\Models\SystemAnnouncement;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class IspSystemAnnouncementsComposer
@@ -25,7 +26,9 @@ class IspSystemAnnouncementsComposer
 
         $view->with(
             'systemAnnouncements',
-            SystemAnnouncement::query()->visibleNow()->get()
+            Cache::remember('isp.system_announcements.visible', 120, static function () {
+                return SystemAnnouncement::query()->visibleNow()->get();
+            })
         );
     }
 }

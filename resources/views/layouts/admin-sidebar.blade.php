@@ -2,7 +2,8 @@
     $user = Auth::user();
     $isSuper = $user->isSuperAdmin();
     $isIsp = $user->isIspAdmin() || $user->isIspStaff();
-    $ispName = optional($user->isp)->name ?? ($isSuper ? 'PrimeBilling Admin' : 'Your ISP');
+    $tenantIsp = request()->attributes->get(\App\Http\Middleware\LoadTenantIsp::ATTRIBUTE);
+    $ispName = $tenantIsp?->name ?? optional($user->isp)->name ?? ($isSuper ? 'PrimeBilling Admin' : 'Your ISP');
     $homeRoute = $isSuper ? route('admin.dashboard') : route('isp.dashboard');
 
     /**

@@ -24,7 +24,8 @@ class EnsureSaasOnboardingComplete
             return $next($request);
         }
 
-        $isp = ISP::query()->find($user->isp_id);
+        $isp = $request->attributes->get(LoadTenantIsp::ATTRIBUTE)
+            ?? ISP::query()->find($user->isp_id);
 
         if (! $isp || ! $isp->needsSaasOnboarding()) {
             return $next($request);
