@@ -26,14 +26,24 @@ class PlatformSaasBillingService
             return null;
         }
 
-        $phoneNumber = preg_replace('/^0/', '254', trim($raw));
-        $phoneNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
+        $digits = preg_replace('/[^0-9]/', '', trim($raw));
 
-        if (! preg_match('/^254[0-9]{9}$/', $phoneNumber)) {
+        if ($digits === '') {
             return null;
         }
 
-        return $phoneNumber;
+        if (preg_match('/^0[0-9]{9}$/', $digits)) {
+            $digits = '254'.substr($digits, 1);
+        } elseif (preg_match('/^[0-9]{9}$/', $digits)) {
+            // Local number entered after a +254 UI prefix (e.g. 728883160 or 111296234).
+            $digits = '254'.$digits;
+        } elseif (preg_match('/^254[0-9]{9}$/', $digits)) {
+            // Already international format.
+        } else {
+            return null;
+        }
+
+        return preg_match('/^254[0-9]{9}$/', $digits) ? $digits : null;
     }
 
     /**

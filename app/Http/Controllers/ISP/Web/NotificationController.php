@@ -72,22 +72,16 @@ class NotificationController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $notifications = $this->notificationService->getRecentNotifications($ispId, 10);
-        $unreadCount = $this->notificationService->getUnreadCount($ispId);
+        $snapshot = $this->notificationService->getDropdownSnapshot(
+            $ispId,
+            NotificationService::DROPDOWN_LIMIT
+        );
 
         return response()->json([
-            'notifications' => $notifications->map(function ($notification) {
-                return [
-                    'id' => $notification->id,
-                    'title' => $notification->title,
-                    'message' => $notification->message,
-                    'type' => $notification->type,
-                    'is_read' => $notification->is_read,
-                    'time_ago' => $notification->created_at->diffForHumans(),
-                    'created_at' => $notification->created_at->toISOString(),
-                ];
-            }),
-            'unread_count' => $unreadCount,
+            'notifications' => $snapshot['notifications']->map(
+                fn (Notification $notification) => $this->notificationService->formatForDropdown($notification)
+            )->values(),
+            'unread_count' => $snapshot['unread_count'],
         ]);
     }
 

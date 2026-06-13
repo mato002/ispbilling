@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\ISP;
 use App\Services\PlatformSaasBillingService;
+use App\Support\SaasOnboardingContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -22,7 +23,7 @@ class SaasOnboardingCompleteRequest extends FormRequest
         }
 
         if ($this->routeIs('isp.saas-onboarding.*')) {
-            return $user->isIspAdmin() && (bool) $user->isp_id;
+            return SaasOnboardingContext::canAccess($user);
         }
 
         return false;
@@ -55,19 +56,13 @@ class SaasOnboardingCompleteRequest extends FormRequest
         $base = ['wizard_step' => ['required', 'integer', 'in:1,2,3,4']];
 
         if ($this->routeIs('isp.saas-onboarding.*') && $this->input('wizard_action') === 'go_back') {
-            $isp = ISP::query()->find($this->user()->isp_id);
+            $isp = SaasOnboardingContext::resolveIsp($this->user());
             $serverStep = min(4, max(1, (int) ($isp?->saas_onboarding_step ?? 1)));
 
             return [
                 'wizard_action' => ['required', 'in:go_back'],
                 'wizard_step' => ['required', 'integer', Rule::in([$serverStep])],
             ];
-        }
-
-        if ($step === 2 && $this->input('wizard_action') === 'continue_after_verify') {
-            return array_merge($base, [
-                'wizard_action' => ['required', 'in:continue_after_verify'],
-            ]);
         }
 
         if ($step === 2 && $this->input('wizard_action') === 'local_dev_skip_mpesa_verify') {
@@ -140,20 +135,20 @@ class SaasOnboardingCompleteRequest extends FormRequest
                 if (! PlatformSaasBillingService::normalizeKenyanMsisdn($raw)) {
                     $validator->errors()->add(
                         'saas_billing_phone',
-                        'Enter a valid Kenyan M-Pesa number in international format (2547XXXXXXXX).'
+                        'Enter a valid Kenyan number (e.g. 0712345678 or digits after +254).'
                     );
                 }
 
                 return;
             }
 
-            if ((int) $this->input('wizard_step') === 2 && ! in_array($this->input('wizard_action'), ['continue_after_verify', 'local_dev_skip_mpesa_verify'], true)) {
+            if ((int) $this->input('wizard_step') === 2 && $this->input('wizard_action') !== 'local_dev_skip_mpesa_verify') {
                 if ($this->input('saas_billing_method') === 'mpesa') {
                     $raw = (string) $this->input('saas_billing_phone', '');
                     if (! PlatformSaasBillingService::normalizeKenyanMsisdn($raw)) {
                         $validator->errors()->add(
                             'saas_billing_phone',
-                            'Enter a valid Kenyan M-Pesa number in international format (2547XXXXXXXX).'
+                            'Enter a valid Kenyan number (e.g. 0712345678 or digits after +254).'
                         );
                     }
                 }

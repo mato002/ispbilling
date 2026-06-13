@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\IspPaymentMethod;
 use App\Models\Payment;
 use App\Models\ISP;
 use App\Support\IspPaymentExperience;
+use App\Support\MpesaGatewayConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -30,40 +30,33 @@ class MpesaService
     {
         $this->isp = $isp;
 
-        if ($isp) {
-            $daraja = IspPaymentMethod::query()
-                ->forIsp($isp->id)
-                ->byProvider('daraja')
-                ->where('active', true)
-                ->first();
+        if (! $isp) {
+            $this->applyConfig(MpesaGatewayConfig::fromConfigDefaults());
 
-            if ($daraja) {
-                $c = $daraja->credentials;
-                $this->consumerKey = $c['consumer_key'] ?? config('services.mpesa.consumer_key');
-                $this->consumerSecret = $c['consumer_secret'] ?? config('services.mpesa.consumer_secret');
-                $this->passkey = $c['passkey'] ?? config('services.mpesa.passkey');
-                $this->shortcode = $c['shortcode'] ?? config('services.mpesa.shortcode');
-                $this->environment = $c['environment'] ?? config('services.mpesa.environment', 'sandbox');
-                $this->transactionType = $c['transaction_type'] ?? config('services.mpesa.transaction_type', 'CustomerPayBillOnline');
-                $this->callbackUrl = $daraja->callback_url ?: config('services.mpesa.callback_url');
-                $this->timeoutUrl = $this->callbackUrl ?: config('services.mpesa.timeout_url');
-
-                return;
-            }
+            return;
         }
 
-        $settings = $isp?->settings ?? [];
-        $paymentGateways = $settings['payment_gateways'] ?? [];
-        $mpesaSettings = $paymentGateways['mpesa'] ?? [];
+        $config = $isp->resolvedMpesaConfig(activeMethodOnly: true);
+        if (empty($config['consumer_key'])) {
+            $config = $isp->resolvedMpesaConfig(activeMethodOnly: false);
+        }
 
-        $this->consumerKey = $mpesaSettings['consumer_key'] ?? config('services.mpesa.consumer_key');
-        $this->consumerSecret = $mpesaSettings['consumer_secret'] ?? config('services.mpesa.consumer_secret');
-        $this->passkey = $mpesaSettings['passkey'] ?? config('services.mpesa.passkey');
-        $this->shortcode = $mpesaSettings['shortcode'] ?? config('services.mpesa.shortcode');
-        $this->environment = $mpesaSettings['environment'] ?? config('services.mpesa.environment', 'sandbox');
-        $this->transactionType = $mpesaSettings['transaction_type'] ?? config('services.mpesa.transaction_type', 'CustomerPayBillOnline');
-        $this->callbackUrl = $mpesaSettings['callback_url'] ?? config('services.mpesa.callback_url');
-        $this->timeoutUrl = $mpesaSettings['timeout_url'] ?? config('services.mpesa.timeout_url');
+        $this->applyConfig($config);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    protected function applyConfig(array $config): void
+    {
+        $this->consumerKey = $config['consumer_key'] ?? config('services.mpesa.consumer_key');
+        $this->consumerSecret = $config['consumer_secret'] ?? config('services.mpesa.consumer_secret');
+        $this->passkey = $config['passkey'] ?? config('services.mpesa.passkey');
+        $this->shortcode = $config['shortcode'] ?? config('services.mpesa.shortcode');
+        $this->environment = $config['environment'] ?? config('services.mpesa.environment', 'sandbox');
+        $this->transactionType = $config['transaction_type'] ?? config('services.mpesa.transaction_type', 'CustomerPayBillOnline');
+        $this->callbackUrl = $config['callback_url'] ?? config('services.mpesa.callback_url');
+        $this->timeoutUrl = $config['timeout_url'] ?? ($this->callbackUrl ?: config('services.mpesa.timeout_url'));
     }
 
     /**
@@ -177,6 +170,24 @@ class MpesaService
      */
     public function initiateStkPush(Payment $payment): array
     {
+        $purpose = $payment->metadata['purpose'] ?? null;
+        $isPlatformCollection = in_array($purpose, ['platform_saas', 'saas_onboarding_verification'], true);
+
+        if ($this->isp === null && ! $isPlatformCollection) {
+            Log::warning('Platform M-Pesa credentials used for a tenant customer payment', [
+                'payment_id' => $payment->id,
+                'isp_id' => $payment->isp_id,
+                'purpose' => $purpose,
+            ]);
+        }
+
+        if ($this->isp !== null && $isPlatformCollection) {
+            return [
+                'success' => false,
+                'message' => 'Platform subscription payments must use PrimeBilling system M-Pesa settings, not the ISP paybill.',
+            ];
+        }
+
         // Validate required credentials
         if (empty($this->consumerKey) || empty($this->consumerSecret) || empty($this->passkey) || empty($this->shortcode)) {
             // Check if we're in development/test mode
@@ -421,6 +432,35 @@ class MpesaService
             Log::error('MPesa verification error: ' . $e->getMessage());
             return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
         }
+    }
+
+    /**
+     * Map Daraja STK Push Query response to a coarse payment outcome.
+     *
+     * @return 'paid'|'cancelled'|'failed'|'pending'
+     */
+    public static function interpretStkQueryResult(array $query): string
+    {
+        $code = (string) ($query['ResultCode'] ?? '');
+        $desc = strtolower((string) ($query['ResultDesc'] ?? ''));
+
+        if ($code === '0') {
+            return 'paid';
+        }
+
+        if ($code === '') {
+            return 'pending';
+        }
+
+        if (in_array($code, ['1032', '1031'], true)) {
+            return 'cancelled';
+        }
+
+        if ($code === '4999' || str_contains($desc, 'still') || str_contains($desc, 'processing')) {
+            return 'pending';
+        }
+
+        return 'failed';
     }
 }
 

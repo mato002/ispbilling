@@ -8,6 +8,8 @@ use App\Http\Requests\SaasOnboardingCompleteRequest;
 use App\Models\ISP;
 use App\Models\PlatformSaasPlan;
 use App\Services\SaasOnboardingWizardService;
+use App\Support\SaasOnboardingContext;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -16,18 +18,23 @@ class SaasOnboardingController extends Controller
     public function show(): View|RedirectResponse
     {
         $user = auth()->user();
-        abort_unless($user->isp_id, 403);
-        abort_unless($user->isIspAdmin(), 403);
+        abort_unless(SaasOnboardingContext::canAccess($user), 403);
 
-        $isp = request()->attributes->get(LoadTenantIsp::ATTRIBUTE);
-        if ($isp instanceof ISP) {
-            $isp->loadMissing(['saasPlan', 'pendingSaasPlan', 'routers']);
-        } else {
-            $isp = ISP::query()->with(['saasPlan', 'pendingSaasPlan', 'routers'])->findOrFail($user->isp_id);
+        $isp = request()->attributes->get(LoadTenantIsp::ATTRIBUTE)
+            ?? SaasOnboardingContext::resolveIsp($user);
+
+        if (! $isp instanceof ISP) {
+            return redirect()
+                ->route('admin.isps.index')
+                ->with('info', 'Select an ISP from Admin → ISPs to run SaaS onboarding.');
         }
 
+        $isp->loadMissing(['saasPlan', 'pendingSaasPlan', 'routers']);
+
         if (! $isp->needsSaasOnboarding()) {
-            return redirect()->route('isp.dashboard');
+            return $user->isSuperAdmin()
+                ? redirect()->route('admin.isps.show', $isp)
+                : redirect()->route('isp.dashboard');
         }
 
         $plans = PlatformSaasPlan::query()
@@ -41,16 +48,18 @@ class SaasOnboardingController extends Controller
         return view('isp.saas-onboarding.show', compact('isp', 'plans', 'verifyAmount'));
     }
 
-    public function store(SaasOnboardingCompleteRequest $request, SaasOnboardingWizardService $wizard): RedirectResponse
+    public function store(SaasOnboardingCompleteRequest $request, SaasOnboardingWizardService $wizard): RedirectResponse|JsonResponse
     {
         $user = auth()->user();
-        abort_unless($user->isp_id, 403);
-        abort_unless($user->isIspAdmin(), 403);
+        abort_unless(SaasOnboardingContext::canAccess($user), 403);
 
-        $isp = ISP::query()->findOrFail($user->isp_id);
+        $isp = SaasOnboardingContext::resolveIsp($user);
+        abort_unless($isp instanceof ISP, 403);
 
         if (! $isp->needsSaasOnboarding()) {
-            return redirect()->route('isp.dashboard');
+            return $user->isSuperAdmin()
+                ? redirect()->route('admin.isps.show', $isp)
+                : redirect()->route('isp.dashboard');
         }
 
         return $wizard->processIspWizard($isp, $request);

@@ -29,6 +29,7 @@
                 <option value="completed" @selected(request('status') === 'completed')>Completed</option>
                 <option value="pending" @selected(request('status') === 'pending')>Pending</option>
                 <option value="failed" @selected(request('status') === 'failed')>Failed</option>
+                <option value="unreconciled" @selected(request('status') === 'unreconciled')>Unreconciled</option>
             </select>
         </div>
         <div class="min-w-[130px]">
@@ -37,6 +38,7 @@
                 <option value="">All</option>
                 <option value="initiated" @selected(request('transaction_type') === 'initiated')>Initiated</option>
                 <option value="webhook" @selected(request('transaction_type') === 'webhook')>Webhook</option>
+                <option value="c2b_unreconciled" @selected(request('transaction_type') === 'c2b_unreconciled')>C2B unreconciled</option>
             </select>
         </div>
         <div class="flex items-end gap-2">

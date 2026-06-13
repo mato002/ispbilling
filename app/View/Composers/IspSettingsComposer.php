@@ -34,7 +34,7 @@ class IspSettingsComposer
 
         $daraja = IspPaymentMethod::query()
             ->forIsp($isp->id)
-            ->byProvider('daraja')
+            ->mpesaProvider()
             ->first();
 
         $view->with('ispSettingsShell', $this->buildShell($isp, $daraja));
@@ -255,6 +255,12 @@ class IspSettingsComposer
                 'label' => 'Twilio',
                 'short' => 'SMS active',
                 'detail' => 'SMS channel marked active with Twilio.',
+            ],
+            'vonage' => [
+                'tone' => 'ok',
+                'label' => 'Vonage',
+                'short' => 'SMS active',
+                'detail' => 'SMS channel marked active with Vonage (Nexmo).',
             ],
             'custom' => [
                 'tone' => 'warn',

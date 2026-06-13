@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureSaasOnboardingComplete;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\LoadTenantIsp;
 use App\Http\Middleware\ResolveLandingIspFromSubdomain;
+use App\Http\Middleware\ShareNotifications;
 use App\Http\Middleware\ValidateIsp;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -22,6 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(prepend: [
             ResolveLandingIspFromSubdomain::class,
+        ]);
+
+        $middleware->web(append: [
+            ShareNotifications::class,
         ]);
 
         $middleware->alias([

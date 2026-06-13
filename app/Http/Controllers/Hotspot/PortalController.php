@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Hotspot;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\Voucher;
+use App\Models\Invoice;
 use App\Models\Router;
+use App\Models\Subscription;
+use App\Models\Voucher;
 use App\Models\HotspotSession;
 use App\Models\PortalSetting;
+use App\Support\InvoiceTax;
 use App\Services\MikroTikService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -612,7 +615,9 @@ class PortalController extends Controller
         if ($plan->isp_id !== $router->isp_id) {
             return back()->withErrors(['error' => 'Invalid package.']);
         }
-        
+
+        $router->load('isp');
+
         // Create temporary customer record
         $customer = Customer::create([
             'isp_id' => $router->isp_id,
@@ -627,23 +632,53 @@ class PortalController extends Controller
             'connection_type' => 'hotspot',
             'status' => 'inactive',
         ]);
-        
-        // Create payment record
-        $payment = \App\Models\Payment::create([
-            'customer_id' => $customer->id,
-            'isp_id' => $router->isp_id,
-            'plan_id' => $plan->id,
-            'amount' => $plan->price,
-            'method' => 'mpesa',
-            'status' => 'pending',
-            'phone_number' => $request->phone_number,
-            'description' => "Purchase of {$plan->name} package",
-        ]);
-        
-        // Redirect to checkout page for payment processing
-        return redirect()->route('checkout', [
+
+        // Subscription + invoice (payment row is created when user pays via customer.payments.initiate)
+        $subscription = Subscription::updateOrCreate(
+            [
+                'customer_id' => $customer->id,
+                'plan_id' => $plan->id,
+            ],
+            [
+                'start_date' => now(),
+                'end_date' => now()->addDays($plan->duration_days),
+                'renewal_date' => now()->addDays($plan->duration_days),
+                'status' => 'suspended',
+                'auto_renew' => false,
+            ]
+        );
+
+        $invoice = Invoice::where('subscription_id', $subscription->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if (! $invoice) {
+            $ispPrefix = strtoupper(substr($router->isp->name ?? 'ISP', 0, 3));
+            $invoiceCount = Invoice::where('isp_id', $router->isp_id)->count() + 1;
+            $invoiceNumber = $ispPrefix . '-' . now()->format('Y') . '-' . str_pad($invoiceCount, 6, '0', STR_PAD_LEFT);
+
+            $amount = (float) $plan->price;
+            $lines = InvoiceTax::computeForAmount($amount, $router->isp);
+
+            $invoice = Invoice::create([
+                'isp_id' => $router->isp_id,
+                'customer_id' => $customer->id,
+                'subscription_id' => $subscription->id,
+                'invoice_number' => $invoiceNumber,
+                'amount' => $lines['amount'],
+                'tax' => $lines['tax'],
+                'total_amount' => $lines['total_amount'],
+                'issue_date' => now(),
+                'due_date' => now()->addDays(7),
+                'status' => 'pending',
+                'notes' => "Purchase of {$plan->name} package (plan_id: {$plan->id})",
+            ]);
+        }
+
+        return redirect()->route('customer.checkout', [
             'customer' => $customer->id,
-            'payment' => $payment->id,
+            'invoice' => $invoice->id,
+            'plan' => $plan->id,
         ]);
     }
 

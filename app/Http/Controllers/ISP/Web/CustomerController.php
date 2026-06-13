@@ -11,16 +11,22 @@ use App\Models\Plan;
 use App\Models\Router;
 use App\Models\Subscription;
 use App\Services\MikroTikService;
+use App\Services\NotificationService;
 use App\Support\IspCustomFields;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerController extends Controller
 {
+    public function __construct(
+        private readonly NotificationService $notificationService,
+    ) {}
+
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
@@ -316,6 +322,15 @@ class CustomerController extends Controller
             $customer->activate();
 
             DB::commit();
+
+            try {
+                $this->notificationService->newCustomer($customer);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to create ISP new-customer notification', [
+                    'customer_id' => $customer->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return redirect()->route('isp.customers.show', $customer)
                 ->with('success', 'Customer created and activated successfully.');

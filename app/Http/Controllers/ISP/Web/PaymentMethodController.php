@@ -8,6 +8,7 @@ use App\Models\ISP;
 use App\Models\PlatformIntegration;
 use App\Support\IspPaymentExperience;
 use App\Support\IspSettingsChangeTracker;
+use App\Support\MpesaGatewayConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
@@ -29,7 +30,7 @@ class PaymentMethodController extends Controller
         $isp = ISP::query()->findOrFail($ispId);
 
         $paymentMethod = IspPaymentMethod::forIsp($ispId)
-            ->byProvider('daraja')
+            ->mpesaProvider()
             ->first();
 
         $recommendedCallback = ($paymentMethod && $paymentMethod->webhook_token)
@@ -89,15 +90,15 @@ class PaymentMethodController extends Controller
 
         $isp = ISP::query()->findOrFail($ispId);
 
-        $credentials = [
+        $credentials = MpesaGatewayConfig::normalizeCredentials([
             'consumer_key' => $request->consumer_key,
             'consumer_secret' => $request->consumer_secret,
             'shortcode' => $request->shortcode,
             'passkey' => $request->passkey,
-        ];
+        ]);
 
         $paymentMethod = IspPaymentMethod::forIsp($ispId)
-            ->byProvider('daraja')
+            ->mpesaProvider()
             ->first();
 
         $webhookToken = $paymentMethod?->webhook_token ?: Str::random(48);
@@ -119,7 +120,7 @@ class PaymentMethodController extends Controller
         } else {
             $paymentMethod = IspPaymentMethod::create([
                 'isp_id' => $ispId,
-                'provider' => 'daraja',
+                'provider' => MpesaGatewayConfig::STORAGE_PROVIDER,
                 'credentials' => $credentials,
                 'callback_url' => $callbackUrl,
                 'webhook_token' => $webhookToken,

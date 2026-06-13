@@ -15,6 +15,22 @@ use Illuminate\Support\Facades\Log;
  */
 class PaymentCompletionService
 {
+    public function __construct(
+        private readonly NotificationService $notificationService,
+    ) {}
+    /**
+     * Complete a payment row and run tenant side effects (router, subscription, notify).
+     */
+    public function markAsCompleted(Payment $payment, bool $forceServiceAutomation = false): void
+    {
+        if ($payment->status !== 'completed') {
+            $payment->markAsCompleted();
+            $payment->refresh();
+        }
+
+        $this->processTenantPaymentSuccess($payment, $forceServiceAutomation);
+    }
+
     public function processTenantPaymentSuccess(Payment $payment, bool $forceServiceAutomation = false): void
     {
         if ($payment->isPlatformSaasPayment()) {
@@ -91,6 +107,12 @@ class PaymentCompletionService
                 } catch (\Exception $e) {
                     Log::error("Failed to send payment notification to customer {$customer->id}: ".$e->getMessage());
                 }
+            }
+
+            try {
+                $this->notificationService->paymentReceived($payment);
+            } catch (\Throwable $e) {
+                Log::error("Failed to create ISP in-app payment notification for payment {$payment->id}: ".$e->getMessage());
             }
 
             $payment->update([

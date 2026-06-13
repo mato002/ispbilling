@@ -96,7 +96,7 @@ class ManageUserConnections implements ShouldQueue
         // Get customers with overdue unpaid invoices
         $unpaidCustomers = Customer::where('status', 'active')
             ->whereHas('invoices', function ($query) {
-                $query->where('status', 'unpaid')
+                $query->whereIn('status', ['pending', 'overdue'])
                     ->where('due_date', '<', now()->subDays(7)) // 7 days grace period
                     ->whereDoesntHave('payments', function ($paymentQuery) {
                         $paymentQuery->where('status', 'completed');

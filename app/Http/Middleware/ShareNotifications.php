@@ -23,11 +23,11 @@ class ShareNotifications
     {
         // Only share notifications for authenticated ISP users
         if (auth()->check() && auth()->user()->isp_id) {
-            $ispId = auth()->user()->isp_id;
-            
-            // Share recent notifications and unread count with all views
-            View::share('recentNotifications', $this->notificationService->getRecentNotifications($ispId, 5));
-            View::share('unreadCount', $this->notificationService->getUnreadCount($ispId));
+            $ispId = (int) auth()->user()->isp_id;
+            $snapshot = $this->notificationService->getDropdownSnapshot($ispId);
+
+            View::share('recentNotifications', $snapshot['notifications']);
+            View::share('unreadCount', $snapshot['unread_count']);
         }
 
         return $next($request);

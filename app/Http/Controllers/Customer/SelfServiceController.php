@@ -315,7 +315,6 @@ class SelfServiceController extends Controller
         if ($paymentId) {
             $specificPayment = \App\Models\Payment::where('customer_id', $customer->id)
                 ->where('id', $paymentId)
-                ->with('plan')
                 ->first();
         }
 

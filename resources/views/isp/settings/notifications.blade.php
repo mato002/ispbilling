@@ -112,6 +112,7 @@
                             <option value="">Select provider</option>
                             <option value="africas_talking" @selected($sp === 'africas_talking')>Africa's Talking</option>
                             <option value="twilio" @selected($sp === 'twilio')>Twilio</option>
+                            <option value="vonage" @selected($sp === 'vonage')>Vonage (Nexmo)</option>
                             <option value="custom" @selected($sp === 'custom')>Custom API</option>
                         </select>
                     </div>

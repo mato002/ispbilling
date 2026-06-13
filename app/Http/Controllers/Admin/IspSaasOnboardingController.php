@@ -7,6 +7,7 @@ use App\Http\Requests\SaasOnboardingCompleteRequest;
 use App\Models\ISP;
 use App\Models\PlatformSaasPlan;
 use App\Services\PlatformSaasBillingService;
+use App\Support\SaasOnboardingContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -22,13 +23,7 @@ class IspSaasOnboardingController extends Controller
                 ->with('info', 'This ISP has already completed PrimeBilling SaaS onboarding.');
         }
 
-        $plans = PlatformSaasPlan::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
-
-        return view('admin.isps.saas-onboarding', compact('isp', 'plans'));
+        return redirect()->to(SaasOnboardingContext::showUrl($isp));
     }
 
     public function store(SaasOnboardingCompleteRequest $request, ISP $isp, PlatformSaasBillingService $billing): RedirectResponse

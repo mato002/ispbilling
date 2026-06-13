@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\MpesaGatewayConfig;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -159,6 +161,24 @@ class ISP extends Model
     public function needsSaasOnboarding(): bool
     {
         return $this->saas_onboarding_completed_at === null;
+    }
+
+    /**
+     * Unified Daraja/M-Pesa credentials from isp_payment_methods, settings.payment_gateways, or config.
+     *
+     * @return array<string, mixed>
+     */
+    protected function mpesaConfig(): Attribute
+    {
+        return Attribute::get(fn (): array => MpesaGatewayConfig::resolveForIsp($this));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function resolvedMpesaConfig(bool $activeMethodOnly = false): array
+    {
+        return MpesaGatewayConfig::resolveForIsp($this, $activeMethodOnly);
     }
 
     public function saasHasFeature(string $key): bool

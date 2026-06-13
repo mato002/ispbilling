@@ -76,4 +76,10 @@ return [
         'environment' => env('SELCOM_ENVIRONMENT', 'sandbox'), // sandbox or production
     ],
 
+    'vonage' => [
+        'key' => env('VONAGE_KEY'),
+        'secret' => env('VONAGE_SECRET'),
+        'sms_from' => env('VONAGE_SMS_FROM'),
+    ],
+
 ];

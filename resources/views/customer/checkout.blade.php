@@ -168,7 +168,7 @@
                                 @endif
                             @else
                                 {{-- If no invoice, create one first --}}
-                                <form method="POST" action="{{ route('checkout.select-plan') }}" class="mt-4">
+                                <form method="POST" action="{{ route('customer.checkout.select-plan') }}" class="mt-4">
                                     @csrf
                                     <input type="hidden" name="customer_id" value="{{ $customer->id }}">
                                     <input type="hidden" name="plan_id" value="{{ $plan->id }}">

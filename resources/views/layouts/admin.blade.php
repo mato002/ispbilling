@@ -373,36 +373,54 @@
         }
     </style>
 </head>
-<body class="pb-canvas isp-page antialiased overflow-x-hidden">
+@php
+    $pbIslandLayout = request()->routeIs('isp.saas-onboarding.*');
+@endphp
+<body class="pb-canvas isp-page antialiased overflow-x-hidden @if($pbIslandLayout) pb-onboarding-island @endif">
     @include('layouts.admin-header')
 
     <div id="pb-admin-shell" class="min-h-screen">
-        @include('layouts.admin-sidebar')
+        @unless ($pbIslandLayout)
+            @include('layouts.admin-sidebar')
 
-        {{-- Mobile sidebar overlay --}}
-        <div
-            x-show="$store.sidebar.mobileOpen"
-            x-cloak
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm md:hidden"
-            @click="$store.sidebar.closeMobile()"
-        ></div>
+            {{-- Mobile sidebar overlay --}}
+            <div
+                x-show="$store.sidebar.mobileOpen"
+                x-cloak
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm md:hidden"
+                @click="$store.sidebar.closeMobile()"
+            ></div>
+        @endunless
 
         <main
             id="pb-main"
-            class="min-h-screen pt-16 transition-all duration-300 ease-in-out md:ml-64"
-            :class="$store.sidebar.collapsed ? 'md:!ml-16' : ''"
+            @class([
+                'min-h-screen pt-16 transition-all duration-300 ease-in-out',
+                'md:ml-64' => ! $pbIslandLayout,
+            ])
+            @unless($pbIslandLayout) :class="$store.sidebar.collapsed ? 'md:!ml-16' : ''" @endunless
         >
-                <div class="px-4 py-6 sm:px-6 lg:px-8 overflow-x-hidden">
-                    <x-system-announcements-banner :announcements="$systemAnnouncements ?? collect()" />
+                <div @class([
+                    'overflow-x-hidden',
+                    'px-4 py-6 sm:px-6 lg:px-8' => ! $pbIslandLayout,
+                    'mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:py-12' => $pbIslandLayout,
+                ])>
+                    @unless ($pbIslandLayout)
+                        <x-system-announcements-banner :announcements="$systemAnnouncements ?? collect()" />
+                    @endunless
 
                     @hasSection('header')
-                        <div class="pb-card pb-fade-up p-4 sm:p-5 mb-6">
+                        <div @class([
+                            'pb-fade-up mb-6',
+                            'pb-card p-4 sm:p-5' => ! $pbIslandLayout,
+                            'text-center sm:text-left' => $pbIslandLayout,
+                        ])>
                             @yield('header')
                         </div>
                     @elseif(request()->routeIs('isp.*'))
@@ -427,6 +445,7 @@
             'error' => session('error'),
             'warning' => session('warning'),
             'info' => session('info'),
+            'flash_modal' => session('flash_modal'),
             'validation_errors' => (isset($errors) && $errors->any()) ? $errors->all() : null,
         ];
     @endphp

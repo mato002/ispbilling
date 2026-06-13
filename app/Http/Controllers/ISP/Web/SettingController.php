@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\InvoiceTax;
 use App\Support\IspCustomFields;
 use App\Support\IspSettingsChangeTracker;
+use App\Support\MpesaGatewayConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -169,13 +170,12 @@ class SettingController extends Controller
         $settings = $isp->settings ?? [];
 
         $settings['payment_gateways'] = [
-            'mpesa' => [
-                'enabled' => $request->has('mpesa_enabled'),
+            MpesaGatewayConfig::SETTINGS_KEY => MpesaGatewayConfig::formatForSettings([
                 'consumer_key' => $request->input('mpesa_consumer_key'),
                 'consumer_secret' => $request->input('mpesa_consumer_secret'),
                 'shortcode' => $request->input('mpesa_shortcode'),
                 'passkey' => $request->input('mpesa_passkey'),
-            ],
+            ], $request->has('mpesa_enabled')),
             'selcom' => [
                 'enabled' => $request->has('selcom_enabled'),
                 'api_key' => $request->input('selcom_api_key'),
@@ -186,6 +186,7 @@ class SettingController extends Controller
                 'enabled' => $request->has('manual_enabled'),
             ],
         ];
+        unset($settings['payment_gateways']['daraja']);
 
         $settings['meta'] = array_merge($settings['meta'] ?? [], [
             'last_settings_change_at' => now()->toIso8601String(),

@@ -12,23 +12,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Run automatic user management every 5 minutes
-        $schedule->job(\App\Jobs\ManageUserConnections::class)
-            ->everyFiveMinutes()
-            ->description('Automatic user connection management')
-            ->withoutOverlapping();
-
-        // Run expired subscription check every hour
-        $schedule->job(\App\Jobs\CheckExpiredSubscriptions::class)
-            ->hourly()
-            ->description('Check for expired subscriptions')
-            ->withoutOverlapping();
-
-        // Run unpaid invoice check every 6 hours
-        $schedule->job(\App\Jobs\CheckUnpaidInvoices::class)
-            ->everySixHours()
-            ->description('Check for unpaid invoices')
-            ->withoutOverlapping();
+        // Billing automation (invoices, suspend/reactivate, reminders) is scheduled
+        // once daily in routes/console.php to avoid racing duplicate jobs here.
 
         // Clean up old payment logs daily
         $schedule->command('model:prune', [

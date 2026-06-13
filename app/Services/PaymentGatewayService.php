@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\IspPaymentMethod;
 use App\Models\Payment;
+use App\Support\MpesaGatewayConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -15,7 +16,9 @@ class PaymentGatewayService
     public function __construct(int $ispId)
     {
         $this->ispId = $ispId;
-        $this->paymentMethods = IspPaymentMethod::forIsp($ispId)->active()->get()->keyBy('provider');
+        $this->paymentMethods = IspPaymentMethod::forIsp($ispId)->active()->get()->keyBy(function (IspPaymentMethod $method) {
+            return MpesaGatewayConfig::normalizeProviderForCheckout($method->provider);
+        });
     }
 
     /**
@@ -25,12 +28,12 @@ class PaymentGatewayService
     {
         return $this->paymentMethods->map(function ($method) {
             return [
-                'provider' => $method->provider,
+                'provider' => MpesaGatewayConfig::normalizeProviderForCheckout($method->provider),
                 'name' => $this->getProviderName($method->provider),
                 'environment' => $method->getCredential('environment', 'production'),
                 'callback_url' => $method->callback_url,
             ];
-        })->toArray();
+        })->values()->toArray();
     }
 
     /**
@@ -38,10 +41,12 @@ class PaymentGatewayService
      */
     public function initiatePayment(string $provider, array $data): array
     {
-        if (!$this->paymentMethods->has($provider)) {
+        $provider = MpesaGatewayConfig::normalizeProviderForCheckout($provider);
+
+        if (! $this->paymentMethods->has($provider)) {
             return [
                 'success' => false,
-                'message' => 'Payment method not available'
+                'message' => 'Payment method not available',
             ];
         }
 
@@ -360,6 +365,7 @@ class PaymentGatewayService
     {
         $names = [
             'mpesa' => 'M-Pesa',
+            'daraja' => 'M-Pesa',
             'paypal' => 'PayPal',
             'stripe' => 'Stripe (Card)',
             'flutterwave' => 'Flutterwave',
@@ -374,7 +380,9 @@ class PaymentGatewayService
      */
     public function testConnection(string $provider): array
     {
-        if (!$this->paymentMethods->has($provider)) {
+        $provider = MpesaGatewayConfig::normalizeProviderForCheckout($provider);
+
+        if (! $this->paymentMethods->has($provider)) {
             return [
                 'success' => false,
                 'message' => 'Payment method not configured'

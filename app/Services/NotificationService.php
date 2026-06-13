@@ -6,13 +6,57 @@ use App\Events\NewNotification;
 use App\Models\Notification;
 use App\Models\ISP;
 use App\Models\Customer;
-use App\Models\Subscription;
+use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Subscription;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
+    public const DROPDOWN_LIMIT = 5;
+
+    /**
+     * Lightweight payload for header dropdown + polling endpoint.
+     *
+     * @return array{notifications: \Illuminate\Support\Collection<int, Notification>, unread_count: int}
+     */
+    public function getDropdownSnapshot(int $ispId, int $limit = self::DROPDOWN_LIMIT): array
+    {
+        $query = Notification::withoutGlobalScope('isp_tenant')
+            ->where('isp_id', $ispId);
+
+        $notifications = (clone $query)
+            ->select(['id', 'isp_id', 'title', 'message', 'type', 'is_read', 'created_at'])
+            ->latest('id')
+            ->limit($limit)
+            ->get();
+
+        $unreadCount = (clone $query)
+            ->unread()
+            ->count();
+
+        return [
+            'notifications' => $notifications,
+            'unread_count' => $unreadCount,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function formatForDropdown(Notification $notification): array
+    {
+        return [
+            'id' => $notification->id,
+            'title' => $notification->title,
+            'message' => $notification->message,
+            'type' => $notification->type,
+            'is_read' => (bool) $notification->is_read,
+            'time_ago' => $notification->created_at?->diffForHumans(),
+            'created_at' => $notification->created_at?->toISOString(),
+        ];
+    }
     /**
      * Create a new notification
      */
@@ -30,13 +74,16 @@ class NotificationService
     /**
      * Payment received notification
      */
-    public function paymentReceived($payment): Notification
+    public function paymentReceived(Payment $payment): Notification
     {
+        $payment->loadMissing(['isp', 'customer']);
+
         $title = 'Payment Received';
-        $message = "Payment of {$payment->isp->currency} " . number_format($payment->amount, 2) . 
-                   " received from {$payment->customer->name}. Reference: {$payment->payment_reference}";
-        
-        return $this->createNotification($payment->isp_id, $title, $message, 'payment');
+        $customerName = $this->customerDisplayName($payment->customer);
+        $message = "Payment of {$payment->isp->currency} ".number_format($payment->amount, 2)
+            ." received from {$customerName}. Reference: {$payment->payment_reference}";
+
+        return $this->createAndBroadcast($payment->isp_id, $title, $message, 'payment');
     }
 
     /**
@@ -67,13 +114,29 @@ class NotificationService
     /**
      * New customer registration notification
      */
-    public function newCustomer($customer): Notification
+    public function newCustomer(Customer $customer): Notification
     {
         $title = 'New Customer Registration';
-        $message = "New customer {$customer->name} has registered. " .
-                  "Email: {$customer->email}, Phone: {$customer->phone_number}";
-        
-        return $this->createNotification($customer->isp_id, $title, $message, 'success');
+        $customerName = $this->customerDisplayName($customer);
+        $message = "New customer {$customerName} has registered. "
+            ."Email: ".($customer->email ?: '—').", Phone: {$customer->phone_number}";
+
+        return $this->createAndBroadcast($customer->isp_id, $title, $message, 'success');
+    }
+
+    /**
+     * Customer suspended on MikroTik due to non-payment.
+     */
+    public function userSuspended(Customer $customer, ?Invoice $invoice = null): Notification
+    {
+        $title = 'Customer Suspended';
+        $message = "Customer {$this->customerDisplayName($customer)} ({$customer->username}) was deactivated on MikroTik due to non-payment.";
+
+        if ($invoice) {
+            $message .= " Invoice {$invoice->invoice_number} is overdue.";
+        }
+
+        return $this->createAndBroadcast($customer->isp_id, $title, $message, 'error');
     }
 
     /**
@@ -136,18 +199,7 @@ class NotificationService
         }
         $message .= ' Check router connectivity and the user record on RouterOS; manual enable may be required.';
 
-        $notification = $this->createNotification($customer->isp_id, $title, $message, 'error');
-
-        try {
-            broadcast(new NewNotification($notification));
-        } catch (\Throwable $e) {
-            Log::warning('Could not broadcast provisioning failure notification', [
-                'notification_id' => $notification->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return $notification;
+        return $this->createAndBroadcast($customer->isp_id, $title, $message, 'error');
     }
 
     /**
@@ -202,12 +254,13 @@ class NotificationService
     /**
      * Get recent notifications
      */
-    public function getRecentNotifications($ispId, $limit = 10)
+    public function getRecentNotifications($ispId, $limit = self::DROPDOWN_LIMIT)
     {
         return Notification::withoutGlobalScope('isp_tenant')
             ->where('isp_id', $ispId)
-            ->latest()
-            ->take($limit)
+            ->select(['id', 'isp_id', 'title', 'message', 'type', 'is_read', 'created_at'])
+            ->latest('id')
+            ->limit($limit)
             ->get();
     }
 
@@ -268,5 +321,32 @@ class NotificationService
             'read' => $total - $unread,
             'by_type' => $byType,
         ];
+    }
+
+    private function createAndBroadcast(int $ispId, string $title, string $message, string $type = 'info'): Notification
+    {
+        $notification = $this->createNotification($ispId, $title, $message, $type);
+
+        try {
+            broadcast(new NewNotification($notification));
+        } catch (\Throwable $e) {
+            Log::warning('Could not broadcast in-app notification', [
+                'notification_id' => $notification->id,
+                'isp_id' => $ispId,
+                'type' => $type,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $notification;
+    }
+
+    private function customerDisplayName(?Customer $customer): string
+    {
+        if (! $customer) {
+            return 'Unknown customer';
+        }
+
+        return trim((string) ($customer->full_name ?: $customer->username ?: 'Unknown customer'));
     }
 }

@@ -1,7 +1,14 @@
 @php
+    use App\Support\SaasOnboardingContext;
+
     $user = Auth::user();
-    $ispName = $user->isp?->name ?? ($user->isSuperAdmin() ? 'PrimeBilling Admin' : 'Your ISP');
+    $onboardingIsp = SaasOnboardingContext::resolveIsp($user);
+    $ispName = $onboardingIsp?->name ?? $user->isp?->name ?? ($user->isSuperAdmin() ? 'PrimeBilling Admin' : 'Your ISP');
     $homeRoute = $user->isSuperAdmin() ? route('admin.dashboard') : route('isp.dashboard');
+    $pbIslandLayout = request()->routeIs('isp.saas-onboarding.*');
+    $onboardingHomeRoute = ($pbIslandLayout && $onboardingIsp)
+        ? SaasOnboardingContext::showUrl($onboardingIsp)
+        : $homeRoute;
 @endphp
 
 <header
@@ -22,13 +29,17 @@
     @keydown.window.cmd.k.prevent="searchOpen = true"
     @keydown.window.ctrl.k.prevent="searchOpen = true"
     @keydown.window.escape="searchOpen = false; quickActionsOpen = false; profileOpen = false; $store.sidebar.closeMobile()"
-    class="pb-topbar fixed top-0 right-0 z-30 h-16 transition-all duration-300 ease-in-out left-0 md:left-64"
-    :class="$store.sidebar.collapsed ? 'md:!left-16' : ''"
+    @class([
+        'pb-topbar fixed top-0 right-0 z-30 h-16 transition-all duration-300 ease-in-out left-0',
+        'md:left-64' => ! $pbIslandLayout,
+    ])
+    @unless($pbIslandLayout) :class="$store.sidebar.collapsed ? 'md:!left-16' : ''" @endunless
 >
     <div class="flex h-full items-center gap-2 px-3 sm:gap-4 sm:px-6">
 
         {{-- ============= LEFT CLUSTER ============= --}}
         <div class="flex items-center gap-2 min-w-0">
+            @unless ($pbIslandLayout)
             {{-- Sidebar collapse toggle (desktop) --}}
             <button @click="$store.sidebar.toggle()"
                     class="hidden md:inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
@@ -48,9 +59,10 @@
                     <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
                 </svg>
             </button>
+            @endunless
 
             {{-- Logo + brand --}}
-            <a href="{{ $homeRoute }}" class="flex items-center gap-2.5 min-w-0">
+            <a href="{{ $onboardingHomeRoute }}" class="flex items-center gap-2.5 min-w-0">
                 <span class="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-500 to-cyan-400 shadow-[0_8px_18px_-8px_rgba(99,102,241,0.6),inset_0_1px_0_rgba(255,255,255,0.18)]">
                     <svg class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M2 12a10 10 0 0 1 20 0"/>
@@ -66,7 +78,20 @@
             </a>
         </div>
 
+        @if ($pbIslandLayout)
+            <div class="hidden flex-1 justify-center px-2 sm:flex">
+                <span class="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-indigo-50/90 px-3 py-1.5 text-xs font-semibold text-indigo-800 shadow-sm dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+                    <span class="relative flex h-2 w-2">
+                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60"></span>
+                        <span class="relative inline-flex h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400"></span>
+                    </span>
+                    Workspace setup in progress
+                </span>
+            </div>
+        @endif
+
         {{-- ============= GLOBAL SEARCH ============= --}}
+        @unless ($pbIslandLayout)
         <div class="hidden md:flex flex-1 justify-center px-2">
             <button
                 @click="searchOpen = true"
@@ -81,10 +106,12 @@
                 </span>
             </button>
         </div>
+        @endunless
 
         {{-- ============= RIGHT CLUSTER ============= --}}
         <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
 
+            @unless ($pbIslandLayout)
             {{-- Mobile search trigger --}}
             <button @click="searchOpen = true"
                     class="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -168,6 +195,7 @@
                     </div>
                 </div>
             @endif
+            @endunless
 
             {{-- Theme toggle --}}
             <button @click="toggleTheme()"

@@ -9,7 +9,12 @@
 @section('content')
     @php
         $pg = $isp->settings['payment_gateways'] ?? [];
-        $mp = $pg['mpesa'] ?? [];
+        $mp = array_merge(
+            $pg['daraja'] ?? [],
+            $pg['mpesa'] ?? []
+        );
+        $mp = \App\Support\MpesaGatewayConfig::normalizeCredentials($mp);
+        $mp['enabled'] = ($pg['mpesa']['enabled'] ?? $pg['daraja']['enabled'] ?? false) === true;
         $sel = $pg['selcom'] ?? [];
         $man = $pg['manual'] ?? [];
     @endphp

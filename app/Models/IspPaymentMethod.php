@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToIspTenant;
+use App\Support\MpesaGatewayConfig;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Crypt;
@@ -31,6 +32,15 @@ class IspPaymentMethod extends Model
         'credentials',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $model): void {
+            if (MpesaGatewayConfig::isMpesaProvider($model->provider)) {
+                $model->provider = MpesaGatewayConfig::STORAGE_PROVIDER;
+            }
+        });
+    }
+
     public function isp(): BelongsTo
     {
         return $this->belongsTo(ISP::class, 'isp_id');
@@ -42,7 +52,7 @@ class IspPaymentMethod extends Model
     public function setCredentialsAttribute($value)
     {
         if (is_array($value)) {
-            $value = json_encode($value);
+            $value = json_encode(MpesaGatewayConfig::normalizeCredentials($value));
         }
         $this->attributes['credentials'] = Crypt::encryptString($value);
     }
@@ -58,7 +68,8 @@ class IspPaymentMethod extends Model
 
         try {
             $decrypted = Crypt::decryptString($value);
-            return json_decode($decrypted, true) ?? [];
+
+            return MpesaGatewayConfig::normalizeCredentials(json_decode($decrypted, true) ?? []);
         } catch (\Exception $e) {
             Log::error('Failed to decrypt payment method credentials: ' . $e->getMessage());
             return [];
@@ -71,7 +82,13 @@ class IspPaymentMethod extends Model
     public function getCredential(string $key, $default = null)
     {
         $credentials = $this->credentials;
+
         return $credentials[$key] ?? $default;
+    }
+
+    public function scopeMpesaProvider($query)
+    {
+        return $query->whereIn('provider', MpesaGatewayConfig::mpesaProviderSlugs());
     }
 
     /**

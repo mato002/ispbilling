@@ -11,6 +11,10 @@ use App\Models\Plan;
 use App\Models\PlatformIntegration;
 use App\Models\PlatformSaasPlan;
 use App\Models\Router;
+use App\Support\MpesaGatewayConfig;
+use App\Support\MpesaVerificationFlash;
+use App\Support\SaasOnboardingContext;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -83,7 +87,59 @@ class SaasOnboardingWizardService
         return true;
     }
 
-    public function processIspWizard(ISP $isp, Request $request): RedirectResponse
+    /**
+     * When the Safaricom callback is delayed or missing, query Daraja STK status and update the payment row.
+     */
+    public function reconcileOnboardingVerificationPayment(Payment $payment): void
+    {
+        if (! $payment->isSaasOnboardingVerification() || $payment->status !== 'pending') {
+            return;
+        }
+
+        $checkoutId = $payment->metadata['mpesa_checkout_request_id']
+            ?? ($payment->metadata['stk_push_response']['CheckoutRequestID'] ?? null)
+            ?? $payment->transaction_id;
+
+        if (! $checkoutId || ! str_starts_with((string) $checkoutId, 'ws_CO_')) {
+            return;
+        }
+
+        if ($payment->created_at->greaterThan(now()->subSeconds(8))) {
+            return;
+        }
+
+        $query = (new MpesaService(null))->verifyPayment((string) $checkoutId);
+        $outcome = MpesaService::interpretStkQueryResult($query);
+
+        if ($outcome === 'pending') {
+            return;
+        }
+
+        $metadata = array_merge($payment->metadata ?? [], [
+            'stk_query_result' => $query,
+            'stk_query_at' => now()->toIso8601String(),
+        ]);
+
+        if ($outcome === 'paid') {
+            $payment->update(['metadata' => $metadata]);
+            $payment->markAsCompleted();
+
+            if ($payment->isp_id) {
+                ISP::query()->whereKey($payment->isp_id)->update([
+                    'saas_payment_verified_at' => now(),
+                ]);
+            }
+
+            return;
+        }
+
+        $payment->update([
+            'status' => $outcome === 'cancelled' ? 'cancelled' : 'failed',
+            'metadata' => $metadata,
+        ]);
+    }
+
+    public function processIspWizard(ISP $isp, Request $request): RedirectResponse|JsonResponse
     {
         if ($request->input('wizard_action') === 'go_back') {
             return $this->goBackStep($isp);
@@ -96,7 +152,7 @@ class SaasOnboardingWizardService
             2 => $this->stepBusinessAndBilling($isp, $request),
             3 => $this->stepRouterAndPlans($isp, $request),
             4 => $this->stepPaybillAndFinish($isp, $request),
-            default => redirect()->route('isp.saas-onboarding.show')->with('error', 'Invalid onboarding step.'),
+            default => redirect()->to(SaasOnboardingContext::showUrl($isp))->with('error', 'Invalid onboarding step.'),
         };
     }
 
@@ -105,14 +161,14 @@ class SaasOnboardingWizardService
         $current = min(4, max(1, (int) $isp->saas_onboarding_step));
 
         if ($current <= 1) {
-            return redirect()->route('isp.saas-onboarding.show')->with('info', 'You are already on the first step.');
+            return redirect()->to(SaasOnboardingContext::showUrl($isp))->with('info', 'You are already on the first step.');
         }
 
         $next = $current - 1;
 
         $isp->update(['saas_onboarding_step' => $next]);
 
-        return redirect()->route('isp.saas-onboarding.show')->with('info', 'Returned to the previous step.');
+        return redirect()->to(SaasOnboardingContext::showUrl($isp))->with('info', 'Returned to the previous step.');
     }
 
     protected function stepPlan(ISP $isp, Request $request): RedirectResponse
@@ -128,10 +184,10 @@ class SaasOnboardingWizardService
             'saas_onboarding_step' => 2,
         ]);
 
-        return redirect()->route('isp.saas-onboarding.show')->with('success', 'Plan saved. Next: your business details and platform billing.');
+        return redirect()->to(SaasOnboardingContext::showUrl($isp))->with('success', 'Plan saved. Next: your business details and platform billing.');
     }
 
-    protected function stepBusinessAndBilling(ISP $isp, Request $request): RedirectResponse
+    protected function stepBusinessAndBilling(ISP $isp, Request $request): RedirectResponse|JsonResponse
     {
         if ($request->input('wizard_action') === 'local_dev_skip_mpesa_verify') {
             abort_unless(app()->environment('local'), 403);
@@ -143,58 +199,20 @@ class SaasOnboardingWizardService
             if ($isp->saas_payment_verified_at) {
                 $isp->update(['saas_onboarding_step' => 3]);
 
-                return redirect()->route('isp.saas-onboarding.show')->with('success', 'Already verified. Continue with network setup.');
+                return redirect()->to(SaasOnboardingContext::showUrl($isp))->with('success', 'Already verified. Continue with network setup.');
             }
 
             if (! $this->completePendingSaasOnboardingMpesaVerificationAsSimulated($isp)) {
-                return back()->with(
-                    'error',
-                    'No pending KES verification payment found. Save this step with M-Pesa first (that sends the STK), then use “Skip STK callback”, or run: php artisan mpesa:simulate-onboarding-verification '.$isp->id.' --force'
-                );
+                return MpesaVerificationFlash::redirectBackNoPendingPayment($isp);
             }
 
             $isp->refresh();
             $isp->update(['saas_onboarding_step' => 3]);
 
-            return redirect()->route('isp.saas-onboarding.show')->with(
+            return redirect()->to(SaasOnboardingContext::showUrl($isp))->with(
                 'success',
                 'Local dev only: M-Pesa verification was completed without a Daraja callback. Next: connect your router.'
             );
-        }
-
-        if ($request->input('wizard_action') === 'continue_after_verify') {
-            if ($isp->saas_billing_method === 'mpesa' && ! $isp->saas_payment_verified_at) {
-                $this->syncSaasPaymentVerifiedAtIfOnboardingPaymentCompleted($isp);
-                $isp->refresh();
-
-                if (! $isp->saas_payment_verified_at) {
-                    $hasPendingVerification = Payment::query()
-                        ->where('isp_id', $isp->id)
-                        ->where('status', 'pending')
-                        ->where('metadata->purpose', 'saas_onboarding_verification')
-                        ->exists();
-
-                    $amount = max(1, (int) ceil((float) config('services.mpesa.saas_onboarding_verification_amount', 1)));
-
-                    $base = 'PrimeBilling still has no successful M-Pesa callback for your KES '.$amount.' verification, so your account is not marked as verified yet. '
-                        .($hasPendingVerification
-                            ? 'A verification payment is still pending in the database — approving on your phone is not enough until Safaricom can POST to your public callback URL. '
-                            : '');
-
-                    $fix = 'Fix the callback: keep ngrok pointed at your app, run scripts\\sync-ngrok-env.ps1, then php artisan config:clear, and submit step 2 again so a new STK uses the updated URLs. Check http://127.0.0.1:4040 for POST /api/payments/mpesa/callback. '
-                        .'Or choose Bank or Card above to skip platform M-Pesa.';
-
-                    if (app()->environment('local')) {
-                        $fix .= ' On APP_ENV=local you can also click Skip STK callback (local only) next to Continue, or run: php artisan mpesa:simulate-onboarding-verification '.$isp->id.' --force';
-                    }
-
-                    return back()->with('error', $base.$fix);
-                }
-            }
-
-            $isp->update(['saas_onboarding_step' => 3]);
-
-            return redirect()->route('isp.saas-onboarding.show')->with('success', 'Payment verified. Connect your first router.');
         }
 
         $method = $request->input('saas_billing_method', 'mpesa');
@@ -226,7 +244,11 @@ class SaasOnboardingWizardService
         if ($method === 'mpesa' && $isp->saas_payment_verified_at) {
             $isp->update(['saas_onboarding_step' => 3]);
 
-            return redirect()->route('isp.saas-onboarding.show')->with('success', 'Billing profile updated. Continue to network setup.');
+            return $this->jsonOrRedirect($request, [
+                'success' => true,
+                'status' => 'paid',
+                'redirect' => SaasOnboardingContext::showUrl($isp),
+            ], redirect()->to(SaasOnboardingContext::showUrl($isp))->with('success', 'Billing profile updated. Continue to network setup.'));
         }
 
         if ($method !== 'mpesa') {
@@ -235,30 +257,86 @@ class SaasOnboardingWizardService
                 'saas_onboarding_step' => 3,
             ]);
 
-            return redirect()->route('isp.saas-onboarding.show')->with('success', 'Billing profile saved. Connect your first router.');
+            return $this->jsonOrRedirect($request, [
+                'success' => true,
+                'status' => 'paid',
+                'redirect' => SaasOnboardingContext::showUrl($isp),
+            ], redirect()->to(SaasOnboardingContext::showUrl($isp))->with('success', 'Billing profile saved. Connect your first router.'));
         }
 
         if (! $normalizedPhone) {
-            return back()->withErrors(['saas_billing_phone' => 'Enter a valid Kenyan M-Pesa number (2547XXXXXXXX).'])->withInput();
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Enter a valid Kenyan number (e.g. 0712345678 or digits after +254).',
+                    'errors' => ['saas_billing_phone' => ['Enter a valid Kenyan number (e.g. 0712345678 or digits after +254).']],
+                ], 422);
+            }
+
+            return back()->withErrors(['saas_billing_phone' => 'Enter a valid Kenyan number (e.g. 0712345678 or 0111296234 after the +254 prefix).'])->withInput();
+        }
+
+        return $this->sendOnboardingVerificationStk($isp, $request, forceResend: false);
+    }
+
+    /**
+     * Send the SaaS onboarding M-Pesa verification STK push.
+     */
+    protected function sendOnboardingVerificationStk(ISP $isp, Request $request, bool $forceResend = false): RedirectResponse|JsonResponse
+    {
+        if ($isp->saas_payment_verified_at) {
+            $isp->update(['saas_onboarding_step' => 3]);
+
+            return $this->jsonOrRedirect($request, [
+                'success' => true,
+                'status' => 'paid',
+                'redirect' => SaasOnboardingContext::showUrl($isp),
+            ], redirect()->to(SaasOnboardingContext::showUrl($isp))->with('success', 'Already verified. Continue with network setup.'));
+        }
+
+        $normalizedPhone = PlatformSaasBillingService::normalizeKenyanMsisdn(
+            $request->input('saas_billing_phone') ?: $isp->saas_billing_phone
+        );
+
+        if (! $normalizedPhone) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Enter a valid Kenyan number.',
+                    'errors' => ['saas_billing_phone' => ['Enter a valid Kenyan number (e.g. 0712345678 or digits after +254).']],
+                ], 422);
+            }
+
+            return back()->withErrors([
+                'saas_billing_phone' => 'Enter a valid Kenyan number (e.g. 0712345678 or 0111296234 after the +254 prefix).',
+            ])->withInput();
         }
 
         $isp->update(['saas_billing_phone' => $normalizedPhone]);
 
         $amount = max(1, (int) ceil((float) config('services.mpesa.saas_onboarding_verification_amount', 1)));
 
-        $recentPending = Payment::query()
-            ->where('isp_id', $isp->id)
-            ->where('status', 'pending')
-            ->where('metadata->purpose', 'saas_onboarding_verification')
-            ->where('created_at', '>=', now()->subMinutes(2))
-            ->latest()
-            ->first();
+        if (! $forceResend) {
+            $recentPending = Payment::query()
+                ->where('isp_id', $isp->id)
+                ->where('status', 'pending')
+                ->where('metadata->purpose', 'saas_onboarding_verification')
+                ->where('phone_number', $normalizedPhone)
+                ->where('created_at', '>=', now()->subSeconds(20))
+                ->latest()
+                ->first();
 
-        if ($recentPending && (string) $recentPending->phone_number === $normalizedPhone) {
-            return redirect()->route('isp.saas-onboarding.show')->with(
-                'success',
-                'A verification prompt was already sent recently. Approve it on your phone, then use “Continue to network setup”.'
-            );
+            if ($recentPending) {
+                return $this->jsonOrRedirect($request, [
+                    'success' => true,
+                    'payment_id' => $recentPending->id,
+                    'poll' => true,
+                    'message' => 'Verification STK already in progress.',
+                ], redirect()->to(SaasOnboardingContext::showUrl($isp))->with(
+                    'success',
+                    'Verification STK was just sent — check your phone.'
+                ));
+            }
         }
 
         $payment = Payment::create([
@@ -274,11 +352,16 @@ class SaasOnboardingWizardService
             ],
         ]);
 
-        $mpesa = new MpesaService(null);
-        $stk = $mpesa->initiateStkPush($payment);
+        $stk = (new MpesaService(null))->initiateStkPush($payment);
 
         if (! ($stk['success'] ?? false)) {
-            return back()->with('error', $stk['message'] ?? 'Could not start M-Pesa verification.')->withInput();
+            $message = $stk['message'] ?? 'Could not start M-Pesa verification.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $message], 422);
+            }
+
+            return back()->with('error', $message)->withInput();
         }
 
         if ($stk['simulated'] ?? false) {
@@ -287,19 +370,40 @@ class SaasOnboardingWizardService
                 'saas_onboarding_step' => 3,
             ]);
 
-            return redirect()->route('isp.saas-onboarding.show')->with('success', 'Verification simulated (dev). Continue to connect your router.');
+            return $this->jsonOrRedirect($request, [
+                'success' => true,
+                'status' => 'paid',
+                'redirect' => SaasOnboardingContext::showUrl($isp),
+            ], redirect()->to(SaasOnboardingContext::showUrl($isp))->with('success', 'Verification simulated (dev). Continue to connect your router.'));
         }
 
-        return redirect()->route('isp.saas-onboarding.show')->with(
+        return $this->jsonOrRedirect($request, [
+            'success' => true,
+            'payment_id' => $payment->id,
+            'poll' => true,
+            'message' => 'STK Push sent. Enter your M-Pesa PIN on your phone.',
+        ], redirect()->to(SaasOnboardingContext::showUrl($isp))->with(
             'success',
-            'We sent an M-Pesa verification of KES '.$amount.'. Approve it on your phone, then click “Continue to network setup”.'
-        );
+            'We sent an M-Pesa verification of KES '.$amount.' to '.$normalizedPhone.'.'
+        ));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function jsonOrRedirect(Request $request, array $payload, RedirectResponse $redirect): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json($payload);
+        }
+
+        return $redirect;
     }
 
     protected function stepRouterAndPlans(ISP $isp, Request $request): RedirectResponse
     {
         if ($isp->saas_billing_method === 'mpesa' && ! $isp->saas_payment_verified_at) {
-            return redirect()->route('isp.saas-onboarding.show')
+            return redirect()->to(SaasOnboardingContext::showUrl($isp))
                 ->with('error', 'Complete M-Pesa verification before connecting your router.');
         }
 
@@ -407,7 +511,7 @@ class SaasOnboardingWizardService
 
         $isp->update(['saas_onboarding_step' => 4]);
 
-        return redirect()->route('isp.saas-onboarding.show')->with(
+        return redirect()->to(SaasOnboardingContext::showUrl($isp))->with(
             'success',
             'Router connected'.($imported > 0 ? " ({$imported} hotspot server records synced)." : '.').' Link your customer Paybill next.'
         );
@@ -461,7 +565,7 @@ class SaasOnboardingWizardService
     protected function stepPaybillAndFinish(ISP $isp, Request $request): RedirectResponse
     {
         if (! Router::query()->where('isp_id', $isp->id)->exists()) {
-            return redirect()->route('isp.saas-onboarding.show')->with('error', 'Add a router before linking M-Pesa.');
+            return redirect()->to(SaasOnboardingContext::showUrl($isp))->with('error', 'Add a router before linking M-Pesa.');
         }
 
         $data = $request->only([
@@ -474,7 +578,7 @@ class SaasOnboardingWizardService
 
         $plan = PlatformSaasPlan::query()->where('is_active', true)->find($isp->saas_pending_platform_plan_id);
         if (! $plan) {
-            return redirect()->route('isp.saas-onboarding.show')
+            return redirect()->to(SaasOnboardingContext::showUrl($isp))
                 ->with('error', 'Your selected plan is no longer available. Please pick a plan again.');
         }
 
@@ -482,17 +586,17 @@ class SaasOnboardingWizardService
             return back()->with('error', 'M-Pesa is disabled at platform level. Save as inactive or contact support.')->withInput();
         }
 
-        $credentials = [
+        $credentials = MpesaGatewayConfig::normalizeCredentials([
             'consumer_key' => $data['mpesa_consumer_key'],
             'consumer_secret' => $data['mpesa_consumer_secret'],
             'shortcode' => $data['mpesa_shortcode'],
             'passkey' => $data['mpesa_passkey'],
             'environment' => $data['mpesa_environment'] ?? config('services.mpesa.environment', 'sandbox'),
-        ];
+        ]);
 
         $paymentMethod = IspPaymentMethod::query()
             ->forIsp($isp->id)
-            ->byProvider('daraja')
+            ->mpesaProvider()
             ->first();
 
         $webhookToken = $paymentMethod?->webhook_token ?: Str::random(48);
@@ -508,7 +612,7 @@ class SaasOnboardingWizardService
         } else {
             $paymentMethod = IspPaymentMethod::create([
                 'isp_id' => $isp->id,
-                'provider' => 'daraja',
+                'provider' => MpesaGatewayConfig::STORAGE_PROVIDER,
                 'credentials' => $credentials,
                 'callback_url' => $defaultCallback,
                 'webhook_token' => $webhookToken,
@@ -544,6 +648,6 @@ class SaasOnboardingWizardService
             (bool) $isp->saas_white_label_opt_in
         );
 
-        return redirect()->route('isp.dashboard')->with('success', 'Welcome to PrimeBilling — your network, plans, and M-Pesa C2B are configured.');
+        return SaasOnboardingContext::completionRedirect($isp->fresh());
     }
 }

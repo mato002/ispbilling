@@ -26,7 +26,7 @@ class CheckUnpaidInvoices implements ShouldQueue
         // Get customers with unpaid invoices overdue by 7+ days
         $unpaidCustomers = Customer::where('status', 'active')
             ->whereHas('invoices', function ($query) {
-                $query->where('status', 'unpaid')
+                $query->whereIn('status', ['pending', 'overdue'])
                     ->where('due_date', '<', now()->subDays(7))
                     ->whereDoesntHave('payments', function ($paymentQuery) {
                         $paymentQuery->where('status', 'completed');

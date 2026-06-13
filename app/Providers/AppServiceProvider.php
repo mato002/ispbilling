@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Sms\SmsGatewayManager;
 use App\View\Composers\IspBrandingComposer;
 use App\View\Composers\IspSettingsComposer;
 use App\View\Composers\IspSystemAnnouncementsComposer;
@@ -15,7 +16,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(SmsGatewayManager::class);
     }
 
     /**

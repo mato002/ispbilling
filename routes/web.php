@@ -36,6 +36,7 @@ use App\Http\Controllers\ISP\Web\PaymentSettingsController;
 use App\Http\Controllers\ISP\Web\PlatformSubscriptionController;
 use App\Http\Controllers\ISP\Web\RouterActionLogController;
 use App\Http\Controllers\ISP\Web\RouterController;
+use App\Http\Controllers\ISP\Web\OnboardingPaymentStatusController;
 use App\Http\Controllers\ISP\Web\SaasOnboardingController;
 use App\Http\Controllers\ISP\Web\SessionController;
 use App\Http\Controllers\ISP\Web\SubscriptionController;
@@ -80,6 +81,11 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
     Route::middleware('ensure.isp.platform')->prefix('isp')->name('isp.')->group(function () {
         Route::get('/saas-onboarding', [SaasOnboardingController::class, 'show'])->name('saas-onboarding.show');
         Route::post('/saas-onboarding', [SaasOnboardingController::class, 'store'])->name('saas-onboarding.store');
+    });
+
+    Route::middleware('ensure.isp.platform')->group(function () {
+        Route::get('/api/onboarding/payment-status/{payment}', [OnboardingPaymentStatusController::class, 'show'])
+            ->name('api.onboarding.payment-status');
     });
 
     // ISP Dashboard Routes (for ISP Admin and Staff)
@@ -372,14 +378,11 @@ Route::prefix('customer')->name('customer.')->group(function () {
     Route::get('/plans', [PlanController::class, 'index'])->name('plans');
     Route::get('/plans/{plan}', [PlanController::class, 'show'])->name('plans.show');
 
-    // Payments
-    Route::get('/checkout', [App\Http\Controllers\Customer\PaymentController::class, 'checkout'])->name('payment.checkout');
-    Route::post('/payment/process', [App\Http\Controllers\Customer\PaymentController::class, 'processPayment'])->name('payment.process');
-    Route::get('/payment/processing', [App\Http\Controllers\Customer\PaymentController::class, 'processing'])->name('payment.processing');
-    Route::post('/payment/status/check', [App\Http\Controllers\Customer\PaymentController::class, 'checkStatus'])->name('payment.status.check');
-    Route::get('/payment/success', [App\Http\Controllers\Customer\PaymentController::class, 'success'])->name('payment.success');
+    // Hotspot checkout lives in the SelfService group above (customer.checkout).
+    // Legacy PaymentController wizard routes removed — views customer.payment-checkout,
+    // customer.payment-processing, and customer.payment-success do not exist.
 
-    // Payment Callbacks
+    // Payment provider callbacks (webhook-style; no Blade views)
     Route::post('/payment/callback/{provider}', [App\Http\Controllers\Customer\PaymentController::class, 'callback'])->name('payment.callback')->middleware(HandlePaymentWebhook::class);
 });
 

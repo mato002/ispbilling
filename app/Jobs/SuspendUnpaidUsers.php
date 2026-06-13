@@ -6,6 +6,7 @@ use App\Models\ISP;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Services\MikroTikService;
+use App\Services\NotificationService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -27,16 +28,16 @@ class SuspendUnpaidUsers implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(NotificationService $notificationService): void
     {
         $isps = $this->isp ? collect([$this->isp]) : ISP::where('is_active', true)->get();
 
         foreach ($isps as $isp) {
-            $this->suspendUnpaidUsersForIsp($isp);
+            $this->suspendUnpaidUsersForIsp($isp, $notificationService);
         }
     }
 
-    protected function suspendUnpaidUsersForIsp(ISP $isp): void
+    protected function suspendUnpaidUsersForIsp(ISP $isp, NotificationService $notificationService): void
     {
         // Get customers with overdue invoices
         $overdueInvoices = Invoice::where('isp_id', $isp->id)
@@ -63,6 +64,12 @@ class SuspendUnpaidUsers implements ShouldQueue
                     
                     // Update invoice status
                     $invoice->update(['status' => 'overdue']);
+
+                    try {
+                        $notificationService->userSuspended($customer, $invoice);
+                    } catch (\Throwable $e) {
+                        Log::error("Failed to create ISP suspension notification for customer {$customer->id}: ".$e->getMessage());
+                    }
 
                     Log::info("Suspended customer {$customer->id} due to unpaid invoice {$invoice->id}");
                 } catch (\Exception $e) {

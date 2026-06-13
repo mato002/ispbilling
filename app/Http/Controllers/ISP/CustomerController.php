@@ -8,13 +8,19 @@ use App\Models\Plan;
 use App\Models\Router;
 use App\Models\Subscription;
 use App\Services\MikroTikService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
+    public function __construct(
+        private readonly NotificationService $notificationService,
+    ) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -120,6 +126,15 @@ class CustomerController extends Controller
             $customer->activate();
 
             DB::commit();
+
+            try {
+                $this->notificationService->newCustomer($customer);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to create ISP new-customer notification', [
+                    'customer_id' => $customer->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,

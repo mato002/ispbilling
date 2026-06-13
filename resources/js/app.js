@@ -38,6 +38,69 @@ document.addEventListener('DOMContentLoaded', () => {
     processPbFlashPayload();
 });
 
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function buildMpesaVerificationModalHtml(modal) {
+    let html = '<div class="text-left text-sm leading-relaxed text-slate-600 dark:text-slate-300 space-y-3">';
+    html += `<p class="text-slate-600 dark:text-slate-300">${escapeHtml(modal.message || '')}</p>`;
+
+    const details = modal.developer_details;
+    if (details) {
+        html += '<details class="mt-4 rounded-xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-600 dark:bg-slate-800/60">';
+        html += '<summary class="cursor-pointer select-none text-xs font-semibold text-slate-700 dark:text-slate-200">🛠️ Developer Debugging Logs</summary>';
+        html += '<div class="mt-3 space-y-2.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400">';
+
+        if (details.summary) {
+            html += `<p>${escapeHtml(details.summary)}</p>`;
+        }
+
+        if (details.steps?.length) {
+            html += '<ol class="list-decimal list-inside space-y-1.5 pl-0.5">';
+            details.steps.forEach((step) => {
+                html += `<li>${escapeHtml(step)}</li>`;
+            });
+            html += '</ol>';
+        }
+
+        if (details.callback_url) {
+            html += `<p class="mt-2 rounded-lg bg-white/80 px-2 py-1.5 font-mono text-[11px] text-slate-500 dark:bg-slate-900/80 dark:text-slate-400">${escapeHtml(details.callback_url)}</p>`;
+        }
+
+        html += '</div></details>';
+    }
+
+    html += '</div>';
+
+    return html;
+}
+
+function showFlashModal(modal) {
+    if (!modal || modal.type !== 'mpesa_verification_pending') {
+        return false;
+    }
+
+    window.Swal.fire({
+        icon: 'info',
+        title: modal.title || 'Payment Verification Pending',
+        html: buildMpesaVerificationModalHtml(modal),
+        confirmButtonText: 'Got it',
+        confirmButtonColor: '#4f46e5',
+        customClass: {
+            popup: 'pb-mpesa-verify-swal',
+            htmlContainer: 'pb-mpesa-verify-swal__body',
+            confirmButton: 'pb-mpesa-verify-swal__confirm',
+        },
+    });
+
+    return true;
+}
+
 function processPbFlashPayload() {
     const el = document.getElementById('pb-flash-payload');
     if (!el) {
@@ -53,7 +116,9 @@ function processPbFlashPayload() {
             return;
         }
         el.remove();
-        if (payload.validation_errors?.length) {
+        if (payload.flash_modal?.message) {
+            window.alert(payload.flash_modal.message);
+        } else if (payload.validation_errors?.length) {
             window.alert(payload.validation_errors.join('\n'));
         } else if (payload.error) {
             window.alert(payload.error);
@@ -71,6 +136,10 @@ function processPbFlashPayload() {
     }
     el.remove();
 
+    if (payload.flash_modal && showFlashModal(payload.flash_modal)) {
+        return;
+    }
+
     if (payload.success) {
         window.Swal.fire({
             icon: 'success',
@@ -84,9 +153,10 @@ function processPbFlashPayload() {
     if (payload.error) {
         window.Swal.fire({
             icon: 'error',
-            title: 'Error!',
+            title: 'Something went wrong',
             text: payload.error,
-            confirmButtonColor: '#ef4444',
+            confirmButtonColor: '#4f46e5',
+            confirmButtonText: 'Got it',
         });
     }
     if (payload.warning) {
@@ -108,9 +178,12 @@ function processPbFlashPayload() {
     if (payload.validation_errors?.length) {
         window.Swal.fire({
             icon: 'error',
-            title: 'Validation Error',
-            text: payload.validation_errors.join('\n'),
-            confirmButtonColor: '#ef4444',
+            title: 'Please fix the following',
+            html: '<ul class="mt-2 list-inside list-disc space-y-1 text-left text-sm text-slate-600 dark:text-slate-300">'
+                + payload.validation_errors.map((msg) => `<li>${escapeHtml(msg)}</li>`).join('')
+                + '</ul>',
+            confirmButtonColor: '#4f46e5',
+            confirmButtonText: 'Got it',
         });
     }
 }
@@ -181,6 +254,8 @@ window.notificationDropdownComponent = function notificationDropdownComponent(el
         },
         ispId: Number(el.dataset.ispId || 0),
         refreshTimer: null,
+        echoChannel: null,
+        pollingEnabled: false,
 
         init() {
             const serverNotifications = getJson('notifications', []);
@@ -190,19 +265,71 @@ window.notificationDropdownComponent = function notificationDropdownComponent(el
             }));
             this.unreadCount = Number(el.dataset.unreadCount || 0);
 
-            this.refreshTimer = setInterval(() => this.refreshNotifications(), 30000);
+            this.startPolling();
 
-            if (window.Echo && this.ispId > 0) {
-                window.Echo.private(`notifications.${this.ispId}`)
-                    .listen('NewNotification', (event) => {
-                        const incoming = {
-                            ...event.notification,
-                            time_ago: this.getTimeAgo(event.notification.created_at),
-                        };
-                        this.notifications.unshift(incoming);
-                        this.unreadCount += 1;
-                        this.showToast(incoming);
-                    });
+            if (this.canUseRealtimePush()) {
+                this.bindRealtimePush();
+            }
+        },
+
+        canUseRealtimePush() {
+            return Boolean(
+                window.Echo
+                && typeof window.Echo.private === 'function'
+                && this.ispId > 0
+            );
+        },
+
+        startPolling() {
+            if (!this.routes.recent || this.ispId <= 0) {
+                return;
+            }
+
+            this.pollingEnabled = true;
+            this.refreshNotifications({ silent: true });
+
+            this.refreshTimer = window.setInterval(() => {
+                this.refreshNotifications({ silent: true });
+            }, 30000);
+        },
+
+        bindRealtimePush() {
+            if (!this.canUseRealtimePush()) {
+                return;
+            }
+
+            try {
+                this.echoChannel = window.Echo.private(`notifications.${this.ispId}`);
+                this.echoChannel.listen('NewNotification', (event) => {
+                    const payload = event?.notification;
+                    if (!payload) {
+                        return;
+                    }
+
+                    const incoming = {
+                        ...payload,
+                        time_ago: this.getTimeAgo(payload.created_at),
+                    };
+                    this.notifications.unshift(incoming);
+                    this.unreadCount += 1;
+                    this.showToast(incoming);
+                });
+            } catch (error) {
+                if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+                    console.debug('Realtime notifications unavailable; using polling fallback.', error);
+                }
+            }
+        },
+
+        destroy() {
+            if (this.refreshTimer) {
+                window.clearInterval(this.refreshTimer);
+                this.refreshTimer = null;
+            }
+
+            if (this.echoChannel && typeof this.echoChannel.stopListening === 'function') {
+                this.echoChannel.stopListening('NewNotification');
+                this.echoChannel = null;
             }
         },
 
@@ -222,15 +349,30 @@ window.notificationDropdownComponent = function notificationDropdownComponent(el
             return `${Math.floor(seconds / 86400)} days ago`;
         },
 
-        async refreshNotifications() {
-            if (!this.routes.recent) return;
+        async refreshNotifications(options = {}) {
+            const silent = Boolean(options.silent);
+
+            if (!this.pollingEnabled || !this.routes.recent || this.ispId <= 0) {
+                return;
+            }
+
+            if (this.loading) {
+                return;
+            }
 
             this.loading = true;
             try {
                 const response = await fetch(this.routes.recent, {
-                    headers: { Accept: 'application/json' },
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
                 });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
 
                 const data = await response.json();
                 this.notifications = (data.notifications || []).map((notification) => ({
@@ -239,7 +381,9 @@ window.notificationDropdownComponent = function notificationDropdownComponent(el
                 }));
                 this.unreadCount = Number(data.unread_count || 0);
             } catch (error) {
-                console.error('Failed to refresh notifications:', error);
+                if (!silent && typeof console !== 'undefined' && typeof console.error === 'function') {
+                    console.error('Failed to refresh notifications:', error);
+                }
             } finally {
                 this.loading = false;
             }

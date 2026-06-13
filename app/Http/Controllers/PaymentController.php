@@ -222,7 +222,7 @@ class PaymentController extends Controller
             if ($webhook_token !== null && $webhook_token !== '') {
                 $tokenValid = IspPaymentMethod::query()
                     ->where('isp_id', $payment->isp_id)
-                    ->where('provider', 'daraja')
+                    ->mpesaProvider()
                     ->where('webhook_token', $webhook_token)
                     ->exists();
 

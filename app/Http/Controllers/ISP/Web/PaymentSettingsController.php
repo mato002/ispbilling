@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ISP\Web;
 use App\Http\Controllers\Controller;
 use App\Models\IspPaymentMethod;
 use App\Models\PlatformIntegration;
+use App\Support\MpesaGatewayConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -55,9 +56,13 @@ class PaymentSettingsController extends Controller
 
         // Prepare credentials based on provider
         $credentials = $this->prepareCredentials($validated);
+        $storageProvider = MpesaGatewayConfig::isMpesaProvider($validated['provider'])
+            ? MpesaGatewayConfig::STORAGE_PROVIDER
+            : $validated['provider'];
+
         IspPaymentMethod::create([
             'isp_id' => $ispId,
-            'provider' => $validated['provider'],
+            'provider' => $storageProvider,
             'credentials' => $credentials,
             'callback_url' => $validated['callback_url'] ?? null,
             'active' => $validated['active'] ?? false,
@@ -241,13 +246,23 @@ class PaymentSettingsController extends Controller
         }
 
         // Check for uniqueness if creating new payment method
-        if (! $paymentMethod) {
+        if (! $paymentMethod && ! MpesaGatewayConfig::isMpesaProvider((string) $provider)) {
             $rules['provider'] .= '|unique:isp_payment_methods,provider,NULL,id,isp_id,'.auth()->user()->isp_id;
         }
 
-        return Validator::make($request->all(), $rules, [
+        $validator = Validator::make($request->all(), $rules, [
             'provider.unique' => 'You already have a payment method configured for this provider.',
         ]);
+
+        if (! $paymentMethod && MpesaGatewayConfig::isMpesaProvider((string) $provider)) {
+            $validator->after(function ($validator) {
+                if (IspPaymentMethod::forIsp(auth()->user()->isp_id)->mpesaProvider()->exists()) {
+                    $validator->errors()->add('provider', 'You already have a payment method configured for M-Pesa.');
+                }
+            });
+        }
+
+        return $validator;
     }
 
     protected function prepareCredentials(array $validated): array
@@ -257,13 +272,14 @@ class PaymentSettingsController extends Controller
 
         switch ($provider) {
             case 'mpesa':
-                $credentials = [
+            case 'daraja':
+                $credentials = MpesaGatewayConfig::normalizeCredentials([
                     'consumer_key' => $validated['consumer_key'],
                     'consumer_secret' => $validated['consumer_secret'],
                     'passkey' => $validated['passkey'],
                     'shortcode' => $validated['shortcode'],
                     'environment' => $validated['environment'],
-                ];
+                ]);
                 break;
 
             case 'paypal':

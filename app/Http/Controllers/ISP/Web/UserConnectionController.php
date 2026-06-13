@@ -214,7 +214,7 @@ class UserConnectionController extends Controller
             })->where('status', 'active')->where('end_date', '<', now())->count(),
             'unpaid_invoices' => \App\Models\Invoice::whereHas('customer', function ($query) use ($ispId) {
                 $query->where('isp_id', $ispId);
-            })->where('status', 'unpaid')->where('due_date', '<', now()->subDays(7))->count(),
+            })->whereIn('status', ['pending', 'overdue'])->where('due_date', '<', now()->subDays(7))->count(),
         ];
 
         return response()->json([
