@@ -14,7 +14,7 @@ jobs:
   deploy:
     name: Build & FTP deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -42,6 +42,9 @@ jobs:
       - name: Install Composer dependencies (production)
         run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress --no-scripts
 
+      - name: Archive vendor folder
+        run: tar -czf vendor.tar.gz vendor/
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -53,21 +56,24 @@ jobs:
           npm ci
           npm run build
 
-      - name: Deploy via FTP
+      - name: Deploy application files (no vendor)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           port: ${{ secrets.FTP_PORT != '' && secrets.FTP_PORT || '21' }}
-          protocol: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftps' }}
+          protocol: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftp' }}
           local-dir: ./
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          state-name: ftp-deploy-sync-state.json
+          timeout: 600000
           log-level: minimal
           exclude: |
             **/.git*
             **/.github/**
             **/node_modules/**
+            **/vendor/**
             **/tests/**
             **/.env
             **/.env.*
@@ -78,6 +84,8 @@ jobs:
             **/phpunit.xml
             **/README.md
             **/*.zip
+            **/*.sql
+            **/vendor.tar.gz
             **/Homestead.*
             **/.idea/**
             **/.vscode/**
@@ -88,3 +96,18 @@ jobs:
             **/storage/pail/**
             **/public/hot
             **/public/storage
+
+      - name: Upload vendor archive
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT != '' && secrets.FTP_PORT || '21' }}
+          protocol: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftp' }}
+          local-dir: ./
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          timeout: 600000
+          log-level: minimal
+          include: |
+            vendor.tar.gz
