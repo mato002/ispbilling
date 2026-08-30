@@ -24,7 +24,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, bcmath, ctype, curl, dom, fileinfo, json, openssl, pdo, tokenizer, xml, gd
+          extensions: mbstring, bcmath, ctype, curl, dom, fileinfo, json, openssl, pdo, tokenizer, xml, gd, zip
           coverage: none
 
       - name: Get Composer cache directory
@@ -42,8 +42,16 @@ jobs:
       - name: Install Composer dependencies (production)
         run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress --no-scripts
 
-      - name: Archive vendor folder
-        run: tar -czf vendor.tar.gz vendor/
+      - name: Archive vendor folder (single ZIP for FTP)
+        run: zip -r -q vendor.zip vendor/
+
+      - name: Write deploy extract token
+        env:
+          DEPLOY_EXTRACT_TOKEN: ${{ secrets.DEPLOY_EXTRACT_TOKEN }}
+        run: |
+          if [ -n "$DEPLOY_EXTRACT_TOKEN" ]; then
+            echo "$DEPLOY_EXTRACT_TOKEN" > storage/app/.deploy-extract-token
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -56,7 +64,7 @@ jobs:
           npm ci
           npm run build
 
-      - name: Deploy application files (no vendor)
+      - name: Deploy application files (no vendor tree)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -85,7 +93,6 @@ jobs:
             **/README.md
             **/*.zip
             **/*.sql
-            **/vendor.tar.gz
             **/Homestead.*
             **/.idea/**
             **/.vscode/**
@@ -97,7 +104,7 @@ jobs:
             **/public/hot
             **/public/storage
 
-      - name: Upload vendor archive
+      - name: Upload vendor.zip
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -110,4 +117,4 @@ jobs:
           timeout: 600000
           log-level: minimal
           include: |
-            vendor.tar.gz
+            vendor.zip
