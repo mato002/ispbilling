@@ -2,7 +2,11 @@
     /** @var \App\Models\Router|null $router */
     $router = $router ?? null;
     $owners = $owners ?? collect();
+    $routerDefaults = $routerDefaults ?? [];
     $isEdit = isset($router) && $router->exists;
+    $defaultPort = (int) ($routerDefaults['default_api_port'] ?? 8728);
+    $defaultSsl = (bool) ($routerDefaults['use_ssl_by_default'] ?? false);
+    $defaultLifecycle = $routerDefaults['lifecycle_default'] ?? 'live';
     $val = function (string $field, $default = null) use ($router) {
         return old($field, $router?->{$field} ?? $default);
     };
@@ -61,12 +65,12 @@
             <div class="grid grid-cols-3 gap-3">
                 <div>
                     <label class="isp-form-label mb-1">Port *</label>
-                    <input type="number" name="port" id="port" value="{{ $val('port', 8728) }}" required
+                    <input type="number" name="port" id="port" value="{{ $val('port', $defaultPort) }}" required
                            class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900" />
                 </div>
                 <div class="col-span-2 flex items-end gap-3">
                     <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                        <input type="checkbox" name="use_ssl" value="1" {{ $val('use_ssl') ? 'checked' : '' }}
+                        <input type="checkbox" name="use_ssl" value="1" {{ $val('use_ssl', $defaultSsl) ? 'checked' : '' }}
                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                         Use SSL
                     </label>
@@ -137,7 +141,7 @@
                 <label class="isp-form-label mb-1">Lifecycle</label>
                 <select name="lifecycle_status" class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900">
                     @foreach (['live', 'stock', 'maintenance', 'retired'] as $opt)
-                        <option value="{{ $opt }}" @selected($val('lifecycle_status', 'live') === $opt)>{{ ucfirst($opt) }}</option>
+                        <option value="{{ $opt }}" @selected($val('lifecycle_status', $defaultLifecycle) === $opt)>{{ ucfirst($opt) }}</option>
                     @endforeach
                 </select>
             </div>

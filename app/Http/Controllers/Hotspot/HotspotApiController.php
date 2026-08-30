@@ -400,6 +400,8 @@ class HotspotApiController extends Controller
                 'total_uptime_seconds' => \DB::raw('total_uptime_seconds + ' . $session->uptime_seconds),
             ]
         );
+
+        app(\App\Services\DataUsageRecordingService::class)->recordHotspotSessionEnd($session->fresh());
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToIspTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -17,6 +18,7 @@ class Customer extends Model
     protected $fillable = [
         'isp_id',
         'router_id',
+        'inventory_item_id',
         'full_name',
         'phone_number',
         'email',
@@ -25,6 +27,7 @@ class Customer extends Model
         'username',
         'password',
         'status',
+        'account_credit',
         'installation_date',
         'mikrotik_user_id',
         'notes',
@@ -34,6 +37,7 @@ class Customer extends Model
     protected $casts = [
         'installation_date' => 'date',
         'custom_attributes' => 'array',
+        'account_credit' => 'decimal:2',
     ];
 
     protected $hidden = [
@@ -48,6 +52,11 @@ class Customer extends Model
     public function router(): BelongsTo
     {
         return $this->belongsTo(Router::class, 'router_id');
+    }
+
+    public function inventoryItem(): BelongsTo
+    {
+        return $this->belongsTo(InventoryItem::class, 'inventory_item_id');
     }
 
     public function subscriptions(): HasMany
@@ -69,6 +78,11 @@ class Customer extends Model
         return $this->hasMany(Invoice::class, 'customer_id');
     }
 
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class, 'customer_id');
+    }
+
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class, 'customer_id');
@@ -84,9 +98,30 @@ class Customer extends Model
         return $this->hasMany(CustomerUsageStat::class, 'customer_id');
     }
 
+    public function dataUsages(): HasMany
+    {
+        return $this->hasMany(DataUsage::class, 'customer_id');
+    }
+
+    public function smsGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(SmsGroup::class, 'sms_group_customer', 'customer_id', 'sms_group_id')
+            ->withTimestamps();
+    }
+
     public function devices(): HasMany
     {
         return $this->hasMany(CustomerDevice::class, 'customer_id');
+    }
+
+    public function inventoryAssignments(): HasMany
+    {
+        return $this->hasMany(InventoryAssignment::class, 'customer_id');
+    }
+
+    public function activeInventoryAssignments(): HasMany
+    {
+        return $this->hasMany(InventoryAssignment::class, 'customer_id')->where('is_active', true);
     }
 
     public function activeDevices(): HasMany

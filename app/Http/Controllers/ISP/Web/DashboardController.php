@@ -39,10 +39,12 @@ class DashboardController extends Controller
             'pending_invoices' => Invoice::where('isp_id', $ispId)->where('status', 'pending')->count(),
             'overdue_invoices' => Invoice::where('isp_id', $ispId)->where('status', 'overdue')->count(),
             'active_subscriptions' => Subscription::query()
+                ->whereHas('customer', fn ($q) => $q->where('isp_id', $ispId))
                 ->where('status', 'active')
                 ->where('end_date', '>=', now())
                 ->count(),
             'expiring_soon' => Subscription::query()
+                ->whereHas('customer', fn ($q) => $q->where('isp_id', $ispId))
                 ->where('status', 'active')
                 ->whereBetween('end_date', [now(), now()->addDays(7)])
                 ->count(),

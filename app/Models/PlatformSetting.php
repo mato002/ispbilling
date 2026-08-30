@@ -31,6 +31,26 @@ class PlatformSetting extends Model
         return (float) $v;
     }
 
+    public static function getInt(string $key, int $default = 0): int
+    {
+        $v = static::get($key);
+        if ($v === null || $v === '') {
+            return $default;
+        }
+
+        return (int) $v;
+    }
+
+    public static function getBool(string $key, bool $default = false): bool
+    {
+        $v = static::get($key);
+        if ($v === null || $v === '') {
+            return $default;
+        }
+
+        return in_array(strtolower((string) $v), ['1', 'true', 'yes', 'on'], true);
+    }
+
     public static function put(string $key, string $value): void
     {
         static::query()->updateOrCreate(

@@ -26,9 +26,11 @@
     @else
         @php
             $onboardingStep = min(4, max(1, (int) ($isp->saas_onboarding_step ?? 1)));
+            $trialDeferred = $isp->pendingPlanDefersOnboardingPayment();
             $mpesaAsyncOnboarding = $onboardingStep === 2
                 && ($isp->saas_billing_method ?? 'mpesa') === 'mpesa'
-                && ! $isp->saas_payment_verified_at;
+                && ! $isp->saas_payment_verified_at
+                && ! $trialDeferred;
         @endphp
         <form
             id="pb-saas-onboarding-form"

@@ -20,15 +20,20 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Reference</p>
                     <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{{ $payment->payment_reference }}</p>
-                    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ $payment->customer->full_name }}</p>
+                    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ $payment->customer?->full_name ?? 'Unassigned' }}</p>
                 </div>
-                <div>
+                <div class="flex flex-wrap gap-2">
                     @if($payment->status === 'completed')
                         <x-status-badge status="paid" />
                     @elseif($payment->status === 'pending')
                         <x-status-badge status="pending" />
                     @else
                         <span class="pb-pill pb-pill-bad">Failed</span>
+                    @endif
+                    @if ($payment->isUnposted())
+                        <span class="pb-pill pb-pill-warn">Unposted</span>
+                    @elseif ($payment->posting_status === 'posted')
+                        <span class="pb-pill pb-pill-ok">Posted</span>
                     @endif
                 </div>
             </div>
@@ -82,22 +87,44 @@
     </div>
 
     <div class="space-y-6">
-        <x-form-section title="Customer">
-            <dl class="space-y-3 text-sm">
-                <div>
-                    <dt class="isp-form-label mb-1">Name</dt>
-                    <dd class="font-medium text-slate-900 dark:text-white">{{ $payment->customer->full_name }}</dd>
-                </div>
-                <div>
-                    <dt class="isp-form-label mb-1">Phone</dt>
-                    <dd>{{ $payment->customer->phone_number }}</dd>
-                </div>
-                <div>
-                    <dt class="isp-form-label mb-1">Location</dt>
-                    <dd>{{ $payment->customer->location }}</dd>
-                </div>
-            </dl>
-        </x-form-section>
+        @if ($payment->customer)
+            <x-form-section title="Customer">
+                <dl class="space-y-3 text-sm">
+                    <div>
+                        <dt class="isp-form-label mb-1">Name</dt>
+                        <dd class="font-medium text-slate-900 dark:text-white">{{ $payment->customer->full_name }}</dd>
+                    </div>
+                    <div>
+                        <dt class="isp-form-label mb-1">Phone</dt>
+                        <dd>{{ $payment->customer->phone_number }}</dd>
+                    </div>
+                    <div>
+                        <dt class="isp-form-label mb-1">Location</dt>
+                        <dd>{{ $payment->customer->location }}</dd>
+                    </div>
+                </dl>
+            </x-form-section>
+        @elseif ($payment->isUnposted())
+            <x-form-section title="Suspense account">
+                <p class="text-sm text-slate-600 dark:text-slate-300">This payment has not been assigned to a subscriber.</p>
+                <a href="{{ route('isp.payments.unposted') }}" class="pb-btn pb-btn-primary mt-3 w-full justify-center">Assign from unposted queue</a>
+            </x-form-section>
+        @endif
+
+        @if ($payment->assigned_at)
+            <x-form-section title="Manual posting">
+                <p class="text-sm text-slate-600">Posted {{ $payment->assigned_at->format('M j, Y H:i') }} by {{ $payment->assignedBy?->name ?? 'Staff' }}</p>
+            </x-form-section>
+        @endif
+
+        @if ($payment->status === 'completed')
+            <x-form-section title="Service sync">
+                <form method="POST" action="{{ route('isp.payments.force-sync', $payment) }}">
+                    @csrf
+                    <button type="submit" class="pb-btn w-full justify-center">Re-run auto-reconnect &amp; activation</button>
+                </form>
+            </x-form-section>
+        @endif
 
         @if($payment->status === 'pending' && $payment->payment_method === 'mpesa')
             <div data-mpesa-pending class="rounded-xl border border-amber-200 bg-amber-50/90 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
@@ -111,12 +138,12 @@
         @if($payment->status === 'pending' && $payment->payment_method === 'manual')
             <x-form-section title="Manual payment">
                 <div class="flex flex-col gap-2">
-                    <form method="POST" action="{{ route('payments.confirm-manual', $payment->id) }}">
+                    <form method="POST" action="{{ route('isp.payments.confirm-manual', $payment) }}">
                         @csrf
                         <input type="hidden" name="confirm" value="1">
                         <button type="submit" class="pb-btn pb-btn-primary w-full justify-center">Mark completed</button>
                     </form>
-                    <form method="POST" action="{{ route('payments.confirm-manual', $payment->id) }}">
+                    <form method="POST" action="{{ route('isp.payments.confirm-manual', $payment) }}">
                         @csrf
                         <input type="hidden" name="confirm" value="0">
                         <button type="submit" class="pb-btn w-full justify-center border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100">Mark failed</button>

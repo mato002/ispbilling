@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\ActivityLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,16 +31,19 @@ class AuthenticatedSessionController extends Controller
 
         $user = Auth::user();
 
+        try {
+            ActivityLogService::logLogin($user);
+        } catch (\Throwable $e) {
+            // Never block login on audit write failures.
+        }
+
         // Redirect based on user role
         if ($user->isSuperAdmin()) {
-            // Super Admin - redirect to admin dashboard
             return redirect()->intended(route('admin.dashboard', absolute: false));
         } elseif ($user->isIspAdmin() || $user->isIspStaff()) {
-            // ISP Admin or Staff - redirect to ISP dashboard (or regular dashboard for now)
             return redirect()->intended(route('dashboard', absolute: false));
         }
 
-        // Default fallback - regular users go to dashboard
         return redirect()->intended(route('dashboard', absolute: false));
     }
 
@@ -48,6 +52,16 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        $user = Auth::user();
+
+        if ($user) {
+            try {
+                ActivityLogService::logLogout($user);
+            } catch (\Throwable $e) {
+                // Never block logout on audit write failures.
+            }
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

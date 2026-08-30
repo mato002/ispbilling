@@ -79,23 +79,10 @@ class PaymentCompletionService
                 if ($invoice && $invoice->subscription_id) {
                     $subscription = Subscription::query()->find($invoice->subscription_id);
 
-                    if ($subscription) {
-                        if ($customer->connection_type === 'hotspot') {
-                            if ($subscription->status === 'suspended' || $subscription->isExpired()) {
-                                $subscription->update([
-                                    'status' => 'active',
-                                    'start_date' => now(),
-                                    'end_date' => now()->addDays($subscription->plan->duration_days ?? 30),
-                                    'renewal_date' => now()->addDays($subscription->plan->duration_days ?? 30),
-                                ]);
-                                Log::info("Activated hotspot subscription {$subscription->id} for customer {$customer->id} after payment");
-                            }
-                        } else {
-                            if ($subscription->isExpired() || $subscription->end_date <= now()->addDays(7)) {
-                                $subscription->renew();
-                                Log::info("Renewed subscription {$subscription->id} for customer {$customer->id}");
-                            }
-                        }
+                    if ($subscription && in_array($subscription->status, ['active', 'expired', 'suspended'], true)) {
+                        $subscription->loadMissing('plan');
+                        $subscription->renew();
+                        Log::info("Renewed subscription {$subscription->id} for customer {$customer->id} after payment {$payment->id}");
                     }
                 }
             }

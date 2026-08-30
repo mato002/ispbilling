@@ -8,7 +8,7 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0">
                 <nav class="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
-                    <a href="{{ route('isp.settings.index') }}" class="rounded-md px-1.5 py-0.5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-200">Settings</a>
+                    <a href="{{ route('isp.settings.index') }}" data-turbo-frame="pb-main" data-turbo-action="advance" class="rounded-md px-1.5 py-0.5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-200">Settings</a>
                     <span class="text-slate-300 dark:text-slate-600" aria-hidden="true">/</span>
                     <span class="text-slate-700 dark:text-slate-200">Control center</span>
                 </nav>
@@ -16,9 +16,6 @@
                 <h1 class="mt-2 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
                     ISP System Settings
                 </h1>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                    Configure company operations, payments, notifications, user access, and network preferences.
-                </p>
             </div>
             <div class="flex flex-wrap gap-2 shrink-0 lg:justify-end">
                 @if ($S)

@@ -23,18 +23,26 @@
 
                     <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 space-y-4">
                         <div class="flex items-start space-x-3">
+                            @php
+                                $openerName = optional($ticket->createdBy)->name
+                                    ?? optional($ticket->customer)->full_name
+                                    ?? 'System';
+                            @endphp
                             <div class="flex-shrink-0">
                                 <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-500 text-white text-sm font-semibold">
-                                    {{ strtoupper(substr(optional($ticket->createdBy)->name ?? 'S', 0, 1)) }}
+                                    {{ strtoupper(substr($openerName, 0, 1)) }}
                                 </span>
                             </div>
                             <div>
                                 <div class="flex items-center space-x-2">
                                     <p class="text-sm font-medium text-gray-900">
-                                        {{ optional($ticket->createdBy)->name ?? 'System' }}
+                                        {{ $openerName }}
                                     </p>
                                     <span class="text-xs text-gray-400">
                                         opened the ticket • {{ $ticket->created_at->format('Y-m-d H:i') }}
+                                        @if(! $ticket->created_by_user_id && $ticket->customer_id)
+                                            · customer portal
+                                        @endif
                                     </span>
                                 </div>
                                 <p class="mt-2 text-sm text-gray-700 whitespace-pre-line">
@@ -157,9 +165,15 @@
                         </div>
 
                         <div>
-                            <label class="isp-form-label">Assigned To (User ID)</label>
-                            <input type="number" name="assigned_to_user_id" value="{{ old('assigned_to_user_id', $ticket->assigned_to_user_id) }}"
-                                   class="isp-form-input">
+                            <label class="isp-form-label">Assigned to</label>
+                            <select name="assigned_to_user_id" class="isp-form-select">
+                                <option value="">Unassigned</option>
+                                @foreach(($staffUsers ?? []) as $staff)
+                                    <option value="{{ $staff->id }}" @selected((string) old('assigned_to_user_id', $ticket->assigned_to_user_id) === (string) $staff->id)>
+                                        {{ $staff->name }} ({{ $staff->role === 'isp_admin' ? 'Admin' : 'Staff' }})
+                                    </option>
+                                @endforeach
+                            </select>
                             @error('assigned_to_user_id')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror

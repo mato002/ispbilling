@@ -41,6 +41,13 @@ class IspBrandingComposer
             $faviconUrl = Storage::disk('public')->url($b['favicon_path']);
         }
 
+        $portalLogoUrl = null;
+        if (! empty($b['portal_logo_path'])) {
+            $portalLogoUrl = Storage::disk('public')->url($b['portal_logo_path']);
+        } elseif ($logoUrl) {
+            $portalLogoUrl = $logoUrl;
+        }
+
         $accent = $b['accent_hex'] ?? '#6366f1';
         if (! is_string($accent) || ! preg_match('/^#[0-9A-Fa-f]{6}$/', $accent)) {
             $accent = '#6366f1';
@@ -49,8 +56,13 @@ class IspBrandingComposer
         $view->with('ispBranding', [
             'logo_url' => $logoUrl,
             'favicon_url' => $faviconUrl,
+            'portal_logo_url' => $portalLogoUrl,
             'workspace_title' => (string) ($b['workspace_title'] ?? config('app.name', 'PrimeBilling')),
             'workspace_tagline' => (string) ($b['workspace_tagline'] ?? ($isp->name ?? '')),
+            'portal_title' => (string) ($b['portal_title'] ?? ($isp->company_name ?? '')),
+            'portal_welcome_message' => (string) ($b['portal_welcome_message'] ?? ''),
+            'portal_support_email' => (string) ($b['portal_support_email'] ?? ($isp->email ?? '')),
+            'invoice_footer' => (string) ($b['invoice_footer'] ?? ''),
             'accent_hex' => $accent,
             'isp' => $isp,
         ]);

@@ -86,3 +86,23 @@ Schedule::job(new ReconcileHardwareStateJob())
     ->everyThirtyMinutes()
     ->name('hardware:reconcile-db-vs-routeros')
     ->withoutOverlapping(25);
+
+Schedule::command('usage:sync')
+    ->everyFifteenMinutes()
+    ->name('usage:sync-fleet')
+    ->withoutOverlapping(10);
+
+Schedule::job(new \App\Jobs\DispatchScheduledCommunicationCampaignsJob())
+    ->everyMinute()
+    ->name('communications:dispatch-scheduled')
+    ->withoutOverlapping(2);
+
+Schedule::job(new \App\Jobs\RefreshAllProvisioningSnapshotsJob())
+    ->everyMinute()
+    ->name('provisioning:refresh-snapshots')
+    ->withoutOverlapping(55);
+
+Schedule::job(new \App\Jobs\DispatchScheduledRouterBackupsJob())
+    ->hourly()
+    ->name('routers:scheduled-backups')
+    ->withoutOverlapping(50);

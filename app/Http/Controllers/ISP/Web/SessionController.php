@@ -2,62 +2,37 @@
 
 namespace App\Http\Controllers\ISP\Web;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Http\Controllers\ISP\BaseController;
 use App\Models\HotspotSession;
 use App\Models\Router;
 use App\Services\MikroTikService;
+use App\Support\Export\CsvExporter;
+use App\Support\Search\SearchHelper;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SessionController extends BaseController
 {
+    use InteractsWithListings;
+
     /**
      * Display active sessions
      */
     public function index(Request $request)
     {
         $ispId = $this->getIspId();
-        
-        $query = HotspotSession::where('isp_id', $ispId)
-            ->with(['router', 'customer', 'customer.activeSubscription.plan']);
 
-        // Filter by status
-        if ($request->has('status') && $request->status) {
-            $query->where('status', $request->status);
-        } else {
-            $query->where('status', 'active');
-        }
-
-        // Filter by router
-        if ($request->has('router_id') && $request->router_id) {
-            $query->where('router_id', $request->router_id);
-        }
-
-        // Search
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('username', 'like', "%{$search}%")
-                  ->orWhere('ip_address', 'like', "%{$search}%")
-                  ->orWhere('mac_address', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function ($q2) use ($search) {
-                      $q2->where('full_name', 'like', "%{$search}%")
-                         ->orWhere('phone_number', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        // Date range
-        if ($request->has('date_from') && $request->date_from) {
-            $query->whereDate('started_at', '>=', $request->date_from);
-        }
-        if ($request->has('date_to') && $request->date_to) {
-            $query->whereDate('started_at', '<=', $request->date_to);
-        }
-
-        $sessions = $query->latest('started_at')->paginate(50);
         $routers = Router::where('isp_id', $ispId)->where('is_active', true)->get();
+        $routerLabels = $routers->pluck('name', 'id')->mapWithKeys(
+            fn (string $name, int $id): array => [(string) $id => $name]
+        )->all();
 
-        // Get real-time stats
+        $query = $this->filteredSessionsQuery($request, $ispId);
+        $perPage = $this->resolvePerPage($request, 25);
+        $sessions = $query->paginate($perPage)->withQueryString();
+
         $stats = [
             'active_sessions' => HotspotSession::where('isp_id', $ispId)->where('status', 'active')->count(),
             'total_today' => HotspotSession::where('isp_id', $ispId)->whereDate('started_at', today())->count(),
@@ -66,7 +41,95 @@ class SessionController extends BaseController
                 ->sum(\DB::raw('bytes_uploaded + bytes_downloaded')),
         ];
 
-        return view('isp.sessions.index', compact('sessions', 'routers', 'stats'));
+        $filterChips = $this->listingFilterChips($request, route('isp.sessions.index'), [
+            'search' => 'Search',
+            'status' => [
+                'label' => 'Status',
+                'values' => [
+                    'active' => 'Active',
+                    'terminated' => 'Terminated',
+                    'expired' => 'Expired',
+                ],
+            ],
+            'router_id' => [
+                'label' => 'Router',
+                'values' => $routerLabels,
+            ],
+            'date_from' => 'From',
+            'date_to' => 'To',
+        ]);
+
+        $exportFormats = $this->listingExportFormats($request, route('isp.sessions.export.csv'));
+
+        return view('isp.sessions.index', compact('sessions', 'routers', 'stats', 'filterChips', 'exportFormats'));
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $ispId = $this->getIspId();
+        $query = $this->filteredSessionsQuery($request, $ispId)->with(['router', 'customer']);
+        $filename = 'sessions-'.now()->format('Ymd-His').'.csv';
+
+        return CsvExporter::download($filename, [
+            'Username', 'Customer', 'Phone', 'IP', 'MAC', 'Router', 'Status',
+            'Started', 'Ended', 'Upload (bytes)', 'Download (bytes)',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($sessions) use ($out) {
+                foreach ($sessions as $session) {
+                    fputcsv($out, [
+                        $session->username,
+                        $session->customer?->full_name,
+                        $session->customer?->phone_number,
+                        $session->ip_address,
+                        $session->mac_address,
+                        $session->router?->name,
+                        $session->status,
+                        $session->started_at?->format('Y-m-d H:i:s'),
+                        $session->ended_at?->format('Y-m-d H:i:s'),
+                        $session->bytes_uploaded,
+                        $session->bytes_downloaded,
+                    ]);
+                }
+            });
+        });
+    }
+
+    protected function filteredSessionsQuery(Request $request, int $ispId): Builder
+    {
+        $query = HotspotSession::where('isp_id', $ispId)
+            ->with(['router', 'customer', 'customer.activeSubscription.plan']);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        } else {
+            $query->where('status', 'active');
+        }
+
+        if ($request->filled('router_id')) {
+            $query->where('router_id', $request->router_id);
+        }
+
+        if ($pattern = SearchHelper::likePattern($request->search)) {
+            $query->where(function ($q) use ($pattern) {
+                $q->where('username', 'like', $pattern)
+                    ->orWhere('ip_address', 'like', $pattern)
+                    ->orWhere('mac_address', 'like', $pattern)
+                    ->orWhereHas('customer', function ($q2) use ($pattern) {
+                        $q2->where('full_name', 'like', $pattern)
+                            ->orWhere('phone_number', 'like', $pattern);
+                    });
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('started_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('started_at', '<=', $request->date_to);
+        }
+
+        return $query->latest('started_at');
     }
 
     /**
@@ -75,7 +138,7 @@ class SessionController extends BaseController
     public function show(HotspotSession $session)
     {
         $this->ensureIspAccess($session);
-        
+
         $session->load(['router', 'customer', 'customer.activeSubscription.plan', 'isp']);
 
         // Get real-time stats from MikroTik if active
@@ -89,7 +152,7 @@ class SessionController extends BaseController
                         '?user' => $session->username,
                     ]);
 
-                    if (!empty($activeSessions)) {
+                    if (! empty($activeSessions)) {
                         $realTimeStats = $activeSessions[0];
                     }
                 }
@@ -130,7 +193,7 @@ class SessionController extends BaseController
 
             return back()->with('success', 'Session disconnected successfully.');
         } catch (\Exception $e) {
-            return back()->with('error', 'Failed to disconnect session: ' . $e->getMessage());
+            return back()->with('error', 'Failed to disconnect session: '.$e->getMessage());
         }
     }
 
@@ -140,7 +203,7 @@ class SessionController extends BaseController
     public function customerHistory(Request $request, $customerId)
     {
         $ispId = $this->getIspId();
-        
+
         $customer = \App\Models\Customer::where('id', $customerId)
             ->where('isp_id', $ispId)
             ->firstOrFail();
@@ -153,8 +216,3 @@ class SessionController extends BaseController
         return view('isp.sessions.customer-history', compact('customer', 'sessions'));
     }
 }
-
-
-
-
-

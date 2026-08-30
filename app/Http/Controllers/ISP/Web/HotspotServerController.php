@@ -2,30 +2,76 @@
 
 namespace App\Http\Controllers\ISP\Web;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Http\Controllers\Controller;
 use App\Models\HotspotServer;
 use App\Models\Router;
 use App\Services\MikroTikService;
+use App\Support\Export\CsvExporter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HotspotServerController extends Controller
 {
+    use InteractsWithListings;
+
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        $hotspotServers = HotspotServer::forIsp($ispId)
+
+        $query = $this->filteredHotspotServersQuery($request, $ispId);
+        $perPage = $this->resolvePerPage($request);
+        $hotspotServers = $query->paginate($perPage)->withQueryString();
+
+        $routers = Router::forIsp($ispId)->active()->get();
+
+        $filterChips = $this->listingFilterChips($request, route('isp.hotspot-servers.index'), [
+            'is_active' => [
+                'label' => 'Status',
+                'values' => ['1' => 'Active', '0' => 'Inactive'],
+            ],
+        ]);
+
+        $exportFormats = $this->listingExportFormats($request, route('isp.hotspot-servers.export.csv'));
+
+        return view('isp.hotspot-servers.index', compact('hotspotServers', 'routers', 'filterChips', 'exportFormats'));
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $ispId = auth()->user()->isp_id;
+        $query = $this->filteredHotspotServersQuery($request, $ispId)->with('router');
+        $filename = 'hotspot-servers-'.now()->format('Ymd-His').'.csv';
+
+        return CsvExporter::download($filename, [
+            'Name', 'Router', 'Interface', 'Profile', 'Login by', 'Active', 'Allowed users',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($servers) use ($out) {
+                foreach ($servers as $server) {
+                    fputcsv($out, [
+                        $server->name,
+                        $server->router?->name,
+                        $server->interface,
+                        $server->default_profile,
+                        $server->login_by,
+                        $server->is_active ? 'Active' : 'Inactive',
+                        $server->allowed_users,
+                    ]);
+                }
+            });
+        });
+    }
+
+    protected function filteredHotspotServersQuery(Request $request, int $ispId): Builder
+    {
+        return HotspotServer::forIsp($ispId)
             ->with('router')
             ->when($request->filled('is_active'), function ($query) use ($request) {
                 $query->where('is_active', $request->is_active);
             })
-            ->orderBy('name')
-            ->paginate(10)
-            ->appends($request->query());
-
-        $routers = Router::forIsp($ispId)->active()->get();
-
-        return view('isp.hotspot-servers.index', compact('hotspotServers', 'routers'));
+            ->orderBy('name');
     }
 
     public function sync(Request $request)
@@ -154,11 +200,6 @@ class HotspotServerController extends Controller
     {
         if ($hotspotServer->isp_id !== auth()->user()->isp_id) {
             abort(403);
-        }
-
-        // Check if server is being used by customers
-        if ($hotspotServer->customers()->count() > 0) {
-            return back()->with('error', 'Cannot delete hotspot server. It is being used by customers.');
         }
 
         $hotspotServer->delete();

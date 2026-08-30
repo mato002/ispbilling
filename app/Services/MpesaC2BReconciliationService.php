@@ -274,13 +274,54 @@ class MpesaC2BReconciliationService
             'trans_id' => $payload['TransID'] ?? null,
         ]);
 
+        $transId = isset($payload['TransID']) ? (string) $payload['TransID'] : null;
+        $amount = isset($payload['TransAmount']) ? (float) $payload['TransAmount'] : 0;
+        $msisdn = isset($payload['MSISDN']) ? (string) $payload['MSISDN'] : null;
+
+        if ($transId && $amount > 0) {
+            $existing = Payment::query()
+                ->where('isp_id', $ispId)
+                ->where('transaction_id', $transId)
+                ->first();
+
+            if (! $existing) {
+                try {
+                    $payment = Payment::create([
+                        'isp_id' => $ispId,
+                        'customer_id' => null,
+                        'payment_method' => 'mpesa',
+                        'amount' => $amount,
+                        'transaction_id' => $transId,
+                        'phone_number' => $this->normalizeKenyanPhone($msisdn),
+                        'status' => 'completed',
+                        'posting_status' => Payment::POSTING_UNPOSTED,
+                        'processed_at' => now(),
+                        'metadata' => [
+                            'source' => 'c2b_unreconciled',
+                            'c2b_payload' => $payload,
+                            'unreconciled_reason' => $reason,
+                            'partial_match_invoice_id' => $partialMatch?->id,
+                        ],
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    $payment = Payment::query()
+                        ->where('isp_id', $ispId)
+                        ->where('transaction_id', $transId)
+                        ->first();
+                }
+            } else {
+                $payment = $existing;
+            }
+        }
+
         PaymentTransactionLog::log([
+            'payment_id' => isset($payment) ? $payment->id : null,
             'isp_id' => $ispId,
             'transaction_type' => 'c2b_unreconciled',
             'payment_method' => 'mpesa',
-            'transaction_id' => isset($payload['TransID']) ? (string) $payload['TransID'] : null,
+            'transaction_id' => $transId,
             'status' => 'unreconciled',
-            'amount' => isset($payload['TransAmount']) ? (float) $payload['TransAmount'] : null,
+            'amount' => $amount > 0 ? $amount : null,
             'request_data' => array_merge($payload, array_filter([
                 'partial_match_invoice_id' => $partialMatch?->id,
                 'partial_match_invoice_number' => $partialMatch?->invoice_number,

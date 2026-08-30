@@ -3,18 +3,18 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\ISP;
 use App\Models\Customer;
-use App\Models\Payment;
+use App\Models\ISP;
 use App\Models\Invoice;
+use App\Models\Payment;
+use App\Services\Admin\AdminDashboardService;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(AdminDashboardService $dashboard)
     {
-        // Check if user is super admin
-        if (!auth()->user()->isSuperAdmin()) {
+        if (! auth()->user()->isSuperAdmin()) {
             abort(403, 'Unauthorized access');
         }
 
@@ -28,17 +28,26 @@ class DashboardController extends Controller
             'overdue_invoices' => Invoice::where('status', 'overdue')->count(),
         ];
 
+        $telemetry = $dashboard->telemetry();
+
         $recentIsps = ISP::withCount(['customers', 'routers', 'plans'])
             ->latest()
-            ->take(10)
+            ->take(12)
             ->get();
 
-        return view('admin.dashboard', compact('stats', 'recentIsps'));
+        return view('admin.dashboard', [
+            'stats' => $stats,
+            'recentIsps' => $recentIsps,
+            'fleetTotals' => $telemetry['fleet_totals'],
+            'fleetTenants' => $telemetry['fleet_tenants'],
+            'activityFeed' => $telemetry['activity_feed'],
+            'criticalAlerts' => $telemetry['critical_alerts'],
+        ]);
     }
 
     public function stats()
     {
-        if (!auth()->user()->isSuperAdmin()) {
+        if (! auth()->user()->isSuperAdmin()) {
             abort(403, 'Unauthorized access');
         }
 
@@ -57,11 +66,12 @@ class DashboardController extends Controller
 
     public function isps()
     {
-        if (!auth()->user()->isSuperAdmin()) {
+        if (! auth()->user()->isSuperAdmin()) {
             abort(403, 'Unauthorized access');
         }
 
         $isps = ISP::withCount(['customers', 'routers', 'plans'])->latest()->get();
+
         return response()->json($isps);
     }
 }

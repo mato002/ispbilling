@@ -129,8 +129,11 @@ class ReportController extends Controller
 
                 return [
                     'total' => $query->count(),
-                    'by_access_type' => $query->select('access_type', DB::raw('COUNT(*) as count'))
+                    'by_access_type' => (clone $query)->select('access_type', DB::raw('COUNT(*) as count'))
                         ->groupBy('access_type')
+                        ->get(),
+                    'by_package_type' => (clone $query)->select('package_type', DB::raw('COUNT(*) as count'))
+                        ->groupBy('package_type')
                         ->get(),
                     'popular' => DB::table('subscriptions')
                         ->join('plans', 'subscriptions.plan_id', '=', 'plans.id')

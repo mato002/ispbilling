@@ -142,7 +142,6 @@
                     @if($voucher->status === 'active')
                         <form method="POST" action="{{ route('isp.vouchers.deactivate', $voucher) }}" class="w-full" onsubmit="return confirm('Are you sure you want to deactivate this voucher?');">
                             @csrf
-                            @method('PATCH')
                             <button type="submit" class="pb-btn w-full justify-center border-red-200 bg-red-50 text-red-900 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">Deactivate voucher</button>
                         </form>
                     @endif

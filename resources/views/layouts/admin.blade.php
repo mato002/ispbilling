@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#0F172A">
 
     <title>@yield('title', 'Dashboard') · {{ config('app.name', 'PrimeBilling') }}</title>
@@ -28,6 +29,11 @@
                 }
             } catch (e) {}
         })();
+        try {
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                document.documentElement.classList.add('pb-sidebar-collapsed');
+            }
+        } catch (e) {}
     </script>
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -149,11 +155,28 @@
 
         /* ========== Sidebar ========== */
         .pb-sidebar {
+            width: 16rem;
             background:
                 radial-gradient(80% 60% at 0% 0%, rgba(99, 102, 241, 0.18), transparent 60%),
                 radial-gradient(70% 60% at 100% 100%, rgba(6, 182, 212, 0.10), transparent 60%),
                 linear-gradient(180deg, var(--pb-sidebar-bg) 0%, var(--pb-sidebar-bg-2) 100%);
             color: #cbd5e1;
+        }
+        .pb-sidebar-collapsed .pb-sidebar {
+            width: 4rem;
+        }
+        @media (min-width: 768px) {
+            .pb-sidebar-collapsed #pb-admin-topbar {
+                left: 4rem !important;
+            }
+            .pb-sidebar-collapsed #pb-main {
+                margin-left: 4rem !important;
+            }
+        }
+        @media (max-width: 767px) {
+            .pb-sidebar-collapsed .pb-sidebar {
+                width: 16rem;
+            }
         }
         .pb-sidebar-section-label {
             font-size: 10px;
@@ -162,11 +185,24 @@
             text-transform: uppercase;
             color: rgba(148, 163, 184, 0.7);
             padding: 0 12px;
+            margin-bottom: 0.75rem;
+        }
+        .pb-sidebar-modules {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .pb-sidebar-modules .pb-nav-item {
+            padding-top: 0.6875rem;
+            padding-bottom: 0.6875rem;
         }
         .pb-sidebar-brand-mark {
             background-size: 58% 58%, cover;
             background-position: center, center;
             background-repeat: no-repeat, no-repeat;
+        }
+        .pb-sidebar-mobile-close {
+            -webkit-tap-highlight-color: transparent;
         }
         .pb-nav-item {
             position: relative;
@@ -374,53 +410,68 @@
     </style>
 </head>
 @php
-    $pbIslandLayout = request()->routeIs('isp.saas-onboarding.*');
+    $pbSaasOnboardingOverlay = (bool) ($pbSaasOnboardingOverlay ?? false);
 @endphp
-<body class="pb-canvas isp-page antialiased overflow-x-hidden @if($pbIslandLayout) pb-onboarding-island @endif">
+<body class="pb-canvas isp-page antialiased overflow-x-hidden @if($pbSaasOnboardingOverlay) pb-onboarding-locked @endif">
     @include('layouts.admin-header')
 
-    <div id="pb-admin-shell" class="min-h-screen">
-        @unless ($pbIslandLayout)
-            @include('layouts.admin-sidebar')
+    <div
+        id="pb-admin-shell"
+        class="min-h-screen"
+        x-data
+        @if ($pbSaasOnboardingOverlay)
+            inert
+            aria-hidden="true"
+        @endif
+    >
+        @include('layouts.admin-sidebar')
 
-            {{-- Mobile sidebar overlay --}}
-            <div
-                x-show="$store.sidebar.mobileOpen"
-                x-cloak
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                class="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm md:hidden"
-                @click="$store.sidebar.closeMobile()"
-            ></div>
-        @endunless
+        {{-- Mobile sidebar overlay --}}
+        <div
+            x-show="$store.sidebar.mobileOpen"
+            x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm md:hidden"
+            @click="$store.sidebar.closeMobile()"
+        ></div>
 
-        <main
+        <turbo-frame
             id="pb-main"
-            @class([
-                'min-h-screen pt-16 transition-all duration-300 ease-in-out',
-                'md:ml-64' => ! $pbIslandLayout,
-            ])
-            @unless($pbIslandLayout) :class="$store.sidebar.collapsed ? 'md:!ml-16' : ''" @endunless
+            target="_top"
+            class="block min-h-screen pt-16 transition-all duration-300 ease-in-out md:ml-64"
+            :class="$store.sidebar.collapsed ? 'md:!ml-16' : ''"
         >
-                <div @class([
-                    'overflow-x-hidden',
-                    'px-4 py-6 sm:px-6 lg:px-8' => ! $pbIslandLayout,
-                    'mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:py-12' => $pbIslandLayout,
-                ])>
-                    @unless ($pbIslandLayout)
-                        <x-system-announcements-banner :announcements="$systemAnnouncements ?? collect()" />
-                    @endunless
+            <main class="min-h-screen">
+                <div class="pb-module-workspace-dock px-4 sm:px-6 lg:px-8">
+                    <x-module-workspace-bar />
+                </div>
+
+                <div class="overflow-x-hidden px-4 pb-6 pt-4 sm:px-6 lg:px-8">
+                    @php
+                        $pbQuickCreatePayload = app(\App\Support\Navigation\PbQuickCreatePresenter::class)->forRoute(
+                            Route::currentRouteName(),
+                            auth()->user(),
+                        );
+                    @endphp
+                    <span
+                        id="pb-route-meta"
+                        class="sr-only"
+                        data-route="{{ Route::currentRouteName() }}"
+                        data-title="{{ trim((string) $__env->yieldContent('title')) }}"
+                        data-quick-create="{{ json_encode($pbQuickCreatePayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) }}"
+                        data-i18n-create="{{ __('Create') }}"
+                        aria-hidden="true"
+                    ></span>
+
+                    <x-system-announcements-banner :announcements="$systemAnnouncements ?? collect()" />
 
                     @hasSection('header')
-                        <div @class([
-                            'pb-fade-up mb-6',
-                            'pb-card p-4 sm:p-5' => ! $pbIslandLayout,
-                            'text-center sm:text-left' => $pbIslandLayout,
-                        ])>
+                        <div class="pb-fade-up mb-6 pb-card p-4 sm:p-5">
                             @yield('header')
                         </div>
                     @elseif(request()->routeIs('isp.*'))
@@ -434,21 +485,40 @@
 
                     @yield('content')
                 </div>
-        </main>
+            </main>
+            @include('partials.turbo-frame-flash')
+        </turbo-frame>
     </div>
+
+    @if ($pbSaasOnboardingOverlay)
+        @include('isp.saas-onboarding.partials.overlay')
+    @endif
 
     @stack('scripts')
 
+    <div id="pb-modal-overlay" class="pb-modal-overlay" hidden aria-hidden="true">
+        <div class="pb-modal-overlay__backdrop" data-pb-form-modal-close></div>
+        <div class="pb-modal-overlay__panel" role="dialog" aria-modal="true" aria-labelledby="pb-form-modal-title">
+            <div id="pb-form-modal" class="pb-form-modal-host"></div>
+        </div>
+    </div>
+    <div id="pb-toast-host" class="pb-toast-host" aria-live="polite"></div>
     @php
-        $pbFlashPayload = [
-            'success' => session('success'),
-            'error' => session('error'),
-            'warning' => session('warning'),
-            'info' => session('info'),
-            'flash_modal' => session('flash_modal'),
-            'validation_errors' => (isset($errors) && $errors->any()) ? $errors->all() : null,
+        $pbModalFormConfig = [
+            'blockedPathFragments' => ['/saas-onboarding', '/profile', '/payment-settings'],
+        ];
+        $pbDiscoveryConfig = [
+            'searchUrl' => route('feature-discovery.search'),
+            'categoryLabels' => config('feature_registry.category_labels', []),
+            'resultsLimit' => config('feature_registry.results_limit', 24),
+            'recentLimit' => config('feature_registry.recent_limit', 12),
+            'favoritesLimit' => config('feature_registry.favorites_limit', 12),
         ];
     @endphp
-    <script type="application/json" id="pb-flash-payload">@json($pbFlashPayload)</script>
+    <script>
+        window.__pbModalForm = @json($pbModalFormConfig);
+        window.__pbDiscovery = @json($pbDiscoveryConfig);
+    </script>
+
 </body>
 </html>

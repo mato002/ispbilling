@@ -241,6 +241,38 @@ class SaasOnboardingWizardService
             'settings' => $settings,
         ]);
 
+        $isp->loadMissing('pendingSaasPlan');
+        $deferVerification = $isp->pendingPlanDefersOnboardingPayment(
+            $request->boolean('saas_white_label_opt_in')
+        );
+
+        if ($method === 'mpesa' && $deferVerification) {
+            if (! $normalizedPhone) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Enter a valid Kenyan number (e.g. 0712345678 or digits after +254).',
+                        'errors' => ['saas_billing_phone' => ['Enter a valid Kenyan number (e.g. 0712345678 or digits after +254).']],
+                    ], 422);
+                }
+
+                return back()->withErrors(['saas_billing_phone' => 'Enter a valid Kenyan number (e.g. 0712345678 or 0111296234 after the +254 prefix).'])->withInput();
+            }
+
+            $isp->update(['saas_onboarding_step' => 3]);
+
+            $trialDays = (int) ($isp->pendingSaasPlan?->trial_days ?? 0);
+            $message = $trialDays > 0
+                ? "Billing profile saved. Your {$trialDays}-day free trial starts after setup — no payment required now."
+                : 'Billing profile saved. Continue to network setup.';
+
+            return $this->jsonOrRedirect($request, [
+                'success' => true,
+                'status' => 'paid',
+                'redirect' => SaasOnboardingContext::showUrl($isp),
+            ], redirect()->to(SaasOnboardingContext::showUrl($isp))->with('success', $message));
+        }
+
         if ($method === 'mpesa' && $isp->saas_payment_verified_at) {
             $isp->update(['saas_onboarding_step' => 3]);
 
@@ -402,7 +434,22 @@ class SaasOnboardingWizardService
 
     protected function stepRouterAndPlans(ISP $isp, Request $request): RedirectResponse
     {
-        if ($isp->saas_billing_method === 'mpesa' && ! $isp->saas_payment_verified_at) {
+        if ($request->input('wizard_action') === 'skip_router') {
+            $isp->update(['saas_onboarding_step' => 4]);
+
+            return redirect()->to(SaasOnboardingContext::showUrl($isp))->with(
+                'info',
+                'Router setup skipped. You can add your MikroTik from Network → Routers once the server can reach it.'
+            );
+        }
+
+        $isp->loadMissing('pendingSaasPlan');
+
+        if (
+            $isp->saas_billing_method === 'mpesa'
+            && ! $isp->saas_payment_verified_at
+            && ! $isp->pendingPlanDefersOnboardingPayment()
+        ) {
             return redirect()->to(SaasOnboardingContext::showUrl($isp))
                 ->with('error', 'Complete M-Pesa verification before connecting your router.');
         }
@@ -434,7 +481,10 @@ class SaasOnboardingWizardService
         $result = $mikrotik->testConnection();
 
         if (! $result['success']) {
-            return back()->withErrors(['router_ip_address' => $result['error'] ?? 'Router connection test failed.'])->withInput();
+            $error = $result['error'] ?? 'Router connection test failed.';
+            $error .= $this->routerReachabilityHint($data['router_ip_address'] ?? '');
+
+            return back()->withErrors(['router_ip_address' => $error])->withInput();
         }
 
         $profiles = $mikrotik->listHotspotUserProfiles();
@@ -564,8 +614,8 @@ class SaasOnboardingWizardService
 
     protected function stepPaybillAndFinish(ISP $isp, Request $request): RedirectResponse
     {
-        if (! Router::query()->where('isp_id', $isp->id)->exists()) {
-            return redirect()->to(SaasOnboardingContext::showUrl($isp))->with('error', 'Add a router before linking M-Pesa.');
+        if ($request->input('wizard_action') === 'skip_mpesa_and_finish') {
+            return $this->finalizeSaasOnboarding($isp);
         }
 
         $data = $request->only([
@@ -641,6 +691,17 @@ class SaasOnboardingWizardService
 
         $isp->update(['saas_c2b_registered_at' => now()]);
 
+        return $this->finalizeSaasOnboarding($isp->fresh());
+    }
+
+    protected function finalizeSaasOnboarding(ISP $isp): RedirectResponse
+    {
+        $plan = PlatformSaasPlan::query()->where('is_active', true)->find($isp->saas_pending_platform_plan_id);
+        if (! $plan) {
+            return redirect()->to(SaasOnboardingContext::showUrl($isp))
+                ->with('error', 'Your selected plan is no longer available. Please pick a plan again.');
+        }
+
         $this->platformBilling->completeOnboarding(
             $isp->fresh(),
             $plan,
@@ -649,5 +710,24 @@ class SaasOnboardingWizardService
         );
 
         return SaasOnboardingContext::completionRedirect($isp->fresh());
+    }
+
+    protected function routerReachabilityHint(string $ipOrHost): string
+    {
+        $host = trim($ipOrHost);
+
+        if ($host === '') {
+            return '';
+        }
+
+        if (preg_match('/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/', $host)) {
+            return ' This is a private LAN address — PrimeBilling must reach the router from where the app runs. Use a public IP or VPN, run PrimeBilling on the same network, or skip this step and add the router later from Network → Routers.';
+        }
+
+        if (in_array(strtolower($host), ['localhost', '127.0.0.1', '::1'], true)) {
+            return ' localhost only works when PrimeBilling runs on the same machine as the router API.';
+        }
+
+        return '';
     }
 }

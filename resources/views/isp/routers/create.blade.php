@@ -18,7 +18,11 @@
     <form method="POST" action="{{ route('isp.routers.store') }}" id="routerForm" class="space-y-6">
         @csrf
 
-        @include('isp.routers.partials.form', ['router' => null, 'owners' => $owners])
+        @include('isp.routers.partials.form', [
+            'router' => null,
+            'owners' => $owners,
+            'routerDefaults' => $routerDefaults ?? [],
+        ])
 
         <div class="pb-card p-4 sm:p-5">
             <div class="flex flex-wrap items-center justify-between gap-3">

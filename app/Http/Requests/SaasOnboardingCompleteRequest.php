@@ -65,6 +65,20 @@ class SaasOnboardingCompleteRequest extends FormRequest
             ];
         }
 
+        if ($this->routeIs('isp.saas-onboarding.*') && $this->input('wizard_action') === 'skip_router') {
+            return [
+                'wizard_action' => ['required', 'in:skip_router'],
+                'wizard_step' => ['required', 'integer', 'in:3'],
+            ];
+        }
+
+        if ($this->routeIs('isp.saas-onboarding.*') && $this->input('wizard_action') === 'skip_mpesa_and_finish') {
+            return [
+                'wizard_action' => ['required', 'in:skip_mpesa_and_finish'],
+                'wizard_step' => ['required', 'integer', 'in:4'],
+            ];
+        }
+
         if ($step === 2 && $this->input('wizard_action') === 'local_dev_skip_mpesa_verify') {
             return array_merge($base, [
                 'wizard_action' => ['required', 'in:local_dev_skip_mpesa_verify'],
@@ -124,6 +138,10 @@ class SaasOnboardingCompleteRequest extends FormRequest
             }
 
             if ($this->routeIs('isp.saas-onboarding.*') && $this->input('wizard_action') === 'go_back') {
+                return;
+            }
+
+            if ($this->routeIs('isp.saas-onboarding.*') && in_array($this->input('wizard_action'), ['skip_router', 'skip_mpesa_and_finish'], true)) {
                 return;
             }
 

@@ -73,6 +73,10 @@ class MpesaGatewayConfig
                 ?? config('services.mpesa.transaction_type', 'CustomerPayBillOnline'),
             'callback_url' => $pick(['callback_url', 'mpesa_callback_url']),
             'timeout_url' => $pick(['timeout_url', 'mpesa_timeout_url']),
+            'party_b' => $pick(['party_b', 'stk_party_b', 'PartyB']),
+            'b2c_initiator_name' => $pick(['b2c_initiator_name', 'initiator_name', 'InitiatorName']),
+            'b2c_security_credential' => $pick(['b2c_security_credential', 'security_credential', 'SecurityCredential']),
+            'b2c_shortcode' => $pick(['b2c_shortcode', 'b2c_short_code']),
         ];
 
         return array_filter(

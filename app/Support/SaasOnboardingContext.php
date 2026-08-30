@@ -49,6 +49,13 @@ class SaasOnboardingContext
 
     public static function showUrl(ISP $isp): string
     {
+        $user = auth()->user();
+
+        // Tenant admins continue setup on the live dashboard behind the locking overlay.
+        if ($user && $user->isIspAdmin() && ! $user->isSuperAdmin()) {
+            return route('isp.dashboard');
+        }
+
         return route('isp.saas-onboarding.show', ['isp' => $isp->id]);
     }
 

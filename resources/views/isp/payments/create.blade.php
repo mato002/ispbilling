@@ -158,10 +158,11 @@
                     if (data.payment_method === 'mpesa') {
                         statusMessage.textContent += ' Please check your phone to complete the payment.';
                     }
-                    
+
+                    const nextUrl = result.payment_url || result.redirect || '{{ route("isp.payments.index") }}';
                     setTimeout(() => {
-                        window.location.href = '{{ route("isp.payments.index") }}';
-                    }, 3000);
+                        window.location.href = nextUrl;
+                    }, result.payment_url ? 800 : 2000);
                 } else {
                     statusDiv.className = 'p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800';
                     statusMessage.textContent = result.message || 'Payment initiation failed.';

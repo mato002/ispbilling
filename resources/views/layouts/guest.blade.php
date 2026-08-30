@@ -4,10 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="description" content="PrimeBilling ISP OS — the operating system for modern ISPs. MikroTik automation, M-Pesa billing, hotspot & PPPoE management, and customer analytics.">
-    <meta name="theme-color" content="#0b1120">
 
-    <title>{{ $title ?? 'Sign in' }} · {{ config('app.name', 'PrimeBilling') }}</title>
+    <x-seo-meta
+        :title="($title ?? 'Sign in').' · '.config('app.name', 'PrimeBilling')"
+        :description="$metaDescription ?? config('seo.default_description')"
+        robots="noindex, nofollow"
+    />
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />
@@ -283,12 +285,87 @@
         @media (prefers-reduced-motion: reduce) {
             .pb-blob, .pb-float-1, .pb-float-2, .pb-float-3, .pb-pulse::after, .pb-fade-up { animation: none !important; }
         }
+
+        /* Compact auth — fit register & similar flows in one viewport */
+        .pb-auth-compact,
+        .pb-auth-compact .pb-mesh,
+        .pb-auth-compact .pb-auth-grid {
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+        html:has(.pb-auth-compact) {
+            overflow: hidden;
+        }
+        .pb-auth-compact .pb-brand-panel > .relative {
+            padding: 1.5rem 1.75rem;
+        }
+        .pb-auth-compact .pb-brand-panel h1 {
+            font-size: 1.875rem;
+            line-height: 1.1;
+        }
+        .pb-auth-compact .pb-brand-live-badge,
+        .pb-auth-compact .pb-brand-stat-grid {
+            display: none;
+        }
+        .pb-auth-compact .pb-brand-panel .pb-fade-up.delay-2 p {
+            margin-top: 0.75rem;
+            font-size: 0.8125rem;
+            line-height: 1.45;
+        }
+        .pb-auth-compact .pb-brand-panel .pb-fade-up.delay-3.mt-9 {
+            margin-top: 1rem;
+            gap: 0.625rem;
+        }
+        .pb-auth-compact .pb-stat-card {
+            padding: 0.625rem 0.75rem;
+            border-radius: 12px;
+        }
+        .pb-auth-compact .pb-stat-card .text-2xl {
+            font-size: 1.125rem;
+            line-height: 1.2;
+        }
+        .pb-auth-compact .pb-stat-card .mt-3,
+        .pb-auth-compact .pb-stat-card .mt-2.text-\[11px\] {
+            margin-top: 0.25rem;
+        }
+        .pb-auth-compact .pb-stat-card .h-8 {
+            height: 1.25rem;
+            margin-top: 0.375rem;
+        }
+        .pb-auth-compact .pb-brand-panel .pb-pill {
+            padding: 4px 8px;
+            font-size: 10px;
+        }
+        .pb-auth-compact .pb-brand-panel .mt-4.text-\[11px\] {
+            margin-top: 0.5rem;
+        }
+        .pb-auth-compact .pb-auth-main {
+            min-height: 0;
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+        .pb-auth-compact .pb-card {
+            padding: 1rem 1.125rem;
+        }
+        .pb-auth-compact .pb-input {
+            padding: 8px 12px;
+            font-size: 13px;
+            border-radius: 10px;
+        }
+        .pb-auth-compact .pb-cta {
+            padding: 10px 14px;
+            border-radius: 10px;
+        }
+        .pb-auth-compact .pb-auth-trust-strip {
+            display: none;
+        }
     </style>
 </head>
-<body class="pb-auth-shell antialiased text-slate-900 dark:text-slate-100" data-turbo="false">
+<body @class(['pb-auth-shell antialiased text-slate-900 dark:text-slate-100', 'pb-auth-compact' => $compact ?? false]) data-turbo="false">
 
     <div class="pb-mesh min-h-screen w-full">
-        <div class="grid min-h-screen w-full lg:grid-cols-[1.05fr_1fr] xl:grid-cols-[1.1fr_1fr]">
+        <div @class(['pb-auth-grid grid min-h-screen w-full lg:grid-cols-[1.05fr_1fr] xl:grid-cols-[1.1fr_1fr]', 'min-h-0' => $compact ?? false])>
 
             {{-- ============================================================
                  LEFT — BRANDING / TELECOM PANEL (desktop only)
@@ -318,7 +395,7 @@
 
                     {{-- Headline + supporting copy --}}
                     <div class="max-w-xl">
-                        <div class="pb-fade-up delay-1 mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
+                        <div class="pb-brand-live-badge pb-fade-up delay-1 mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
                             <span class="pb-pulse"></span>
                             <span>Live network operations · running on PrimeBilling</span>
                         </div>
@@ -335,21 +412,45 @@
                             and grow your subscriber base — all from one telecom-grade control plane built for African ISPs.
                         </p>
 
-                        {{-- Mock dashboard preview / floating stat cards --}}
-                        <div class="pb-fade-up delay-3 mt-9 grid grid-cols-2 gap-4 max-w-lg">
+                        {{-- Live dashboard preview / floating stat cards --}}
+                        @php
+                            $stats = $authPanelStats ?? [];
+                            $growthPct = $stats['subscriber_growth_pct'] ?? null;
+                            $growthPositive = $growthPct !== null && $growthPct >= 0;
+                            $routerTone = $stats['router_health_tone'] ?? 'muted';
+                            $routerLabelClass = match ($routerTone) {
+                                'ok' => 'text-emerald-300',
+                                'warn' => 'text-amber-300',
+                                'bad' => 'text-rose-300',
+                                default => 'text-slate-400',
+                            };
+                            $routerDotClass = match ($routerTone) {
+                                'ok' => 'bg-emerald-400',
+                                'warn' => 'bg-amber-400',
+                                'bad' => 'bg-rose-400',
+                                default => 'bg-slate-400',
+                            };
+                        @endphp
+                        <div class="pb-brand-stat-grid pb-fade-up delay-3 mt-9 grid grid-cols-2 gap-4 max-w-lg">
                             <div class="pb-stat-card pb-float-1 p-4">
                                 <div class="flex items-center justify-between">
                                     <span class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Active Subscribers</span>
-                                    <span class="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                        <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v8.69l3.22-3.22a.75.75 0 1 1 1.06 1.06l-4.5 4.5a.75.75 0 0 1-1.06 0l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.22 3.22V3.75A.75.75 0 0 1 10 3Z" transform="rotate(180 10 10)" clip-rule="evenodd"/></svg>
-                                        +6.2%
-                                    </span>
+                                    @if($growthPct !== null)
+                                        <span @class([
+                                            'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold',
+                                            'bg-emerald-500/15 text-emerald-300' => $growthPositive,
+                                            'bg-rose-500/15 text-rose-300' => ! $growthPositive,
+                                        ])>
+                                            <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v8.69l3.22-3.22a.75.75 0 1 1 1.06 1.06l-4.5 4.5a.75.75 0 0 1-1.06 0l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.22 3.22V3.75A.75.75 0 0 1 10 3Z" @unless($growthPositive) transform="rotate(180 10 10)" @endunless clip-rule="evenodd"/></svg>
+                                            {{ $growthPositive ? '+' : '' }}{{ number_format($growthPct, 1) }}%
+                                        </span>
+                                    @endif
                                 </div>
                                 <div class="mt-2 flex items-baseline gap-1">
-                                    <span class="text-2xl font-bold text-white">12,847</span>
+                                    <span class="text-2xl font-bold text-white">{{ number_format($stats['active_subscribers'] ?? 0) }}</span>
                                 </div>
                                 <div class="mt-3 flex items-end gap-1 h-8">
-                                    @foreach ([8, 12, 9, 14, 11, 17, 13, 20, 18, 22, 19, 26] as $h)
+                                    @foreach ($stats['subscriber_sparkline'] ?? array_fill(0, 12, 8) as $h)
                                         <span class="pb-bar" style="height: {{ $h }}px"></span>
                                     @endforeach
                                 </div>
@@ -358,12 +459,15 @@
                             <div class="pb-stat-card pb-float-2 p-4">
                                 <div class="flex items-center justify-between">
                                     <span class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Online Sessions</span>
-                                    <span class="pb-pulse"></span>
+                                    @if(($stats['online_sessions'] ?? 0) > 0)
+                                        <span class="pb-pulse"></span>
+                                    @endif
                                 </div>
-                                <div class="mt-2 text-2xl font-bold text-white">8,432</div>
+                                <div class="mt-2 text-2xl font-bold text-white">{{ number_format($stats['online_sessions'] ?? 0) }}</div>
                                 <div class="mt-2 text-[11px] text-slate-400">PPPoE · Hotspot · Static</div>
                                 <div class="mt-3 flex items-center gap-1 text-[11px] text-slate-300">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-cyan-400"></span> 3 routers reporting
+                                    <span class="h-1.5 w-1.5 rounded-full bg-cyan-400"></span>
+                                    {{ number_format($stats['routers_reporting'] ?? 0) }} {{ Str::plural('router', $stats['routers_reporting'] ?? 0) }} reporting
                                 </div>
                             </div>
 
@@ -372,18 +476,18 @@
                                     <span class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Revenue Today</span>
                                     <span class="rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-300">M-PESA</span>
                                 </div>
-                                <div class="mt-2 text-2xl font-bold text-white">KSh 487,250</div>
-                                <div class="mt-2 text-[11px] text-slate-400">142 transactions · auto-reconciled</div>
+                                <div class="mt-2 text-2xl font-bold text-white">{{ $stats['revenue_today_formatted'] ?? 'KSh 0' }}</div>
+                                <div class="mt-2 text-[11px] text-slate-400">{{ number_format($stats['transactions_today'] ?? 0) }} {{ Str::plural('transaction', $stats['transactions_today'] ?? 0) }} · auto-reconciled</div>
                             </div>
 
                             <div class="pb-stat-card pb-float-1 p-4" style="animation-delay: -3s">
                                 <div class="flex items-center justify-between">
                                     <span class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Router Status</span>
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-300">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Healthy
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold {{ $routerLabelClass }}">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $routerDotClass }}"></span> {{ $stats['router_health_label'] ?? 'No routers' }}
                                     </span>
                                 </div>
-                                <div class="mt-2 text-2xl font-bold text-white">4 / 4</div>
+                                <div class="mt-2 text-2xl font-bold text-white">{{ number_format($stats['routers_healthy'] ?? 0) }} / {{ number_format($stats['routers_total'] ?? 0) }}</div>
                                 <div class="mt-2 text-[11px] text-slate-400">MikroTik · API reachable</div>
                             </div>
                         </div>
@@ -406,7 +510,7 @@
             {{-- ============================================================
                  RIGHT — AUTH CARD
                  ============================================================ --}}
-            <main class="relative flex min-h-screen items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
+            <main @class(['pb-auth-main relative flex min-h-screen items-center justify-center px-4 py-10 sm:px-6 lg:px-10', 'min-h-0 py-3 lg:py-4' => $compact ?? false])>
 
                 <a href="{{ url('/') }}" class="absolute right-4 top-4 hidden items-center gap-1.5 rounded-full border border-slate-200/70 bg-white/70 px-3 py-1.5 text-xs font-medium text-slate-600 backdrop-blur transition hover:border-indigo-300 hover:text-indigo-700 sm:inline-flex dark:border-slate-700/70 dark:bg-slate-900/40 dark:text-slate-300 dark:hover:text-indigo-300">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -415,7 +519,7 @@
                     Back to website
                 </a>
 
-                <div class="w-full max-w-md">
+                <div @class(['w-full max-w-md', 'max-w-xl' => $compact ?? false])>
 
                     {{-- Mobile-only brand header (branding panel hidden on mobile) --}}
                     <div class="pb-fade-up mb-6 flex flex-col items-center text-center lg:hidden">
@@ -432,12 +536,12 @@
                     </div>
 
                     {{-- Auth card --}}
-                    <div class="pb-card pb-fade-up delay-1 rounded-2xl p-6 sm:p-8">
+                    <div @class(['pb-card pb-fade-up delay-1 rounded-2xl p-6 sm:p-8', '!p-4 sm:!p-5' => $compact ?? false])>
                         {{ $slot }}
                     </div>
 
                     {{-- Trust strip --}}
-                    <div class="pb-fade-up delay-2 mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    <div class="pb-auth-trust-strip pb-fade-up delay-2 mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         <span class="inline-flex items-center gap-1.5">
                             <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>

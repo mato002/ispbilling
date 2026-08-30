@@ -7,6 +7,7 @@ use App\Models\Router;
 use App\Services\MikroTikService;
 use App\Models\HotspotSession;
 use App\Models\CustomerUsageStat;
+use App\Services\DataUsageRecordingService;
 
 class SyncHotspotSessions extends Command
 {
@@ -61,6 +62,11 @@ class SyncHotspotSessions extends Command
 
         // Update usage stats for ended sessions
         $this->updateUsageStats();
+
+        $recorded = app(DataUsageRecordingService::class);
+        Router::where('is_active', true)
+            ->when($routerId, fn ($q) => $q->where('id', $routerId))
+            ->each(fn (Router $router) => $recorded->finalizeEndedHotspotSessions($router));
 
         $this->info("\nTotal sessions synced: {$totalSynced}");
         return 0;

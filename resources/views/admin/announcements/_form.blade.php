@@ -1,13 +1,18 @@
 @php
     $ann = $announcement ?? null;
     $action = $ann ? route('admin.announcements.update', $ann) : route('admin.announcements.store');
+    $bare = $bare ?? false;
 @endphp
 
+@if ($bare)
+    <div class="space-y-5">
+@else
 <form method="POST" action="{{ $action }}" class="space-y-5">
     @csrf
     @if ($ann)
         @method('PUT')
     @endif
+@endif
 
     <div>
         <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Title</label>
@@ -55,8 +60,12 @@
         <label for="is_active" class="text-sm text-slate-700 dark:text-slate-300">Active (visible to ISPs when in window)</label>
     </div>
 
+    @if (! $bare)
     <div class="flex flex-wrap gap-2">
         <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">{{ $ann ? 'Save changes' : 'Publish' }}</button>
         <a href="{{ route('admin.announcements.index') }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200">Cancel</a>
     </div>
-</form>
+    </form>
+    @else
+    </div>
+    @endif

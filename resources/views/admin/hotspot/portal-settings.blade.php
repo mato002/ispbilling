@@ -17,7 +17,9 @@
                     <form action="{{ route('admin.portal-settings.update') }}" method="POST" enctype="multipart/form-data">
                         @csrf
                         @method('PUT')
-                        
+                        @if (auth()->user()?->isSuperAdmin())
+                            <input type="hidden" name="isp_id" value="{{ $isp->id }}">
+                        @endif
                         <div class="row">
                             <div class="col-md-6">
                                 <h4>Basic Settings</h4>

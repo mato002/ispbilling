@@ -5,27 +5,80 @@
             <a href="{{ route('admin.promo-codes.create') }}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Create</a>
         </div>
     </x-slot>
+
     @if (session('success'))
         <div class="mb-4 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">{{ session('success') }}</div>
     @endif
-    <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg overflow-hidden">
-        <table class="min-w-full text-sm divide-y divide-gray-200 dark:divide-gray-700">
-            <thead class="bg-gray-50 dark:bg-gray-700/50 text-left text-gray-500 dark:text-gray-300"><tr><th class="px-4 py-2">Code</th><th class="px-4 py-2">Kind</th><th class="px-4 py-2">Active</th><th class="px-4 py-2">Redemptions</th><th class="px-4 py-2"></th></tr></thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-700 text-gray-800 dark:text-gray-100">
-                @foreach ($codes as $row)
+
+    <x-resource-index
+        :filter-action="route('admin.promo-codes.index')"
+        :filter-chips="$filterChips ?? []"
+        :export-formats="$exportFormats ?? []"
+        :paginator="$codes"
+        :empty="$codes->isEmpty()"
+        empty-title="No promo codes"
+        empty-message="Create a global promo code for marketing campaigns."
+        empty-cta-label="Create code"
+        :empty-cta-href="route('admin.promo-codes.create')"
+        :show-flash="false"
+    >
+        <x-slot:filters>
+            <x-listing-filters.search
+                placeholder="Code or title…"
+            />
+            <x-listing-filters.select
+                name="kind"
+                label="Kind"
+                placeholder="All kinds"
+                class="min-w-[160px]"
+                :options="[
+                    \App\Models\GlobalPromoCode::KIND_FIRST_MONTH_FREE => 'First month free',
+                    \App\Models\GlobalPromoCode::KIND_REFERRAL => 'Referral',
+                    \App\Models\GlobalPromoCode::KIND_PERCENT_OFF => 'Percent off',
+                ]"
+            />
+            <x-listing-filters.select
+                name="is_active"
+                label="Active"
+                placeholder="All"
+                :options="['1' => 'Yes', '0' => 'No']"
+            />
+            <x-listing-filters.per-page :default="20" />
+        </x-slot:filters>
+
+        <x-slot:table>
+            <x-listing-table>
+                <thead>
                     <tr>
-                        <td class="px-4 py-2 font-mono font-semibold">{{ $row->code }}</td>
-                        <td class="px-4 py-2">{{ $row->kind }}</td>
-                        <td class="px-4 py-2">{{ $row->is_active ? 'Yes' : 'No' }}</td>
-                        <td class="px-4 py-2">{{ $row->redemption_count }}@if($row->max_redemptions) / {{ $row->max_redemptions }} @endif</td>
-                        <td class="px-4 py-2 whitespace-nowrap">
-                            <a href="{{ route('admin.promo-codes.edit', $row) }}" class="text-indigo-600 dark:text-indigo-400">Edit</a>
-                            <form action="{{ route('admin.promo-codes.destroy', $row) }}" method="POST" class="inline" onsubmit="return confirm('Delete this code?');">@csrf @method('DELETE')<button type="submit" class="text-red-600 ml-2">Delete</button></form>
-                        </td>
+                        <th>Code</th>
+                        <th>Kind</th>
+                        <th>Active</th>
+                        <th>Redemptions</th>
+                        <x-table-actions.header />
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
-        <div class="p-4">{{ $codes->links() }}</div>
-    </div>
+                </thead>
+                <tbody>
+                    @foreach ($codes as $row)
+                        <tr>
+                            <td class="font-mono font-semibold">{{ $row->code }}</td>
+                            <td>{{ $row->kind }}</td>
+                            <td>{{ $row->is_active ? 'Yes' : 'No' }}</td>
+                            <td>{{ $row->redemption_count }}@if ($row->max_redemptions) / {{ $row->max_redemptions }} @endif</td>
+                            <td class="whitespace-nowrap text-right">
+                                <x-table-actions>
+                                    <x-table-actions.link :href="route('admin.promo-codes.edit', $row)" label="Edit" />
+                                    <x-table-actions.form
+                                        :action="route('admin.promo-codes.destroy', $row)"
+                                        method="DELETE"
+                                        label="Delete"
+                                        onsubmit="return confirm('Delete this code?');"
+                                    />
+                                </x-table-actions>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </x-listing-table>
+        </x-slot:table>
+    </x-resource-index>
 </x-admin-layout>

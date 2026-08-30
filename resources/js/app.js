@@ -1,7 +1,12 @@
 import './bootstrap';
 
 import '@hotwired/turbo';
+import './pb-modal-forms';
+import './pb-discovery';
 import Alpine from 'alpinejs';
+
+const PB_MAIN_FRAME = 'pb-main';
+const PB_FRAME_NAV_BLOCKLIST = ['/profile', '/logout', '/saas-onboarding'];
 
 function syncCsrfFromMeta() {
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -31,12 +36,152 @@ document.addEventListener('turbo:before-render', (event) => {
 document.addEventListener('turbo:load', () => {
     syncCsrfFromMeta();
     processPbFlashPayload();
+    syncPbShellFromFrame();
+    initClickableTableRows();
+});
+
+document.addEventListener('turbo:frame-render', (event) => {
+    if (event.target?.id !== PB_MAIN_FRAME) {
+        return;
+    }
+
+    syncCsrfFromMeta();
+    processPbFlashPayload();
+    syncPbShellFromFrame();
+
+    if (window.Alpine) {
+        window.Alpine.initTree(event.target);
+    }
+
+    initClickableTableRows();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
     syncCsrfFromMeta();
     processPbFlashPayload();
+    syncPbShellFromFrame();
+    initClickableTableRows();
 });
+
+function shouldIgnoreTableRowNav(target) {
+    return target.closest('a, button, input, select, textarea, form, label, [data-no-row-nav]');
+}
+
+function navigateTableRow(row) {
+    const href = row.dataset.rowHref;
+    if (! href) {
+        return;
+    }
+
+    if (row.dataset.rowTarget === '_blank') {
+        window.open(href, '_blank', 'noopener');
+        return;
+    }
+
+    if (window.Turbo) {
+        window.Turbo.visit(href, { frame: PB_MAIN_FRAME });
+        return;
+    }
+
+    window.location.assign(href);
+}
+
+function onClickableTableRowClick(event) {
+    if (shouldIgnoreTableRowNav(event.target)) {
+        return;
+    }
+
+    const row = event.target.closest('tr[data-row-href]');
+    if (! row) {
+        return;
+    }
+
+    navigateTableRow(row);
+}
+
+function onClickableTableRowKeydown(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+    }
+
+    if (shouldIgnoreTableRowNav(event.target)) {
+        return;
+    }
+
+    const row = event.target.closest('tr[data-row-href]');
+    if (! row) {
+        return;
+    }
+
+    event.preventDefault();
+    navigateTableRow(row);
+}
+
+function initClickableTableRows() {
+    document.querySelectorAll('.isp-table-wrap').forEach((wrapper) => {
+        if (wrapper.dataset.rowClickBound === '1') {
+            return;
+        }
+
+        wrapper.dataset.rowClickBound = '1';
+        wrapper.addEventListener('click', onClickableTableRowClick);
+        wrapper.addEventListener('keydown', onClickableTableRowKeydown);
+    });
+}
+
+function shouldTargetMainFrame(link) {
+    if (!(link instanceof HTMLAnchorElement) || ! link.href) {
+        return false;
+    }
+
+    if (link.hasAttribute('data-turbo-frame') || link.getAttribute('data-turbo') === 'false') {
+        return false;
+    }
+
+    if (link.getAttribute('target') === '_blank' || link.hasAttribute('download')) {
+        return false;
+    }
+
+    if (link.closest('#pb-form-modal')) {
+        return false;
+    }
+
+    if (! link.closest('.pb-sidebar, #pb-admin-topbar, turbo-frame#pb-main')) {
+        return false;
+    }
+
+    try {
+        const url = new URL(link.href, window.location.origin);
+
+        if (url.origin !== window.location.origin) {
+            return false;
+        }
+
+        const path = url.pathname.toLowerCase();
+
+        if (PB_FRAME_NAV_BLOCKLIST.some((fragment) => path.includes(fragment))) {
+            return false;
+        }
+
+        if (/\/(create|edit)(\/|$)/.test(path) && ! link.hasAttribute('data-no-modal')) {
+            return false;
+        }
+    } catch {
+        return false;
+    }
+
+    return true;
+}
+
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href]');
+
+    if (! shouldTargetMainFrame(link)) {
+        return;
+    }
+
+    link.dataset.turboFrame = PB_MAIN_FRAME;
+}, true);
 
 function escapeHtml(str) {
     return String(str)
@@ -188,16 +333,42 @@ function processPbFlashPayload() {
     }
 }
 
+Alpine.data('pbNavGroup', (startOpen = false) => ({
+    open: Boolean(startOpen),
+
+    toggle() {
+        this.open = ! this.open;
+    },
+
+    syncFromSidebar() {
+        const hasActiveChild = Boolean(this.$el.querySelector('.pb-subnav-item.is-active'));
+        const trigger = this.$el.querySelector('[data-nav-group-trigger]');
+
+        if (hasActiveChild) {
+            this.open = true;
+            trigger?.classList.add('is-active');
+        } else if (trigger && ! trigger.classList.contains('is-active')) {
+            this.open = false;
+        }
+    },
+
+    init() {
+        this.syncFromSidebar();
+        window.addEventListener('pb:sidebar-sync', () => this.syncFromSidebar());
+    },
+}));
+
 window.Alpine = Alpine;
 
 // Create a global store for sidebar state
-Alpine.store('sidebar', {
+const pbSidebarStore = {
     collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
     mobileOpen: false,
-    
+
     toggle() {
         this.collapsed = !this.collapsed;
         localStorage.setItem('sidebarCollapsed', this.collapsed);
+        document.documentElement.classList.toggle('pb-sidebar-collapsed', this.collapsed);
         window.dispatchEvent(new Event('sidebarToggle'));
     },
 
@@ -208,28 +379,32 @@ Alpine.store('sidebar', {
     closeMobile() {
         this.mobileOpen = false;
     },
-    
+
     init() {
-        // Listen for storage changes
+        document.documentElement.classList.toggle('pb-sidebar-collapsed', this.collapsed);
+
         window.addEventListener('storage', (e) => {
             if (e.key === 'sidebarCollapsed') {
                 this.collapsed = e.newValue === 'true';
+                document.documentElement.classList.toggle('pb-sidebar-collapsed', this.collapsed);
             }
         });
-        
-        // Listen for custom toggle events
+
         window.addEventListener('sidebarToggle', () => {
             this.collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            document.documentElement.classList.toggle('pb-sidebar-collapsed', this.collapsed);
         });
 
-        // Ensure mobile drawer closes on desktop resize
         window.addEventListener('resize', () => {
-            if (window.innerWidth >= 1024) {
+            if (window.innerWidth >= 768) {
                 this.mobileOpen = false;
             }
         });
-    }
-});
+    },
+};
+
+Alpine.store('sidebar', pbSidebarStore);
+pbSidebarStore.init();
 
 window.notificationDropdownComponent = function notificationDropdownComponent(el) {
     const getJson = (attr, fallback) => {
@@ -515,5 +690,187 @@ window.notificationDropdownComponent = function notificationDropdownComponent(el
         },
     };
 };
+
+function parsePbQuickCreatePayload(meta) {
+    if (! meta?.dataset?.quickCreate) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(meta.dataset.quickCreate);
+
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+function pbQuickCreateMarkup(items, createLabel = 'Create') {
+    if (! Array.isArray(items) || items.length === 0) {
+        return '';
+    }
+
+    const labelCreate = escapeHtml(createLabel);
+
+    const links = items.map((item) => {
+        const label = escapeHtml(item.label);
+        const href = escapeHtml(item.href);
+        const modalAttr = item.modal ? ' data-pb-modal-open' : ' data-turbo-frame="pb-main"';
+
+        return `<a href="${href}"${modalAttr} class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">${label}</a>`;
+    }).join('');
+
+    return `
+        <div class="relative inline-block text-left" x-data="{ open: false }" @click.outside="open = false">
+            <button
+                type="button"
+                @click="open = !open"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 px-3 py-2 text-xs font-semibold text-white shadow-[0_8px_18px_-10px_rgba(99,102,241,0.6)] hover:from-indigo-600 hover:to-cyan-600"
+                aria-haspopup="true"
+                :aria-expanded="open"
+            >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 5v14"/><path d="M5 12h14"/>
+                </svg>
+                <span class="hidden sm:inline">${labelCreate}</span>
+            </button>
+            <div
+                x-show="open"
+                x-cloak
+                x-transition
+                class="absolute right-0 z-50 mt-2 w-52 origin-top-right rounded-xl border border-slate-200 bg-white py-1 shadow-xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-900"
+            >
+                ${links}
+            </div>
+        </div>
+    `;
+}
+
+function syncPbQuickCreateFromFrame() {
+    const meta = document.getElementById('pb-route-meta');
+    const root = document.getElementById('pb-quick-create');
+
+    if (! root) {
+        return;
+    }
+
+    const items = parsePbQuickCreatePayload(meta);
+    const markup = pbQuickCreateMarkup(items, meta?.dataset?.i18nCreate ?? 'Create');
+
+    root.innerHTML = markup;
+
+    const quickActions = document.querySelector('[data-pb-quick-actions]');
+    if (quickActions) {
+        quickActions.classList.toggle('hidden', items.length > 0);
+    }
+
+    if (markup && window.Alpine) {
+        window.Alpine.initTree(root);
+    }
+}
+
+function pbNavActiveExtraClasses(link) {
+    return String(link?.dataset?.navActiveClass ?? '')
+        .split(/\s+/)
+        .filter(Boolean);
+}
+
+window.pbToggleGatewaySecret = function pbToggleGatewaySecret(inputId, trigger) {
+    const input = document.getElementById(inputId);
+    if (!input) {
+        return;
+    }
+
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    trigger?.setAttribute('aria-label', reveal ? 'Hide credential' : 'Show credential');
+};
+
+window.pbCopyFieldToClipboard = function pbCopyFieldToClipboard(inputId, trigger) {
+    const input = document.getElementById(inputId);
+    if (!input?.value) {
+        return;
+    }
+
+    const value = input.value;
+    const done = () => {
+        if (!trigger) {
+            return;
+        }
+
+        const original = trigger.dataset.copyLabel ?? trigger.textContent ?? 'Copy link';
+        trigger.dataset.copyLabel = original;
+        trigger.textContent = 'Copied';
+        window.setTimeout(() => {
+            trigger.textContent = original;
+        }, 1800);
+    };
+
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(value).then(done).catch(() => {
+            input.select();
+            document.execCommand('copy');
+            done();
+        });
+
+        return;
+    }
+
+    input.select();
+    document.execCommand('copy');
+    done();
+};
+
+function syncPbSidebarActiveState() {
+    const meta = document.getElementById('pb-route-meta');
+    const currentRoute = meta?.dataset?.route ?? '';
+    const sidebarLinks = document.querySelectorAll('.pb-sidebar [data-nav-active-routes]');
+
+    sidebarLinks.forEach((link) => {
+        link.classList.remove('is-active');
+        pbNavActiveExtraClasses(link).forEach((className) => link.classList.remove(className));
+    });
+
+    if (! currentRoute) {
+        window.dispatchEvent(new CustomEvent('pb:sidebar-sync'));
+
+        return;
+    }
+
+    sidebarLinks.forEach((link) => {
+        const patterns = String(link.dataset.navActiveRoutes ?? '')
+            .split(',')
+            .map((part) => part.trim())
+            .filter(Boolean);
+
+        const active = patterns.some((pattern) => pbRouteMatchesPattern(currentRoute, pattern));
+
+        if (active) {
+            link.classList.add('is-active');
+            pbNavActiveExtraClasses(link).forEach((className) => link.classList.add(className));
+        }
+    });
+
+    window.dispatchEvent(new CustomEvent('pb:sidebar-sync'));
+}
+
+function pbRouteMatchesPattern(route, pattern) {
+    if (! route || ! pattern) {
+        return false;
+    }
+
+    if (pattern.endsWith('.*')) {
+        const prefix = pattern.slice(0, -2);
+
+        return route === prefix || route.startsWith(`${prefix}.`);
+    }
+
+    return route === pattern;
+}
+
+function syncPbShellFromFrame() {
+    syncPbQuickCreateFromFrame();
+    syncPbSidebarActiveState();
+}
 
 Alpine.start();

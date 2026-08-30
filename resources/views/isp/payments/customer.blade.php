@@ -33,7 +33,7 @@
             </thead>
             <tbody>
                 @foreach($payments as $payment)
-                    <tr>
+                    <x-listing-table.row :href="route('isp.payments.show', $payment)">
                         <td class="font-mono text-sm font-medium">{{ $payment->payment_reference }}</td>
                         <td>
                             @if($payment->invoice)
@@ -55,9 +55,11 @@
                             @endif
                         </td>
                         <td class="text-right whitespace-nowrap">
-                            <a href="{{ route('isp.payments.show', $payment) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">View</a>
+                            <x-table-actions>
+                                <x-table-actions.link :href="route('isp.payments.show', $payment)" label="View" />
+                            </x-table-actions>
                         </td>
-                    </tr>
+                    </x-listing-table.row>
                 @endforeach
             </tbody>
         </x-data-table>

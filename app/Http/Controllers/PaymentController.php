@@ -391,6 +391,8 @@ class PaymentController extends Controller
                         \App\Models\ISP::query()->whereKey($fresh->isp_id)->update([
                             'saas_payment_verified_at' => now(),
                         ]);
+                    } elseif ($fresh && $fresh->isSmsWalletTopUp()) {
+                        app(\App\Services\PlatformSmsWalletService::class)->creditFromPayment($fresh);
                     } elseif ($fresh) {
                         $this->paymentCompletionService->processTenantPaymentSuccess($fresh);
                     }

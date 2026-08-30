@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Customer;
+use App\Models\InventoryItem;
 use App\Models\Plan;
 use App\Models\Router;
 use Exception;
@@ -676,6 +677,85 @@ class MikroTikService
     }
 
     /**
+     * Bind an installed inventory device to the customer's router profile (PPPoE caller-id or Hotspot MAC).
+     */
+    public function bindInventoryDeviceToCustomer(Customer $customer, InventoryItem $item): bool
+    {
+        if (! $this->connect()) {
+            $this->logAction('bind_inventory_device', $customer, 'failed', 'Failed to connect to router');
+
+            return false;
+        }
+
+        $dotId = $this->resolveMikrotikInternalUserId($customer)
+            ?? ($customer->mikrotik_user_id ? (string) $customer->mikrotik_user_id : null);
+
+        if (! $dotId && $customer->connection_type === 'pppoe') {
+            $subscription = $customer->activeSubscription();
+            if ($subscription?->plan && $this->createPppoeUser($customer, $subscription->plan)) {
+                $dotId = $this->resolveMikrotikInternalUserId($customer)
+                    ?? ($customer->fresh()->mikrotik_user_id ? (string) $customer->fresh()->mikrotik_user_id : null);
+            }
+        }
+
+        if (! $dotId) {
+            $this->logAction('bind_inventory_device', $customer, 'failed',
+                'No RouterOS user found to bind inventory device — username/MAC not applied on router.');
+
+            return false;
+        }
+
+        if ((string) ($customer->mikrotik_user_id ?? '') !== $dotId) {
+            $customer->forceFill(['mikrotik_user_id' => $dotId])->saveQuietly();
+        }
+
+        try {
+            $params = ['.id' => $dotId];
+            $description = "Bound inventory device {$item->serial_number} to {$customer->username}";
+
+            if ($item->mac_address) {
+                $mac = $this->normalizeMacAddress($item->mac_address);
+                if ($customer->connection_type === 'hotspot') {
+                    $params['mac-address'] = $mac;
+                    $description .= " (MAC {$mac})";
+                } else {
+                    $params['caller-id'] = $mac;
+                    $description .= " (caller-id {$mac})";
+                }
+            } else {
+                $description .= ' (username profile only)';
+            }
+
+            $path = $customer->connection_type === 'hotspot'
+                ? '/ip/hotspot/user/set'
+                : '/ppp/secret/set';
+
+            $this->connection->comm($path, $params);
+
+            $this->logAction('bind_inventory_device', $customer, 'success', $description, $params);
+
+            return true;
+        } catch (Exception $e) {
+            Log::error('bindInventoryDeviceToCustomer failed: '.$e->getMessage());
+            $this->logAction('bind_inventory_device', $customer, 'failed',
+                'Failed to bind device: '.$e->getMessage(), null, null, $e->getMessage());
+
+            return false;
+        }
+    }
+
+    protected function normalizeMacAddress(string $mac): string
+    {
+        $value = strtolower(preg_replace('/[^a-f0-9]/i', '', $mac) ?? '');
+
+        if (strlen($value) === 12) {
+            return implode(':', str_split($value, 2));
+        }
+
+        return $mac;
+    }
+
+    /**
      * Resolve RouterOS internal .id for this customer: match by username, then by comment "PB-ID:{customer.id}".
      */
     protected function resolveMikrotikInternalUserId(Customer $customer): ?string
@@ -813,20 +893,32 @@ class MikroTikService
      */
     public function removeUser(Customer $customer): bool
     {
-        if (! $this->connect() || ! $customer->mikrotik_user_id) {
+        if (! $customer->mikrotik_user_id) {
+            return true;
+        }
+
+        return $this->removeUserByDotId(
+            (string) $customer->mikrotik_user_id,
+            $customer->connection_type ?? 'pppoe',
+        );
+    }
+
+    public function removeUserByDotId(string $dotId, string $connectionType = 'pppoe'): bool
+    {
+        if (! $this->connect()) {
             return false;
         }
 
         try {
-            $path = $customer->connection_type === 'hotspot'
+            $path = $connectionType === 'hotspot'
                 ? '/ip/hotspot/user/remove'
                 : '/ppp/secret/remove';
 
-            $this->connection->comm($path, ['.id' => $customer->mikrotik_user_id]);
+            $this->connection->comm($path, ['.id' => $dotId]);
 
             return true;
         } catch (Exception $e) {
-            Log::error('Failed to remove user: '.$e->getMessage());
+            Log::error('Failed to remove user by id: '.$e->getMessage());
 
             return false;
         }
@@ -885,6 +977,65 @@ class MikroTikService
             return true;
         } catch (Exception $e) {
             Log::error('Failed to update user profile: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * Sync username / password / profile for an existing RouterOS user.
+     * Creates the user when it is missing and a plan + plain password are provided.
+     */
+    public function syncUserCredentials(Customer $customer, ?string $plainPassword = null, ?Plan $plan = null): bool
+    {
+        if (! $this->connect()) {
+            return false;
+        }
+
+        $dotId = $this->resolveMikrotikInternalUserId($customer)
+            ?? ($customer->mikrotik_user_id ? (string) $customer->mikrotik_user_id : null);
+
+        if (! $dotId) {
+            if ($plan && $plainPassword) {
+                return $customer->connection_type === 'hotspot'
+                    ? $this->createHotspotUser($customer, $plan, $plainPassword)
+                    : $this->createPppoeUser($customer, $plan, $plainPassword);
+            }
+
+            return false;
+        }
+
+        if ((string) ($customer->mikrotik_user_id ?? '') !== $dotId) {
+            $customer->forceFill(['mikrotik_user_id' => $dotId])->saveQuietly();
+        }
+
+        try {
+            $path = $customer->connection_type === 'hotspot'
+                ? '/ip/hotspot/user/set'
+                : '/ppp/secret/set';
+
+            $params = [
+                '.id' => $dotId,
+                'name' => (string) $customer->username,
+            ];
+
+            if ($plainPassword !== null && $plainPassword !== '') {
+                $params['password'] = $plainPassword;
+            }
+
+            if ($plan) {
+                $params['profile'] = $plan->speed_profile ?? 'default';
+            }
+
+            $this->connection->comm($path, $params);
+            $this->logAction('sync_user_credentials', $customer, 'success',
+                "Synced {$customer->connection_type} credentials for {$customer->username}");
+
+            return true;
+        } catch (Exception $e) {
+            Log::error('Failed to sync user credentials: '.$e->getMessage());
+            $this->logAction('sync_user_credentials', $customer, 'failed',
+                'Failed to sync credentials: '.$e->getMessage(), null, null, $e->getMessage());
 
             return false;
         }
@@ -970,6 +1121,16 @@ class MikroTikService
     }
 
     /**
+     * Alias used by ActiveUsersController realtime panel.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getHotspotActiveUsers(): array
+    {
+        return $this->getActiveHotspotSessions();
+    }
+
+    /**
      * Get active PPPoE sessions
      */
     public function getActivePppoeSessions(): array
@@ -987,6 +1148,303 @@ class MikroTikService
 
             return [];
         }
+    }
+
+    /**
+     * Alias used by ActiveUsersController realtime panel.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getPPPoEActiveUsers(): array
+    {
+        return $this->getActivePppoeSessions();
+    }
+
+    /**
+     * Disconnect a hotspot active session by RouterOS .id (or username fallback).
+     */
+    public function disconnectHotspotUser(string $userId): bool
+    {
+        if (! $this->connect()) {
+            return false;
+        }
+
+        try {
+            if (str_starts_with($userId, '*') || is_numeric($userId)) {
+                $this->connection->comm('/ip/hotspot/active/remove', ['.id' => $userId]);
+            } else {
+                $this->connection->comm('/ip/hotspot/active/remove', ['user' => $userId]);
+            }
+
+            return true;
+        } catch (Exception $e) {
+            Log::error('Failed to disconnect hotspot user: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * Disconnect a PPPoE active session by RouterOS .id (or name fallback).
+     */
+    public function disconnectPPPoEUser(string $userId): bool
+    {
+        if (! $this->connect()) {
+            return false;
+        }
+
+        try {
+            if (str_starts_with($userId, '*') || is_numeric($userId)) {
+                $this->connection->comm('/ppp/active/remove', ['.id' => $userId]);
+            } else {
+                $this->connection->comm('/ppp/active/remove', ['name' => $userId]);
+            }
+
+            return true;
+        } catch (Exception $e) {
+            Log::error('Failed to disconnect PPPoE user: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * Sync hotspot servers from RouterOS into the database for this router.
+     *
+     * @return array{success: bool, message?: string, total: int, created: int, updated: int}
+     */
+    public function syncHotspotServers(): array
+    {
+        if (! $this->connect()) {
+            return [
+                'success' => false,
+                'message' => 'Could not connect to router',
+                'total' => 0,
+                'created' => 0,
+                'updated' => 0,
+            ];
+        }
+
+        try {
+            $rows = $this->apiPrint('/ip/hotspot/print');
+            $created = 0;
+            $updated = 0;
+
+            foreach ($rows as $row) {
+                if (! is_array($row) || empty($row['name'])) {
+                    continue;
+                }
+
+                $mapped = $this->mapHotspotServerImportRow($row);
+                $existing = \App\Models\HotspotServer::query()
+                    ->where('router_id', $this->router->id)
+                    ->where('name', $mapped['name'])
+                    ->first();
+
+                \App\Models\HotspotServer::updateOrCreate(
+                    [
+                        'router_id' => $this->router->id,
+                        'name' => $mapped['name'],
+                    ],
+                    [
+                        'isp_id' => $this->router->isp_id,
+                        'interface' => $mapped['interface'] ?? 'unknown',
+                        'server_profile' => $mapped['server_profile'] ?? null,
+                        'default_profile' => $mapped['default_profile'] ?? null,
+                        'login_by' => $mapped['login_by'] ?? 'cookie',
+                        'use_radius' => $mapped['use_radius'] ?? false,
+                        'radius_accounting' => $mapped['radius_accounting'] ?? false,
+                        'mac_cookie_timeout' => $mapped['mac_cookie_timeout'] ?? 300,
+                        'idle_timeout' => $mapped['idle_timeout'] ?? 300,
+                        'keepalive_timeout' => $mapped['keepalive_timeout'] ?? 60,
+                        'status_autologout' => $mapped['status_autologout'] ?? false,
+                        'allowed_users' => $mapped['allowed_users'] ?? 0,
+                        'shared_users' => $mapped['shared_users'] ?? 0,
+                        'mac_format' => $mapped['mac_format'] ?? null,
+                        'mac_password' => $mapped['mac_password'] ?? null,
+                        'radius_mac_format' => $mapped['radius_mac_format'] ?? null,
+                        'radius_mac_password' => $mapped['radius_mac_password'] ?? null,
+                        'trial_uptime' => $mapped['trial_uptime'] ?? 0,
+                        'trial_uptime_reset' => $mapped['trial_uptime_reset'] ?? 0,
+                        'trial_profile' => $mapped['trial_profile'] ?? null,
+                        'trial_users' => $mapped['trial_users'] ?? 0,
+                        'is_active' => ! ($mapped['disabled'] ?? false),
+                    ]
+                );
+
+                if ($existing) {
+                    $updated++;
+                } else {
+                    $created++;
+                }
+            }
+
+            return [
+                'success' => true,
+                'total' => $created + $updated,
+                'created' => $created,
+                'updated' => $updated,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('syncHotspotServers failed: '.$e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'total' => 0,
+                'created' => 0,
+                'updated' => 0,
+            ];
+        }
+    }
+
+    /**
+     * Create an IP pool on RouterOS.
+     *
+     * @param  array{name: string, ranges: array<int, array{start?: string, end?: string, address?: string}>, comment?: string|null}  $config
+     */
+    public function createIpPool(array $config): bool
+    {
+        if (! $this->connect()) {
+            return false;
+        }
+
+        try {
+            $ranges = $this->formatIpPoolRangesForMikrotik($config['ranges'] ?? []);
+            if ($ranges === '') {
+                return false;
+            }
+
+            $params = [
+                'name' => (string) ($config['name'] ?? 'pool'),
+                'ranges' => $ranges,
+            ];
+
+            if (! empty($config['comment'])) {
+                $params['comment'] = (string) $config['comment'];
+            }
+
+            $this->connection->comm('/ip/pool/add', $params);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('createIpPool failed: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * Sync IP pools from RouterOS into the database for this router.
+     *
+     * @return array{success: bool, message?: string, total: int, created: int, updated: int}
+     */
+    public function syncIpPools(): array
+    {
+        if (! $this->connect()) {
+            return [
+                'success' => false,
+                'message' => 'Could not connect to router',
+                'total' => 0,
+                'created' => 0,
+                'updated' => 0,
+            ];
+        }
+
+        try {
+            $rows = $this->apiPrint('/ip/pool/print');
+            $created = 0;
+            $updated = 0;
+
+            foreach ($rows as $row) {
+                if (! is_array($row) || empty($row['name'])) {
+                    continue;
+                }
+
+                $ranges = $this->parseMikrotikIpPoolRanges((string) ($row['ranges'] ?? ''));
+                $existing = \App\Models\IpPool::query()
+                    ->where('router_id', $this->router->id)
+                    ->where('name', $row['name'])
+                    ->first();
+
+                \App\Models\IpPool::updateOrCreate(
+                    [
+                        'router_id' => $this->router->id,
+                        'name' => (string) $row['name'],
+                    ],
+                    [
+                        'isp_id' => $this->router->isp_id,
+                        'ranges' => $ranges,
+                        'comment' => $row['comment'] ?? null,
+                        'next_pool' => $row['next-pool'] ?? null,
+                        'is_active' => ! in_array((string) ($row['disabled'] ?? 'false'), ['true', 'yes', '1'], true),
+                        'disabled' => in_array((string) ($row['disabled'] ?? 'false'), ['true', 'yes', '1'], true),
+                    ]
+                );
+
+                if ($existing) {
+                    $updated++;
+                } else {
+                    $created++;
+                }
+            }
+
+            return [
+                'success' => true,
+                'total' => $created + $updated,
+                'created' => $created,
+                'updated' => $updated,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('syncIpPools failed: '.$e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'total' => 0,
+                'created' => 0,
+                'updated' => 0,
+            ];
+        }
+    }
+
+    /**
+     * @param  array<int, array{start?: string, end?: string, address?: string}>  $ranges
+     */
+    protected function formatIpPoolRangesForMikrotik(array $ranges): string
+    {
+        $parts = [];
+        foreach ($ranges as $range) {
+            if (! empty($range['start']) && ! empty($range['end'])) {
+                $parts[] = $range['start'].'-'.$range['end'];
+            } elseif (! empty($range['address'])) {
+                $parts[] = (string) $range['address'];
+            }
+        }
+
+        return implode(',', $parts);
+    }
+
+    /**
+     * @return array<int, array{start?: string, end?: string, address?: string}>
+     */
+    protected function parseMikrotikIpPoolRanges(string $ranges): array
+    {
+        $out = [];
+        foreach (array_filter(array_map('trim', explode(',', $ranges))) as $part) {
+            if (str_contains($part, '-')) {
+                [$start, $end] = array_map('trim', explode('-', $part, 2));
+                if (filter_var($start, FILTER_VALIDATE_IP) && filter_var($end, FILTER_VALIDATE_IP)) {
+                    $out[] = ['start' => $start, 'end' => $end];
+                    continue;
+                }
+            }
+            if (filter_var($part, FILTER_VALIDATE_IP) || str_contains($part, '/')) {
+                $out[] = ['address' => $part];
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -1352,6 +1810,258 @@ class MikroTikService
         }
         if (preg_match('/^([\d.]+)s$/i', $value, $m)) {
             return ((float) $m[1]) * 1000.0;
+        }
+
+        return (float) $value;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listSimpleQueues(): array
+    {
+        if (! $this->connect()) {
+            return [];
+        }
+
+        try {
+            $rows = $this->apiPrint('/queue/simple/print');
+            $out = [];
+
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $maxLimit = (string) ($row['max-limit'] ?? '');
+                $rate = (string) ($row['rate'] ?? '');
+                $rateRatio = $this->estimateQueueRateRatio($maxLimit, $rate);
+                $disabled = in_array((string) ($row['disabled'] ?? 'false'), ['true', 'yes', '1'], true);
+
+                $out[] = [
+                    'name' => (string) ($row['name'] ?? ''),
+                    'target' => (string) ($row['target'] ?? ''),
+                    'max_limit' => $maxLimit,
+                    'rate' => $rate,
+                    'rate_ratio' => $rateRatio,
+                    'disabled' => $disabled,
+                    'id' => $row['.id'] ?? null,
+                ];
+            }
+
+            return $out;
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik listSimpleQueues failed: '.$e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function listProvisionedUsernames(): array
+    {
+        if (! $this->connect()) {
+            return [];
+        }
+
+        $names = [];
+
+        try {
+            foreach ($this->apiPrint('/ip/hotspot/user/print') as $row) {
+                if (is_array($row) && ! empty($row['name'])) {
+                    $names[] = (string) $row['name'];
+                }
+            }
+
+            foreach ($this->apiPrint('/ppp/secret/print') as $row) {
+                if (is_array($row) && ! empty($row['name'])) {
+                    $names[] = (string) $row['name'];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik listProvisionedUsernames failed: '.$e->getMessage());
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    public function removeSimpleQueueByName(string $queueName): bool
+    {
+        if (! $this->connect()) {
+            return false;
+        }
+
+        try {
+            $rows = $this->connection->comm('/queue/simple/print', ['?name' => $queueName]);
+            foreach ($rows ?? [] as $row) {
+                if (! empty($row['.id'])) {
+                    $this->connection->comm('/queue/simple/remove', ['.id' => $row['.id']]);
+                }
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('removeSimpleQueueByName failed: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    public function createQueueSimple(array $config): bool
+    {
+        if (! $this->connect()) {
+            return false;
+        }
+
+        try {
+            $params = $this->normalizeQueueConfig($config, includeTarget: true);
+
+            // Upsert by name so redeploy is idempotent.
+            $existing = $this->connection->comm('/queue/simple/print', ['?name' => $params['name']]);
+            if (! empty($existing[0]['.id'])) {
+                $params['.id'] = $existing[0]['.id'];
+                $this->connection->comm('/queue/simple/set', $params);
+            } else {
+                $this->connection->comm('/queue/simple/add', $params);
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('createQueueSimple failed: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    public function createQueueTree(array $config): bool
+    {
+        if (! $this->connect()) {
+            return false;
+        }
+
+        try {
+            $params = $this->normalizeQueueConfig($config, includeTarget: false);
+            $params['parent'] = (string) ($config['parent'] ?? 'global');
+
+            $existing = $this->connection->comm('/queue/tree/print', ['?name' => $params['name']]);
+            if (! empty($existing[0]['.id'])) {
+                $params['.id'] = $existing[0]['.id'];
+                $this->connection->comm('/queue/tree/set', $params);
+            } else {
+                $this->connection->comm('/queue/tree/add', $params);
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('createQueueTree failed: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * Normalize bandwidth deploy config into RouterOS queue params.
+     * Accepts max-limit style keys or download_limit/upload_limit (Kbps).
+     *
+     * @param  array<string, mixed>  $config
+     * @return array<string, string>
+     */
+    protected function normalizeQueueConfig(array $config, bool $includeTarget = true): array
+    {
+        $name = (string) ($config['name'] ?? 'queue');
+        $maxLimit = (string) ($config['max-limit'] ?? $config['max_limit'] ?? '');
+
+        if ($maxLimit === '' && (isset($config['download_limit']) || isset($config['upload_limit']))) {
+            $dl = (int) ($config['download_limit'] ?? 0);
+            $ul = (int) ($config['upload_limit'] ?? 0);
+            $maxLimit = $dl.'k/'.$ul.'k';
+        }
+
+        if ($maxLimit === '') {
+            $maxLimit = '0/0';
+        }
+
+        $params = [
+            'name' => $name,
+            'max-limit' => $maxLimit,
+        ];
+
+        if ($includeTarget) {
+            $params['target'] = (string) ($config['target'] ?? '');
+        }
+
+        if (! empty($config['priority'])) {
+            $params['priority'] = (string) $config['priority'];
+        }
+
+        if (! empty($config['comment'])) {
+            $params['comment'] = (string) $config['comment'];
+        }
+
+        $burstLimit = $config['burst-limit'] ?? $config['burst_limit'] ?? null;
+        if ($burstLimit) {
+            $params['burst-limit'] = (string) $burstLimit;
+        }
+
+        $burstThreshold = $config['burst-threshold'] ?? $config['burst_threshold'] ?? null;
+        if ($burstThreshold) {
+            $params['burst-threshold'] = (string) $burstThreshold;
+        }
+
+        $burstTime = $config['burst-time'] ?? $config['burst_time'] ?? null;
+        if ($burstTime) {
+            $params['burst-time'] = (string) $burstTime;
+        }
+
+        return $params;
+    }
+
+    protected function estimateQueueRateRatio(string $maxLimit, string $rate): float
+    {
+        if ($maxLimit === '' || $rate === '' || $maxLimit === '0/0') {
+            return 0.0;
+        }
+
+        $maxParts = explode('/', $maxLimit);
+        $rateParts = explode('/', $rate);
+
+        $ratios = [];
+        foreach ([0, 1] as $idx) {
+            $maxBps = $this->parseRateToBps($maxParts[$idx] ?? '0');
+            $rateBps = $this->parseRateToBps($rateParts[$idx] ?? '0');
+            if ($maxBps > 0 && $rateBps > 0) {
+                $ratios[] = $rateBps / $maxBps;
+            }
+        }
+
+        return $ratios ? max($ratios) : 0.0;
+    }
+
+    protected function parseRateToBps(string $value): float
+    {
+        $value = trim(strtolower($value));
+        if ($value === '' || $value === '0') {
+            return 0.0;
+        }
+
+        if (preg_match('/^([\d.]+)([kmg]?)(bps)?$/', $value, $m)) {
+            $num = (float) $m[1];
+            $unit = $m[2] ?? '';
+
+            return match ($unit) {
+                'g' => $num * 1_000_000_000,
+                'm' => $num * 1_000_000,
+                'k' => $num * 1_000,
+                default => $num,
+            };
         }
 
         return (float) $value;

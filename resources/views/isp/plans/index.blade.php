@@ -6,100 +6,121 @@
     <x-isp-page-header
         title="Plans &amp; packages"
         module="Catalog"
-        description="Sellable packages with access type, speeds, and pricing for hotspot and PPPoE."
+        description="Hotspot, PPPoE, data bundles, unlimited, static IP, installation, and add-on packages."
         primaryLabel="Create plan"
         :primaryHref="route('isp.plans.create')"
     />
 @endsection
 
 @section('content')
-<div class="space-y-6">
-    @if(session('success'))
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    <x-filter-bar :action="route('isp.plans.index')">
-        <div class="min-w-[140px]">
-            <label class="isp-form-label">Access type</label>
-            <select name="access_type" class="isp-form-select">
-                <option value="">All</option>
-                <option value="pppoe" @selected(request('access_type') === 'pppoe')>PPPoE</option>
-                <option value="hotspot" @selected(request('access_type') === 'hotspot')>Hotspot</option>
-            </select>
-        </div>
-        <div class="min-w-[140px]">
-            <label class="isp-form-label">Status</label>
-            <select name="is_active" class="isp-form-select">
-                <option value="">All</option>
-                <option value="1" @selected(request('is_active') === '1')>Active</option>
-                <option value="0" @selected(request('is_active') === '0')>Inactive</option>
-            </select>
-        </div>
-        <div class="flex items-end gap-2">
-            <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
-            <a href="{{ route('isp.plans.index') }}" class="pb-btn">Reset</a>
-        </div>
-    </x-filter-bar>
-
-    @if($plans->isEmpty())
-        <div class="pb-card p-0">
-            <x-empty-state
-                title="No plans found"
-                message="Create a plan to attach subscriptions and vouchers."
-                ctaLabel="Create plan"
-                :ctaHref="route('isp.plans.create')"
+    @php use App\Support\PlanPackageTypes; @endphp
+    <x-resource-index
+        :filter-action="route('isp.plans.index')"
+        :filter-chips="$filterChips ?? []"
+        :export-formats="$exportFormats ?? []"
+        :paginator="$plans"
+        :empty="$plans->isEmpty()"
+        empty-title="No plans found"
+        empty-message="Create a plan to attach subscriptions and vouchers."
+        empty-cta-label="Create plan"
+        :empty-cta-href="route('isp.plans.create')"
+    >
+        <x-slot:filters>
+            <x-listing-filters.select
+                name="package_type"
+                label="Package type"
+                placeholder="All types"
+                class="min-w-[180px]"
+                :options="PlanPackageTypes::labels()"
             />
-        </div>
-    @else
-        <x-data-table>
-            <thead>
-                <tr>
-                    <th>Plan</th>
-                    <th>Type</th>
-                    <th>Price</th>
-                    <th>Duration</th>
-                    <th>Speed</th>
-                    <th>Subs</th>
-                    <th>Status</th>
-                    <th class="text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($plans as $plan)
+            <x-listing-filters.select
+                name="access_type"
+                label="Access type"
+                placeholder="All"
+                :options="[
+                    'pppoe' => 'PPPoE',
+                    'hotspot' => 'Hotspot',
+                ]"
+            />
+            <x-listing-filters.select
+                name="is_active"
+                label="Status"
+                placeholder="All"
+                :options="['1' => 'Active', '0' => 'Inactive']"
+            />
+            <x-listing-filters.per-page />
+        </x-slot:filters>
+
+        <x-slot:table>
+            <x-data-table>
+                <thead>
                     <tr>
-                        <td class="max-w-[220px]">
-                            <div class="font-semibold text-slate-900 dark:text-white">{{ $plan->name }}</div>
-                            <div class="truncate text-slate-500 dark:text-slate-400 text-sm">{{ $plan->description ?: '—' }}</div>
-                        </td>
-                        <td>
-                            @if($plan->access_type === 'hotspot')
-                                <span class="pb-pill pb-pill-cyan">Hotspot</span>
-                            @else
-                                <span class="pb-pill pb-pill-info">PPPoE</span>
-                            @endif
-                        </td>
-                        <td class="font-mono whitespace-nowrap">KES {{ number_format($plan->price, 2) }}</td>
-                        <td>{{ $plan->duration_days }} days</td>
-                        <td class="max-w-[160px] truncate text-sm">{{ $plan->speed_profile ?? ($plan->download_speed_kbps ? $plan->formatted_speed : '—') }}</td>
-                        <td class="tabular-nums">{{ $plan->subscriptions_count }}</td>
-                        <td>
-                            @if($plan->is_active)
-                                <x-status-badge status="active" />
-                            @else
-                                <x-status-badge status="inactive" />
-                            @endif
-                        </td>
-                        <td class="text-right whitespace-nowrap">
-                            <a href="{{ route('isp.plans.edit', $plan) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">Edit</a>
-                            <a href="{{ route('isp.plans.show', $plan) }}" class="ml-3 text-sm font-semibold text-slate-600 hover:text-slate-800 dark:text-slate-300">View</a>
-                        </td>
+                        <th>Plan</th>
+                        <th>Package type</th>
+                        <th>Access</th>
+                        <th>Price</th>
+                        <th>Duration</th>
+                        <th>Limits</th>
+                        <th>Subs</th>
+                        <th>Status</th>
+                        <x-table-actions.header />
                     </tr>
-                @endforeach
-            </tbody>
-        </x-data-table>
-        <div class="pb-card p-4">{{ $plans->withQueryString()->links() }}</div>
-    @endif
-</div>
+                </thead>
+                <tbody>
+                    @foreach ($plans as $plan)
+                        <x-listing-table.row :href="route('isp.plans.show', $plan)">
+                            <td class="max-w-[220px]">
+                                <div class="font-semibold text-slate-900 dark:text-white">{{ $plan->name }}</div>
+                                <div class="truncate text-sm text-slate-500 dark:text-slate-400">{{ $plan->description ?: '—' }}</div>
+                            </td>
+                            <td>
+                                <span class="pb-pill">{{ $plan->packageTypeLabel() }}</span>
+                            </td>
+                            <td>
+                                @if ($plan->access_type === 'hotspot')
+                                    <span class="pb-pill pb-pill-cyan">Hotspot</span>
+                                @elseif (in_array($plan->package_type, [PlanPackageTypes::INSTALLATION_SERVICE, PlanPackageTypes::ADDON_SERVICE, PlanPackageTypes::STATIC_IP_ADDON], true))
+                                    <span class="text-xs text-slate-500">—</span>
+                                @else
+                                    <span class="pb-pill pb-pill-info">PPPoE</span>
+                                @endif
+                            </td>
+                            <td class="font-mono whitespace-nowrap">KES {{ number_format($plan->price, 2) }}</td>
+                            <td>
+                                {{ $plan->duration_days }}d
+                                @if ($plan->is_one_time)
+                                    <span class="text-[10px] text-slate-400">· once</span>
+                                @endif
+                            </td>
+                            <td class="max-w-[160px] truncate text-sm text-slate-600 dark:text-slate-300">
+                                @if ($plan->data_limit_mb)
+                                    {{ number_format($plan->data_limit_mb) }} MB
+                                @elseif ($plan->isUnlimitedPackage())
+                                    {{ $plan->formatted_speed }}
+                                @elseif ($plan->service_type)
+                                    {{ str_replace('_', ' ', $plan->service_type) }}
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td class="tabular-nums">{{ $plan->subscriptions_count }}</td>
+                            <td>
+                                @if ($plan->is_active)
+                                    <x-status-badge status="active" />
+                                @else
+                                    <x-status-badge status="inactive" />
+                                @endif
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <x-table-actions>
+                                    <x-table-actions.link :href="route('isp.plans.show', $plan)" label="View" />
+                                    <x-table-actions.link :href="route('isp.plans.edit', $plan)" label="Edit" />
+                                </x-table-actions>
+                            </td>
+                        </x-listing-table.row>
+                    @endforeach
+                </tbody>
+            </x-data-table>
+        </x-slot:table>
+    </x-resource-index>
 @endsection

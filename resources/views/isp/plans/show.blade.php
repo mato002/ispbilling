@@ -38,6 +38,12 @@
                         <dd class="text-sm font-medium text-slate-900 dark:text-white">{{ $plan->duration_days }} days</dd>
                     </div>
                     <div>
+                        <dt class="isp-form-label mb-1">Package type</dt>
+                        <dd>
+                            <span class="pb-pill pb-pill-info">{{ $plan->packageTypeLabel() }}</span>
+                        </dd>
+                    </div>
+                    <div>
                         <dt class="isp-form-label mb-1">Access type</dt>
                         <dd>
                             <span class="pb-pill pb-pill-info">{{ strtoupper($plan->access_type) }}</span>
@@ -57,6 +63,35 @@
                         <div>
                             <dt class="isp-form-label mb-1">Data limit</dt>
                             <dd class="text-sm text-slate-800 dark:text-slate-100">{{ number_format($plan->data_limit_mb) }} MB</dd>
+                        </div>
+                    @endif
+                    @if($plan->service_type)
+                        <div>
+                            <dt class="isp-form-label mb-1">Service type</dt>
+                            <dd class="text-sm text-slate-800 dark:text-slate-100">{{ str_replace('_', ' ', $plan->service_type) }}</dd>
+                        </div>
+                    @endif
+                    @if($plan->requires_pppoe_plan)
+                        <div>
+                            <dt class="isp-form-label mb-1">Requires PPPoE</dt>
+                            <dd class="text-sm text-slate-800 dark:text-slate-100">Yes</dd>
+                        </div>
+                    @endif
+                    @if($plan->is_one_time)
+                        <div>
+                            <dt class="isp-form-label mb-1">Billing</dt>
+                            <dd class="text-sm text-slate-800 dark:text-slate-100">One-time</dd>
+                        </div>
+                    @elseif($plan->is_recurring)
+                        <div>
+                            <dt class="isp-form-label mb-1">Billing</dt>
+                            <dd class="text-sm text-slate-800 dark:text-slate-100">Recurring</dd>
+                        </div>
+                    @endif
+                    @if($plan->validity_period)
+                        <div>
+                            <dt class="isp-form-label mb-1">Validity</dt>
+                            <dd class="text-sm text-slate-800 dark:text-slate-100">{{ ucfirst(str_replace('_', ' ', $plan->validity_period)) }}</dd>
                         </div>
                     @endif
                     @if($plan->time_limit_hours)

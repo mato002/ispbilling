@@ -32,16 +32,7 @@
 
     <x-isp-settings-workspace
         meta-title="Subscriber custom fields"
-        meta-description="Define extra attributes collected on customer records. Rules are enforced on create and update; values live on each customer as structured data."
     >
-        <div class="pb-card isp-settings-panel p-4 sm:p-6">
-            <h3 class="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">How this works</h3>
-            <p class="isp-settings-hint mt-2 max-w-3xl">
-                Field keys must be stable identifiers (lowercase letters, numbers, underscores). After saving, open <strong>Customers → Create / Edit</strong> to capture values.
-                Optional Laravel-style rule strings are stored for documentation; built-in validation uses type, required, and select options.
-            </p>
-        </div>
-
         <form
             method="POST"
             action="{{ route('isp.settings.custom-fields.update') }}"

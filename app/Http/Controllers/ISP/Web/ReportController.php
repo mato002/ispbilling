@@ -7,11 +7,13 @@ use App\Models\Customer;
 use App\Models\ISP;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\Plan;
 use App\Models\Subscription;
+use App\Support\Export\CsvExporter;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
@@ -21,12 +23,23 @@ class ReportController extends Controller
         $isp = ISP::query()->with('saasPlan')->findOrFail($ispId);
         $startDate = $request->get('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->get('end_date', now()->toDateString());
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = Carbon::parse($endDate)->endOfDay();
+
+        $paymentsInRange = Payment::query()
+            ->where('isp_id', $ispId)
+            ->where('status', 'completed')
+            ->whereBetween(DB::raw('COALESCE(processed_at, created_at)'), [$start, $end]);
 
         $stats = [
             'total_customers' => Customer::where('isp_id', $ispId)->count(),
             'active_customers' => Customer::where('isp_id', $ispId)->where('status', 'active')->count(),
             'suspended_customers' => Customer::where('isp_id', $ispId)->where('status', 'suspended')->count(),
-            'total_revenue' => Payment::where('isp_id', $ispId)->where('status', 'completed')->sum('amount'),
+            'new_customers' => Customer::where('isp_id', $ispId)
+                ->whereBetween('created_at', [$start, $end])
+                ->count(),
+            'total_revenue' => (float) (clone $paymentsInRange)->sum('amount'),
+            'payment_count' => (clone $paymentsInRange)->count(),
             'pending_invoices' => Invoice::where('isp_id', $ispId)->where('status', 'pending')->count(),
             'overdue_invoices' => Invoice::where('isp_id', $ispId)->where('status', 'overdue')->count(),
             'active_subscriptions' => Subscription::whereHas('customer', function ($q) use ($ispId) {
@@ -34,87 +47,174 @@ class ReportController extends Controller
             })->where('status', 'active')->count(),
         ];
 
-        $saasAdvancedAnalytics = $isp->saasHasFeature('advanced_analytics');
+        $rangeDays = max(1, $start->diffInDays($end) + 1);
+        $previousStart = $start->copy()->subDays($rangeDays);
+        $previousEnd = $start->copy()->subSecond();
+        $previousRevenue = (float) Payment::query()
+            ->where('isp_id', $ispId)
+            ->where('status', 'completed')
+            ->whereBetween(DB::raw('COALESCE(processed_at, created_at)'), [$previousStart, $previousEnd])
+            ->sum('amount');
 
-        return view('isp.reports.index', compact('stats', 'startDate', 'endDate', 'saasAdvancedAnalytics'));
+        $stats['revenue_change_pct'] = $previousRevenue > 0
+            ? (($stats['total_revenue'] - $previousRevenue) / $previousRevenue) * 100
+            : ($stats['total_revenue'] > 0 ? 100.0 : 0.0);
+
+        $saasAdvancedAnalytics = $isp->saasHasFeature('advanced_analytics');
+        $focus = $request->get('focus');
+        $reportView = match ($focus) {
+            'revenue-per-plan' => 'revenue',
+            'monthly-collections' => 'collections',
+            'customer-growth' => 'growth',
+            default => 'overview',
+        };
+
+        $reportMeta = match ($reportView) {
+            'revenue' => [
+                'title' => 'Revenue per plan',
+                'description' => 'Completed payments attributed through invoice → subscription → plan.',
+            ],
+            'collections' => [
+                'title' => 'Monthly collections',
+                'description' => 'Completed payment totals by month.',
+            ],
+            'growth' => [
+                'title' => 'Customer growth',
+                'description' => 'New customers per month and current status mix.',
+            ],
+            default => [
+                'title' => 'Reports overview',
+                'description' => 'Revenue, collections, and customer growth for the selected period.',
+            ],
+        };
+
+        return view('isp.reports.index', compact(
+            'stats',
+            'startDate',
+            'endDate',
+            'saasAdvancedAnalytics',
+            'focus',
+            'reportView',
+            'reportMeta'
+        ));
     }
 
-    /**
-     * Decide whether the request is asking for raw JSON (AJAX/fetch).
-     */
     protected function wantsReportJson(Request $request): bool
     {
         return $request->ajax()
             || $request->wantsJson()
-            || $request->query('format') === 'json';
+            || $request->query('format') === 'json'
+            || str_contains((string) $request->header('Accept'), 'application/json');
+    }
+
+    protected function redirectToReportFocus(string $focus)
+    {
+        return redirect(route('isp.reports.index', ['focus' => $focus]).'#'.$focus);
     }
 
     /**
-     * Get Active vs Suspended Customers Report (Chart-ready)
+     * @return array<string, mixed>
      */
-    public function customerStatusReport(Request $request)
+    protected function buildCustomerGrowthPayload(int $ispId, int $months = 12): array
     {
-        if (! $this->wantsReportJson($request)) {
-            return redirect(route('isp.reports.index', ['focus' => 'customer-status']).'#customer-status');
-        }
+        $months = max(1, min(36, $months));
+        $start = now()->subMonths($months - 1)->startOfMonth();
+        $end = now()->endOfMonth();
 
-        $ispId = auth()->user()->isp_id;
-
-        $data = Customer::where('isp_id', $ispId)
+        $statusRows = Customer::where('isp_id', $ispId)
             ->select('status', DB::raw('COUNT(*) as count'))
             ->groupBy('status')
             ->get();
 
-        // Format for chart (labels and data arrays)
-        $labels = [];
-        $values = [];
-        $colors = [
-            'active' => '#10b981',      // green
-            'suspended' => '#ef4444',   // red
-            'expired' => '#f59e0b',     // yellow
-            'inactive' => '#6b7280',    // gray
+        $statusColors = [
+            'active' => '#10b981',
+            'suspended' => '#ef4444',
+            'expired' => '#f59e0b',
+            'inactive' => '#6b7280',
         ];
 
-        foreach ($data as $item) {
-            $labels[] = ucfirst($item->status);
-            $values[] = (int) $item->count;
+        $statusLabels = [];
+        $statusValues = [];
+        $statusBg = [];
+        foreach ($statusRows as $item) {
+            $statusLabels[] = ucfirst((string) $item->status);
+            $statusValues[] = (int) $item->count;
+            $statusBg[] = $statusColors[strtolower((string) $item->status)] ?? '#6b7280';
         }
 
-        return response()->json([
-            'labels' => $labels,
+        $growthRows = Customer::where('isp_id', $ispId)
+            ->whereBetween('created_at', [$start, $end])
+            ->select(
+                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+                DB::raw('COUNT(*) as count')
+            )
+            ->groupBy('month')
+            ->orderBy('month')
+            ->pluck('count', 'month');
+
+        $growthLabels = [];
+        $growthValues = [];
+        $cursor = $start->copy();
+        while ($cursor <= $end) {
+            $key = $cursor->format('Y-m');
+            $growthLabels[] = $cursor->format('M Y');
+            $growthValues[] = (int) ($growthRows[$key] ?? 0);
+            $cursor->addMonth();
+        }
+
+        $active = (int) ($statusRows->firstWhere('status', 'active')->count ?? 0);
+        $suspended = (int) ($statusRows->firstWhere('status', 'suspended')->count ?? 0);
+        $peakValue = $growthValues ? max($growthValues) : 0;
+        $peakIndex = $growthValues ? array_search($peakValue, $growthValues, true) : false;
+
+        return [
+            'labels' => $statusLabels,
             'datasets' => [
                 [
                     'label' => 'Customers',
-                    'data' => $values,
-                    'backgroundColor' => array_map(function ($status) use ($colors) {
-                        return $colors[strtolower($status)] ?? '#6b7280';
-                    }, $labels),
+                    'data' => $statusValues,
+                    'backgroundColor' => $statusBg,
                 ],
             ],
             'summary' => [
-                'total' => array_sum($values),
-                'active' => $data->where('status', 'active')->first()->count ?? 0,
-                'suspended' => $data->where('status', 'suspended')->first()->count ?? 0,
+                'total' => array_sum($statusValues),
+                'active' => $active,
+                'suspended' => $suspended,
+                'new_in_period' => array_sum($growthValues),
+                'peak_month' => $peakIndex === false ? null : $growthLabels[$peakIndex],
             ],
-        ]);
+            'growth' => [
+                'labels' => $growthLabels,
+                'datasets' => [
+                    [
+                        'label' => 'New customers',
+                        'data' => $growthValues,
+                        'borderColor' => '#6366f1',
+                        'backgroundColor' => 'rgba(99, 102, 241, 0.25)',
+                        'fill' => true,
+                        'tension' => 0.35,
+                    ],
+                ],
+                'details' => array_map(
+                    fn ($label, $count) => ['month' => $label, 'new_customers' => $count],
+                    $growthLabels,
+                    $growthValues
+                ),
+            ],
+        ];
     }
 
     /**
-     * Get Revenue per Plan Report (Chart-ready)
+     * @return array<string, mixed>
      */
-    public function revenuePerPlanReport(Request $request)
+    protected function buildRevenuePerPlanPayload(int $ispId, string $startDate, string $endDate): array
     {
-        if (! $this->wantsReportJson($request)) {
-            return redirect(route('isp.reports.index', ['focus' => 'revenue-per-plan']).'#revenue-per-plan');
-        }
-
-        $ispId = auth()->user()->isp_id;
-        $startDate = $request->get('start_date', now()->startOfYear()->toDateString());
-        $endDate = $request->get('end_date', now()->toDateString());
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = Carbon::parse($endDate)->endOfDay();
 
         $data = Payment::where('payments.isp_id', $ispId)
             ->where('payments.status', 'completed')
-            ->whereBetween('payments.created_at', [$startDate, $endDate])
+            ->whereBetween(DB::raw('COALESCE(payments.processed_at, payments.created_at)'), [$start, $end])
             ->join('invoices', 'payments.invoice_id', '=', 'invoices.id')
             ->join('subscriptions', 'invoices.subscription_id', '=', 'subscriptions.id')
             ->join('plans', 'subscriptions.plan_id', '=', 'plans.id')
@@ -126,36 +226,27 @@ class ReportController extends Controller
                 DB::raw('COUNT(DISTINCT subscriptions.customer_id) as customer_count')
             )
             ->groupBy('plans.id', 'plans.name')
-            ->orderBy('total_revenue', 'desc')
+            ->orderByDesc('total_revenue')
             ->get();
 
-        $labels = [];
-        $revenue = [];
-        $paymentCounts = [];
-        $customerCounts = [];
+        $labels = $data->pluck('name')->all();
+        $revenue = $data->map(fn ($item) => (float) $item->total_revenue)->all();
 
-        foreach ($data as $item) {
-            $labels[] = $item->name;
-            $revenue[] = (float) $item->total_revenue;
-            $paymentCounts[] = (int) $item->payment_count;
-            $customerCounts[] = (int) $item->customer_count;
-        }
-
-        return response()->json([
+        return [
             'labels' => $labels,
             'datasets' => [
                 [
                     'label' => 'Revenue (KES)',
                     'data' => $revenue,
-                    'backgroundColor' => '#3b82f6', // blue
+                    'backgroundColor' => '#3b82f6',
                     'borderColor' => '#2563eb',
                     'borderWidth' => 1,
                 ],
             ],
             'summary' => [
                 'total_revenue' => array_sum($revenue),
-                'total_payments' => array_sum($paymentCounts),
-                'total_customers' => array_sum($customerCounts),
+                'total_payments' => (int) $data->sum('payment_count'),
+                'total_customers' => (int) $data->sum('customer_count'),
             ],
             'details' => $data->map(function ($item) {
                 return [
@@ -165,80 +256,62 @@ class ReportController extends Controller
                     'payment_count' => (int) $item->payment_count,
                     'customer_count' => (int) $item->customer_count,
                 ];
-            }),
-        ]);
+            })->values()->all(),
+        ];
     }
 
     /**
-     * Get Monthly Collections Report (Chart-ready)
+     * @return array<string, mixed>
      */
-    public function monthlyCollectionsReport(Request $request)
+    protected function buildMonthlyCollectionsPayload(int $ispId, int $months = 12, ?string $startDate = null, ?string $endDate = null): array
     {
-        if (! $this->wantsReportJson($request)) {
-            return redirect(route('isp.reports.index', ['focus' => 'monthly-collections']).'#monthly-collections');
-        }
-
-        $ispId = auth()->user()->isp_id;
-        $months = $request->get('months', 12); // Default to last 12 months
-        $startDate = $request->get('start_date', now()->subMonths($months - 1)->startOfMonth()->toDateString());
-        $endDate = $request->get('end_date', now()->endOfMonth()->toDateString());
+        $months = max(1, min(36, $months));
+        $start = Carbon::parse($startDate ?: now()->subMonths($months - 1)->startOfMonth()->toDateString())->startOfMonth();
+        $end = Carbon::parse($endDate ?: now()->endOfMonth()->toDateString())->endOfMonth();
 
         $data = Payment::where('isp_id', $ispId)
             ->where('status', 'completed')
-            ->whereBetween('created_at', [$startDate, $endDate])
+            ->whereBetween(DB::raw('COALESCE(processed_at, created_at)'), [$start, $end])
             ->select(
-                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+                DB::raw('DATE_FORMAT(COALESCE(processed_at, created_at), "%Y-%m") as month'),
                 DB::raw('SUM(amount) as total_revenue'),
                 DB::raw('COUNT(*) as payment_count'),
                 DB::raw('COUNT(DISTINCT customer_id) as customer_count')
             )
             ->groupBy('month')
             ->orderBy('month')
-            ->get();
+            ->get()
+            ->keyBy('month');
 
-        // Fill in missing months with zero values
         $labels = [];
         $revenue = [];
         $paymentCounts = [];
         $customerCounts = [];
 
-        $start = Carbon::parse($startDate)->startOfMonth();
-        $end = Carbon::parse($endDate)->endOfMonth();
-
-        $monthMap = [];
-        foreach ($data as $item) {
-            $monthMap[$item->month] = $item;
-        }
-
         $current = $start->copy();
         while ($current <= $end) {
             $monthKey = $current->format('Y-m');
             $labels[] = $current->format('M Y');
-
-            if (isset($monthMap[$monthKey])) {
-                $item = $monthMap[$monthKey];
-                $revenue[] = (float) $item->total_revenue;
-                $paymentCounts[] = (int) $item->payment_count;
-                $customerCounts[] = (int) $item->customer_count;
-            } else {
-                $revenue[] = 0;
-                $paymentCounts[] = 0;
-                $customerCounts[] = 0;
-            }
-
+            $item = $data->get($monthKey);
+            $revenue[] = (float) ($item->total_revenue ?? 0);
+            $paymentCounts[] = (int) ($item->payment_count ?? 0);
+            $customerCounts[] = (int) ($item->customer_count ?? 0);
             $current->addMonth();
         }
 
-        return response()->json([
+        $peakIndex = $revenue ? array_search(max($revenue), $revenue, true) : false;
+
+        return [
             'labels' => $labels,
             'datasets' => [
                 [
-                    'label' => 'Revenue (KES)',
+                    'label' => 'Collections (KES)',
                     'data' => $revenue,
-                    'backgroundColor' => 'rgba(59, 130, 246, 0.5)',
-                    'borderColor' => '#3b82f6',
+                    'backgroundColor' => 'rgba(16, 185, 129, 0.35)',
+                    'borderColor' => '#10b981',
                     'borderWidth' => 2,
-                    'tension' => 0.4,
+                    'tension' => 0.35,
+                    'fill' => true,
                 ],
             ],
             'summary' => [
@@ -246,8 +319,8 @@ class ReportController extends Controller
                 'average_monthly' => count($revenue) > 0 ? array_sum($revenue) / count($revenue) : 0,
                 'total_payments' => array_sum($paymentCounts),
                 'total_customers' => array_sum($customerCounts),
-                'peak_month' => $labels[array_search(max($revenue), $revenue)] ?? null,
-                'peak_revenue' => max($revenue),
+                'peak_month' => $peakIndex === false ? null : $labels[$peakIndex],
+                'peak_revenue' => $revenue ? max($revenue) : 0,
             ],
             'details' => array_map(function ($label, $rev, $payments, $customers) {
                 return [
@@ -257,6 +330,121 @@ class ReportController extends Controller
                     'customer_count' => $customers,
                 ];
             }, $labels, $revenue, $paymentCounts, $customerCounts),
-        ]);
+        ];
+    }
+
+    public function customerStatusReport(Request $request): JsonResponse|\Illuminate\Http\RedirectResponse
+    {
+        if (! $this->wantsReportJson($request)) {
+            return $this->redirectToReportFocus('customer-growth');
+        }
+
+        return response()->json(
+            $this->buildCustomerGrowthPayload(
+                (int) auth()->user()->isp_id,
+                (int) $request->get('months', 12)
+            )
+        );
+    }
+
+    public function revenuePerPlanReport(Request $request): JsonResponse|\Illuminate\Http\RedirectResponse
+    {
+        if (! $this->wantsReportJson($request)) {
+            return $this->redirectToReportFocus('revenue-per-plan');
+        }
+
+        return response()->json(
+            $this->buildRevenuePerPlanPayload(
+                (int) auth()->user()->isp_id,
+                $request->get('start_date', now()->startOfYear()->toDateString()),
+                $request->get('end_date', now()->toDateString())
+            )
+        );
+    }
+
+    public function monthlyCollectionsReport(Request $request): JsonResponse|\Illuminate\Http\RedirectResponse
+    {
+        if (! $this->wantsReportJson($request)) {
+            return $this->redirectToReportFocus('monthly-collections');
+        }
+
+        return response()->json(
+            $this->buildMonthlyCollectionsPayload(
+                (int) auth()->user()->isp_id,
+                (int) $request->get('months', 12),
+                $request->get('start_date'),
+                $request->get('end_date')
+            )
+        );
+    }
+
+    public function exportRevenueCsv(Request $request): StreamedResponse
+    {
+        $payload = $this->buildRevenuePerPlanPayload(
+            (int) auth()->user()->isp_id,
+            $request->get('start_date', now()->startOfYear()->toDateString()),
+            $request->get('end_date', now()->toDateString())
+        );
+
+        return CsvExporter::download(
+            'revenue-per-plan-'.now()->format('Ymd-His').'.csv',
+            ['Plan', 'Revenue', 'Payments', 'Customers'],
+            function ($out) use ($payload) {
+                foreach ($payload['details'] as $row) {
+                    fputcsv($out, [
+                        $row['plan_name'],
+                        $row['revenue'],
+                        $row['payment_count'],
+                        $row['customer_count'],
+                    ]);
+                }
+            }
+        );
+    }
+
+    public function exportCollectionsCsv(Request $request): StreamedResponse
+    {
+        $payload = $this->buildMonthlyCollectionsPayload(
+            (int) auth()->user()->isp_id,
+            (int) $request->get('months', 12),
+            $request->get('start_date'),
+            $request->get('end_date')
+        );
+
+        return CsvExporter::download(
+            'monthly-collections-'.now()->format('Ymd-His').'.csv',
+            ['Month', 'Revenue', 'Payments', 'Customers'],
+            function ($out) use ($payload) {
+                foreach ($payload['details'] as $row) {
+                    fputcsv($out, [
+                        $row['month'],
+                        $row['revenue'],
+                        $row['payment_count'],
+                        $row['customer_count'],
+                    ]);
+                }
+            }
+        );
+    }
+
+    public function exportGrowthCsv(Request $request): StreamedResponse
+    {
+        $payload = $this->buildCustomerGrowthPayload(
+            (int) auth()->user()->isp_id,
+            (int) $request->get('months', 12)
+        );
+
+        return CsvExporter::download(
+            'customer-growth-'.now()->format('Ymd-His').'.csv',
+            ['Month', 'New customers'],
+            function ($out) use ($payload) {
+                foreach ($payload['growth']['details'] as $row) {
+                    fputcsv($out, [
+                        $row['month'],
+                        $row['new_customers'],
+                    ]);
+                }
+            }
+        );
     }
 }

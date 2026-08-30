@@ -4,118 +4,126 @@
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('All ISPs') }}
             </h2>
-            <a href="{{ route('admin.isps.create') }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <x-form-modal-link :href="route('admin.isps.create')" class="px-4 py-2">
                 Add ISP
-            </a>
+            </x-form-modal-link>
         </div>
     </x-slot>
 
-    <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-        <div class="p-6">
-            <form method="GET" action="{{ route('admin.isps.index') }}" class="flex gap-4">
-                <div class="flex-1">
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by name, company, or email..." 
-                           class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                </div>
-                <div>
-                    <select name="is_active" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <option value="">All Status</option>
-                        <option value="1" {{ request('is_active') == '1' ? 'selected' : '' }}>Active</option>
-                        <option value="0" {{ request('is_active') == '0' ? 'selected' : '' }}>Inactive</option>
-                    </select>
-                </div>
-                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                    Filter
-                </button>
-                @if(request()->has('search') || request()->has('is_active'))
-                    <a href="{{ route('admin.isps.index') }}" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
-                        Clear
-                    </a>
-                @endif
-            </form>
-        </div>
-    </div>
+    <x-resource-index
+        :filter-action="route('admin.isps.index')"
+        :filter-chips="$filterChips ?? []"
+        :export-formats="$exportFormats ?? []"
+        :paginator="$isps"
+        :empty="$isps->isEmpty()"
+        empty-title="No ISPs found"
+        empty-message="Create an ISP or adjust your search filters."
+        :empty-cta-href="route('admin.isps.create')"
+        empty-cta-label="Add ISP"
+    >
+        <x-slot:filters>
+            <x-listing-filters.search
+                placeholder="Name, company, email, phone…"
+                data-pb-auto-search
+            />
+            <x-listing-filters.select
+                name="is_active"
+                label="Status"
+                placeholder="All status"
+                :options="['1' => 'Active', '0' => 'Inactive']"
+            />
+            <x-listing-filters.select
+                name="saas_status"
+                label="SaaS billing"
+                placeholder="All SaaS states"
+                class="min-w-[150px]"
+                :options="[
+                    'none' => 'None',
+                    'active' => 'Active',
+                    'trialing' => 'Trialing',
+                    'past_due' => 'Past due',
+                    'cancelled' => 'Cancelled',
+                    'suspended' => 'Suspended',
+                ]"
+            />
+            <x-listing-filters.select
+                name="onboarding"
+                label="Onboarding"
+                placeholder="All onboarding"
+                class="min-w-[150px]"
+                :options="[
+                    'complete' => 'Complete',
+                    'pending' => 'Pending',
+                ]"
+            />
+            <x-listing-filters.date name="created_from" label="Created from" />
+            <x-listing-filters.date name="created_to" label="Created to" />
+            <x-listing-filters.select
+                name="sort"
+                label="Sort by"
+                class="min-w-[150px]"
+                :value="request('sort', 'latest')"
+                :options="[
+                    'latest' => 'Newest first',
+                    'oldest' => 'Oldest first',
+                    'name_az' => 'Name A–Z',
+                    'name_za' => 'Name Z–A',
+                    'customers_desc' => 'Most customers',
+                ]"
+            />
+            <x-listing-filters.per-page />
+        </x-slot:filters>
 
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-        <div class="p-6">
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ISP Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Company</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Customers</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Routers</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Plans</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Created</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        @forelse($isps as $isp)
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    {{ $isp->name }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $isp->company_name }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $isp->email }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $isp->customers_count }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $isp->routers_count }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $isp->plans_count }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    @if($isp->is_active)
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                                            Active
-                                        </span>
-                                    @else
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
-                                            Inactive
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $isp->created_at->format('M d, Y') }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <div class="flex space-x-2">
-                                        <a href="{{ route('admin.isps.show', $isp->id) }}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400">View</a>
-                                        <a href="{{ route('admin.isps.edit', $isp->id) }}" class="text-green-600 hover:text-green-900 dark:text-green-400">Edit</a>
-                                        <form method="POST" action="{{ route('admin.isps.destroy', $isp->id) }}" class="inline" onsubmit="confirmFormSubmit(event, {title: 'Delete ISP', text: 'Are you sure you want to delete {{ $isp->name }}? This action cannot be undone.', icon: 'warning', confirmButtonText: 'Yes, delete', confirmButtonColor: '#ef4444'}); return false;">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="text-red-600 hover:text-red-900 dark:text-red-400">Delete</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                                    No ISPs found
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mt-4">
-                {{ $isps->links() }}
-            </div>
-        </div>
-    </div>
+        <x-slot:table>
+            <x-listing-table>
+                <thead>
+                    <tr>
+                        <th>ISP Name</th>
+                        <th>Company</th>
+                        <th>Email</th>
+                        <th>Customers</th>
+                        <th>Routers</th>
+                        <th>Plans</th>
+                        <th>Status</th>
+                        <th>SaaS</th>
+                        <th>Created</th>
+                        <x-table-actions.header />
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($isps as $isp)
+                        <x-listing-table.row :href="route('admin.isps.show', $isp->id)">
+                            <td class="font-medium text-gray-900 dark:text-gray-100">{{ $isp->name }}</td>
+                            <td class="text-gray-500 dark:text-gray-400">{{ $isp->company_name }}</td>
+                            <td class="text-gray-500 dark:text-gray-400">{{ $isp->email }}</td>
+                            <td class="text-gray-500 dark:text-gray-400">{{ number_format($isp->customers_count) }}</td>
+                            <td class="text-gray-500 dark:text-gray-400">{{ number_format($isp->routers_count) }}</td>
+                            <td class="text-gray-500 dark:text-gray-400">{{ number_format($isp->plans_count) }}</td>
+                            <td>
+                                @if ($isp->is_active)
+                                    <span class="inline-flex rounded-full bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800 dark:bg-green-800 dark:text-green-100">Active</span>
+                                @else
+                                    <span class="inline-flex rounded-full bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800 dark:bg-red-800 dark:text-red-100">Inactive</span>
+                                @endif
+                            </td>
+                            <td class="text-gray-500 dark:text-gray-400">{{ str_replace('_', ' ', ucfirst($isp->saas_subscription_status ?? 'none')) }}</td>
+                            <td class="text-gray-500 dark:text-gray-400">{{ $isp->created_at->format('M d, Y') }}</td>
+                            <td class="text-right">
+                                <x-table-actions>
+                                    <x-table-actions.link :href="route('admin.isps.show', $isp->id)" label="View" />
+                                    <x-table-actions.link :href="route('admin.isps.edit', $isp->id)" label="Edit" />
+                                    <x-table-actions.form
+                                        :action="route('admin.isps.destroy', $isp->id)"
+                                        method="DELETE"
+                                        label="Delete"
+                                        onsubmit="confirmFormSubmit(event, {title: 'Delete ISP', text: 'Are you sure you want to delete {{ $isp->name }}? This action cannot be undone.', icon: 'warning', confirmButtonText: 'Yes, delete', confirmButtonColor: '#ef4444'}); return false;"
+                                    />
+                                </x-table-actions>
+                            </td>
+                        </x-listing-table.row>
+                    @endforeach
+                </tbody>
+            </x-listing-table>
+        </x-slot:table>
+    </x-resource-index>
 </x-admin-layout>
-

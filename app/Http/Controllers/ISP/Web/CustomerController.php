@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\ISP\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\HandlesModalFormResponses;
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Models\Customer;
 use App\Models\HotspotSession;
 use App\Models\ISP;
@@ -10,10 +12,15 @@ use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Router;
 use App\Models\Subscription;
+use App\Services\ActivityLogService;
 use App\Services\MikroTikService;
 use App\Services\NotificationService;
+use App\Services\DataUsageMonitoringService;
+use App\Support\FormSettingsService;
 use App\Support\IspCustomFields;
+use App\Support\PlanPackageTypes;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -23,8 +30,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerController extends Controller
 {
+    use HandlesModalFormResponses;
+    use InteractsWithListings;
+
     public function __construct(
         private readonly NotificationService $notificationService,
+        private readonly FormSettingsService $formSettings,
+        private readonly DataUsageMonitoringService $dataUsageMonitoring,
     ) {}
 
     public function index(Request $request)
@@ -34,7 +46,7 @@ class CustomerController extends Controller
         $stats = $this->subscriberStats($ispId);
 
         $routers = Router::where('isp_id', $ispId)->where('is_active', true)->orderBy('name')->get();
-        $plans = Plan::where('isp_id', $ispId)->where('is_active', true)->orderBy('name')->get();
+        $plans = Plan::where('isp_id', $ispId)->where('is_active', true)->primarySellable()->orderBy('name')->get();
 
         $recentActivity = Payment::where('isp_id', $ispId)
             ->with('customer')
@@ -49,14 +61,50 @@ class CustomerController extends Controller
             return $this->exportCustomersCsv($query->clone(), $request);
         }
 
-        $customers = $query->latest()->paginate(20)->appends($request->query());
+        $perPage = $this->resolvePerPage($request);
+        $customers = $query->latest()->paginate($perPage)->withQueryString();
+
+        $filterChips = $this->listingFilterChips($request, route('isp.customers.index'), [
+            'search' => 'Search',
+            'status' => [
+                'label' => 'Status',
+                'values' => [
+                    'active' => 'Active',
+                    'suspended' => 'Suspended',
+                    'expired' => 'Expired',
+                    'inactive' => 'Inactive',
+                    'pending_installation' => 'Pending installation',
+                ],
+            ],
+            'connection_type' => [
+                'label' => 'Connection',
+                'values' => ['hotspot' => 'Hotspot', 'pppoe' => 'PPPoE'],
+            ],
+            'router_id' => [
+                'label' => 'Router',
+                'values' => $routers->pluck('name', 'id')->all(),
+            ],
+            'plan_id' => [
+                'label' => 'Plan',
+                'values' => $plans->pluck('name', 'id')->all(),
+            ],
+            'created_from' => 'Created from',
+            'created_to' => 'Created to',
+        ]);
+
+        $exportFormats = $this->listingExportFormats(
+            $request,
+            route('isp.customers.index', ['export' => 'csv']),
+        );
 
         return view('isp.customers.index', compact(
             'customers',
             'routers',
             'plans',
             'stats',
-            'recentActivity'
+            'recentActivity',
+            'filterChips',
+            'exportFormats',
         ));
     }
 
@@ -234,31 +282,32 @@ class CustomerController extends Controller
     {
         $ispId = auth()->user()->isp_id;
         $routers = Router::where('isp_id', $ispId)->where('is_active', true)->get();
-        $plans = Plan::where('isp_id', $ispId)->where('is_active', true)->get();
+        $plans = Plan::where('isp_id', $ispId)->where('is_active', true)->primarySellable()->get();
         $isp = ISP::findOrFail($ispId);
         $customFieldDefinitions = IspCustomFields::definitionsFor($isp, 'customer');
+        $formFields = $this->formSettings->resolvedFields('customer', $ispId);
 
-        return view('isp.customers.create', compact('routers', 'plans', 'customFieldDefinitions'));
+        return view('isp.customers.create', compact('routers', 'plans', 'customFieldDefinitions', 'formFields'));
     }
 
     public function store(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        $isp = ISP::findOrFail($ispId);
+        $isp = ISP::with('saasPlan')->findOrFail($ispId);
 
-        $validated = $request->validate([
-            'full_name' => 'required|string|max:255',
-            'phone_number' => 'required|string|max:20',
-            'email' => 'nullable|email',
-            'location' => 'required|string',
-            'connection_type' => 'required|in:hotspot,pppoe',
-            'router_id' => 'required|exists:routers,id',
-            'plan_id' => 'required|exists:plans,id',
-            'username' => 'nullable|string|max:255|unique:customers,username',
-            'password' => 'nullable|string|min:6',
-            'installation_date' => 'required|date',
-            'notes' => 'nullable|string',
-        ]);
+        $validated = $this->formSettings->validateRequest($request, 'customer', [
+            'full_name' => ['string', 'max:255'],
+            'phone_number' => ['string', 'max:20'],
+            'email' => ['email'],
+            'location' => ['string'],
+            'connection_type' => ['in:hotspot,pppoe'],
+            'router_id' => ['exists:routers,id'],
+            'plan_id' => ['exists:plans,id'],
+            'username' => ['string', 'max:255', 'unique:customers,username'],
+            'password' => ['string', 'min:6'],
+            'installation_date' => ['date'],
+            'notes' => ['string'],
+        ], $ispId);
 
         $customAttributes = IspCustomFields::validateAndExtract($request, $isp, 'customer');
 
@@ -268,12 +317,12 @@ class CustomerController extends Controller
             abort(403);
         }
 
-        $limit = $isp->saasCustomerLimit();
-        if ($limit !== null) {
-            $current = Customer::where('isp_id', $ispId)->count();
-            if ($current >= $limit) {
-                return back()->withInput()->with('error', 'You have reached the maximum number of subscribers allowed on your current PrimeBilling plan. Upgrade in Subscription to add more.');
-            }
+        $currentCount = Customer::where('isp_id', $ispId)->count();
+        if ($isp->saasPlan && ! $isp->saasPlan->allowsCustomerCount($currentCount + 1)) {
+            return back()->withInput()->with(
+                'error',
+                'You have reached the maximum number of subscribers ('.$isp->saasPlan->max_customers.') on your current PrimeBilling plan. Upgrade under System → PrimeBilling subscription.'
+            );
         }
 
         $plainPassword = ! empty($validated['password'])
@@ -308,7 +357,7 @@ class CustomerController extends Controller
                 throw new \RuntimeException('Failed to create user on router');
             }
 
-            Subscription::create([
+            Subscription::create(array_merge([
                 'customer_id' => $customer->id,
                 'plan_id' => $plan->id,
                 'start_date' => now(),
@@ -316,12 +365,14 @@ class CustomerController extends Controller
                 'renewal_date' => now()->addDays((int) $plan->duration_days),
                 'status' => 'active',
                 'auto_renew' => true,
-            ]);
+            ], PlanPackageTypes::subscriptionDefaultsForPlan($plan)));
 
             $mikrotik->enableUser($customer);
             $customer->activate();
 
             DB::commit();
+
+            ActivityLogService::logCreate($customer, 'Created customer: '.$customer->full_name);
 
             try {
                 $this->notificationService->newCustomer($customer);
@@ -332,8 +383,10 @@ class CustomerController extends Controller
                 ]);
             }
 
-            return redirect()->route('isp.customers.show', $customer)
-                ->with('success', 'Customer created and activated successfully.');
+            return $this->modalOrRedirect(
+                'Customer created and activated successfully.',
+                redirect()->route('isp.customers.show', $customer),
+            );
         } catch (\Throwable $e) {
             DB::rollBack();
 
@@ -348,6 +401,8 @@ class CustomerController extends Controller
         }
         $customer->load([
             'router',
+            'inventoryItem',
+            'activeInventoryAssignments.item',
             'subscriptions' => fn ($q) => $q->with('plan')->orderByDesc('end_date')->limit(25),
             'invoices' => fn ($q) => $q->latest('issue_date')->limit(15),
             'payments' => fn ($q) => $q->latest('processed_at')->limit(15),
@@ -358,7 +413,9 @@ class CustomerController extends Controller
                 && $s->end_date->greaterThanOrEqualTo(now()->startOfDay())
         );
 
-        return view('isp.customers.show', compact('customer', 'activeSubscription'));
+        $usageBreakdown = $this->dataUsageMonitoring->customerBreakdown($customer);
+
+        return view('isp.customers.show', compact('customer', 'activeSubscription', 'usageBreakdown'));
     }
 
     public function edit(Customer $customer)
@@ -368,11 +425,12 @@ class CustomerController extends Controller
         }
         $ispId = auth()->user()->isp_id;
         $routers = Router::where('isp_id', $ispId)->where('is_active', true)->get();
-        $plans = Plan::where('isp_id', $ispId)->where('is_active', true)->get();
+        $plans = Plan::where('isp_id', $ispId)->where('is_active', true)->primarySellable()->get();
         $isp = ISP::findOrFail($ispId);
         $customFieldDefinitions = IspCustomFields::definitionsFor($isp, 'customer');
+        $formFields = $this->formSettings->resolvedFields('customer', $ispId);
 
-        return view('isp.customers.edit', compact('customer', 'routers', 'plans', 'customFieldDefinitions'));
+        return view('isp.customers.edit', compact('customer', 'routers', 'plans', 'customFieldDefinitions', 'formFields'));
     }
 
     public function update(Request $request, Customer $customer)
@@ -382,50 +440,138 @@ class CustomerController extends Controller
         }
 
         $isp = ISP::findOrFail($customer->isp_id);
+        $ispId = $customer->isp_id;
+        $oldValues = $customer->only([
+            'full_name', 'phone_number', 'email', 'location', 'connection_type',
+            'router_id', 'username', 'status', 'installation_date', 'notes',
+        ]);
+        $oldRouterId = $customer->router_id;
+        $oldConnectionType = $customer->connection_type;
+        $oldUsername = $customer->username;
+        $oldMikrotikUserId = $customer->mikrotik_user_id;
 
-        $validated = $request->validate([
-            'full_name' => 'required|string|max:255',
-            'phone_number' => 'required|string|max:20',
-            'email' => 'nullable|email',
-            'location' => 'required|string',
-            'connection_type' => 'required|in:hotspot,pppoe',
-            'router_id' => 'required|exists:routers,id',
-            'username' => 'required|string|max:255|unique:customers,username,'.$customer->id,
-            'password' => 'nullable|string|min:6',
-            'status' => 'required|in:active,suspended,expired,inactive',
-            'installation_date' => 'required|date',
-            'notes' => 'nullable|string',
+        $validated = $this->formSettings->validateRequest($request, 'customer', [
+            'full_name' => ['string', 'max:255'],
+            'phone_number' => ['string', 'max:20'],
+            'email' => ['email'],
+            'location' => ['string'],
+            'connection_type' => ['in:hotspot,pppoe'],
+            'router_id' => ['exists:routers,id'],
+            'username' => ['string', 'max:255', 'unique:customers,username,'.$customer->id],
+            'password' => ['string', 'min:6'],
+            'installation_date' => ['date'],
+            'notes' => ['string'],
+        ], $ispId);
+
+        $statusData = $request->validate([
+            'status' => ['required', 'in:active,suspended,expired,inactive,pending_installation'],
         ]);
 
         $customAttributes = IspCustomFields::validateAndExtract($request, $isp, 'customer');
-        $router = Router::findOrFail($validated['router_id']);
-        if ($router->isp_id !== $customer->isp_id) {
-            abort(403);
+
+        if (array_key_exists('router_id', $validated)) {
+            $router = Router::findOrFail($validated['router_id']);
+            if ($router->isp_id !== $customer->isp_id) {
+                abort(403);
+            }
         }
 
-        $data = [
-            'full_name' => $validated['full_name'],
-            'phone_number' => $validated['phone_number'],
-            'email' => $validated['email'] ?? null,
-            'location' => $validated['location'],
-            'connection_type' => $validated['connection_type'],
-            'router_id' => $validated['router_id'],
-            'username' => $validated['username'],
-            'status' => $validated['status'],
-            'installation_date' => $validated['installation_date'],
-            'notes' => $validated['notes'] ?? null,
-        ];
+        $data = array_merge(
+            Arr::only($validated, [
+                'full_name', 'phone_number', 'email', 'location', 'connection_type',
+                'router_id', 'username', 'installation_date', 'notes',
+            ]),
+            ['status' => $statusData['status']]
+        );
 
-        if (! empty($validated['password'])) {
-            $data['password'] = Hash::make($validated['password']);
+        $plainPassword = ! empty($validated['password']) ? $validated['password'] : null;
+        if ($plainPassword) {
+            $data['password'] = Hash::make($plainPassword);
         }
 
         $mergedCustom = array_merge($customer->custom_attributes ?? [], $customAttributes);
         $data['custom_attributes'] = $mergedCustom ?: null;
 
         $customer->update($data);
+        $customer->refresh();
 
-        return redirect()->route('isp.customers.show', $customer)->with('success', 'Customer updated successfully.');
+        $routerChanged = (int) $oldRouterId !== (int) $customer->router_id;
+        $connectionChanged = $oldConnectionType !== $customer->connection_type;
+        $usernameChanged = $oldUsername !== $customer->username;
+        $statusChanged = ($oldValues['status'] ?? null) !== $customer->status;
+        $syncWarning = null;
+
+        try {
+            $activePlan = $customer->subscriptions()
+                ->where('status', 'active')
+                ->with('plan')
+                ->latest('id')
+                ->first()
+                ?->plan;
+
+            if ($routerChanged || $connectionChanged) {
+                if ($oldRouterId && $oldMikrotikUserId) {
+                    $oldRouter = Router::find($oldRouterId);
+                    if ($oldRouter) {
+                        $oldMt = new MikroTikService($oldRouter);
+                        $oldMt->removeUserByDotId((string) $oldMikrotikUserId, $oldConnectionType ?? 'pppoe');
+                    }
+                }
+
+                $customer->forceFill(['mikrotik_user_id' => null])->saveQuietly();
+
+                if ($customer->router && $activePlan && $plainPassword) {
+                    $mikrotik = new MikroTikService($customer->router);
+                    $created = $customer->connection_type === 'hotspot'
+                        ? $mikrotik->createHotspotUser($customer, $activePlan, $plainPassword)
+                        : $mikrotik->createPppoeUser($customer, $activePlan, $plainPassword);
+
+                    if (! $created) {
+                        $syncWarning = 'Customer saved, but recreating the router user failed.';
+                    } elseif ($customer->status === 'active') {
+                        $mikrotik->enableUser($customer);
+                    } elseif (in_array($customer->status, ['suspended', 'expired', 'inactive'], true)) {
+                        $mikrotik->disableUser($customer);
+                    }
+                } elseif ($customer->router && $activePlan && ! $plainPassword) {
+                    $syncWarning = 'Customer saved. Provide a password to reprovision this subscriber on the new router.';
+                }
+            } elseif ($customer->router && ($plainPassword || $usernameChanged || $statusChanged)) {
+                $mikrotik = new MikroTikService($customer->router);
+
+                if ($plainPassword || $usernameChanged) {
+                    $synced = $mikrotik->syncUserCredentials($customer, $plainPassword, $activePlan);
+                    if (! $synced) {
+                        $syncWarning = 'Customer saved, but router credential sync failed.';
+                    }
+                }
+
+                if ($customer->status === 'active') {
+                    $mikrotik->enableUser($customer);
+                } elseif (in_array($customer->status, ['suspended', 'expired', 'inactive'], true)) {
+                    $mikrotik->disableUser($customer);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Customer update: MikroTik sync failed', [
+                'customer_id' => $customer->id,
+                'error' => $e->getMessage(),
+            ]);
+            $syncWarning = 'Customer saved, but router sync failed: '.$e->getMessage();
+        }
+
+        ActivityLogService::logUpdate(
+            $customer,
+            'Updated customer: '.$customer->full_name,
+            $oldValues
+        );
+
+        $redirect = redirect()->route('isp.customers.show', $customer);
+        if ($syncWarning) {
+            return $redirect->with('warning', $syncWarning);
+        }
+
+        return $redirect->with('success', 'Customer updated successfully.');
     }
 
     public function destroy(Request $request, Customer $customer)
@@ -452,7 +598,16 @@ class CustomerController extends Controller
                 }
             }
 
+            $snapshotName = $customer->full_name;
+            $snapshotUsername = $customer->username;
+            $snapshotId = $customer->id;
             $customer->delete();
+
+            ActivityLogService::logAction(
+                'delete',
+                'Deleted customer: '.$snapshotName.' ('.$snapshotUsername.')',
+                ['customer_id' => $snapshotId, 'username' => $snapshotUsername]
+            );
 
             return redirect()->route('isp.customers.index')
                 ->with('success', 'Customer deleted successfully.');
@@ -479,6 +634,12 @@ class CustomerController extends Controller
             $mikrotik->disconnectSession($customer);
             $mikrotik->disableUser($customer);
             $customer->suspend();
+
+            ActivityLogService::logAction(
+                'customer_suspend',
+                'Suspended customer: '.$customer->full_name,
+                ['customer_id' => $customer->id]
+            );
 
             return back()->with('success', 'Customer suspended successfully.');
         } catch (\Exception $e) {
@@ -507,6 +668,12 @@ class CustomerController extends Controller
                 $mikrotik->enableUser($customer);
             }
             $customer->activate();
+
+            ActivityLogService::logAction(
+                'customer_activate',
+                'Activated customer: '.$customer->full_name,
+                ['customer_id' => $customer->id]
+            );
 
             return back()->with('success', 'Customer activated successfully.');
         } catch (\Exception $e) {

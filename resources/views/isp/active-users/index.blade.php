@@ -42,10 +42,6 @@
                 @endforeach
             </select>
         </div>
-        <div class="flex items-end gap-2">
-            <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
-            <a href="{{ route('isp.active-users.index') }}" class="pb-btn">Reset</a>
-        </div>
     </x-filter-bar>
 
     <div>
@@ -144,6 +140,7 @@
             const ctype = escapeHtml(user.connection_type || '');
             const rtr = escapeHtml(user.router || '');
             const uid = escapeHtml(String(user.id));
+            const rid = escapeHtml(String(user.router_id || ''));
             const ctLower = String(user.connection_type || '').toLowerCase();
             const typePill = user.connection_type === 'Hotspot'
                 ? 'pb-pill pb-pill-cyan'
@@ -156,7 +153,7 @@
                 <td>${dur}</td>
                 <td><span class="${typePill} text-xs">${ctype}</span></td>
                 <td>${rtr}</td>
-                <td class="text-right"><button type="button" class="text-sm font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 js-disconnect" data-uid="${uid}" data-ct="${encodeURIComponent(ctLower)}" data-un="${uEnc}">Disconnect</button></td>
+                <td class="text-right"><button type="button" class="text-sm font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 js-disconnect" data-uid="${uid}" data-rid="${rid}" data-ct="${encodeURIComponent(ctLower)}" data-un="${uEnc}">Disconnect</button></td>
             </tr>`;
         }).join('');
     }
@@ -166,7 +163,7 @@
         if (!btn) return;
         const username = decodeURIComponent(btn.getAttribute('data-un') || '');
         const ct = decodeURIComponent(btn.getAttribute('data-ct') || '');
-        openDisconnectModal(username, btn.getAttribute('data-uid') || '', ct);
+        openDisconnectModal(username, btn.getAttribute('data-uid') || '', ct, btn.getAttribute('data-rid') || '');
     });
 
     function updateStats(data) {
@@ -196,10 +193,11 @@
         }
     }
 
-    function openDisconnectModal(username, userId, connectionType) {
+    function openDisconnectModal(username, userId, connectionType, routerId) {
         document.getElementById('disconnect-username').textContent = username;
         document.getElementById('disconnect-user-id').value = userId;
         document.getElementById('disconnect-connection-type').value = connectionType;
+        document.getElementById('disconnect-router-id').value = routerId || '';
         document.getElementById('disconnectModal').classList.remove('hidden');
     }
 
@@ -210,7 +208,9 @@
     function confirmDisconnect() {
         const userId = document.getElementById('disconnect-user-id').value;
         const connectionType = document.getElementById('disconnect-connection-type').value;
-        const routerId = new URLSearchParams(window.location.search).get('router_id') || '';
+        const routerId = document.getElementById('disconnect-router-id').value
+            || new URLSearchParams(window.location.search).get('router_id')
+            || '';
         fetch('{{ route("isp.active-users.disconnect") }}', {
             method: 'POST',
             headers: {

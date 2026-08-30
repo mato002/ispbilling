@@ -3,9 +3,11 @@
 namespace App\Providers;
 
 use App\Services\Sms\SmsGatewayManager;
+use App\View\Composers\GuestLayoutComposer;
 use App\View\Composers\IspBrandingComposer;
 use App\View\Composers\IspSettingsComposer;
 use App\View\Composers\IspSystemAnnouncementsComposer;
+use App\View\Composers\SaasOnboardingOverlayComposer;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -52,8 +54,10 @@ class AppServiceProvider extends ServiceProvider
         }
 
         View::composer('isp.settings.*', IspSettingsComposer::class);
+        View::composer('layouts.guest', GuestLayoutComposer::class);
         View::composer('layouts.admin', IspBrandingComposer::class);
         View::composer('layouts.admin', IspSystemAnnouncementsComposer::class);
+        View::composer('layouts.admin', SaasOnboardingOverlayComposer::class);
     }
 
     private static function parseIniMemoryToBytes(string $val): int

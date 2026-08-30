@@ -93,4 +93,19 @@ class User extends Authenticatable
     {
         return $this->role === 'isp_staff';
     }
+
+    public function isTechnician(): bool
+    {
+        return $this->role === 'isp_technician';
+    }
+
+    public function isIspOperator(): bool
+    {
+        return $this->isIspAdmin() || $this->isIspStaff();
+    }
+
+    public function technicianInventoryAssignments()
+    {
+        return $this->hasMany(InventoryTechnicianAssignment::class, 'technician_user_id');
+    }
 }

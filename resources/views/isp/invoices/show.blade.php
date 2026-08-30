@@ -28,6 +28,8 @@
                 <div>
                     @if($invoice->status === 'paid')
                         <x-status-badge status="paid" />
+                    @elseif($invoice->status === 'cancelled')
+                        <x-status-badge status="cancelled" />
                     @elseif($invoice->status === 'overdue')
                         <x-status-badge status="overdue" />
                     @else
@@ -157,7 +159,7 @@
             </dl>
         </x-form-section>
 
-        @if($invoice->status !== 'paid')
+        @if($invoice->status !== 'paid' && $invoice->status !== 'cancelled')
             <x-form-section title="Pay invoice">
                 <form method="POST" action="{{ route('isp.payments.initiate.store') }}" id="paymentForm" class="space-y-4">
                     @csrf
@@ -180,6 +182,23 @@
                     </div>
                     <button type="submit" class="pb-btn pb-btn-primary w-full justify-center">Initiate payment</button>
                 </form>
+
+                <div class="mt-4 space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                    <form method="POST" action="{{ route('isp.invoices.mark-paid', $invoice) }}"
+                          onsubmit="confirmFormSubmit(event, {title: 'Mark invoice paid', text: 'Record cash/manual payment of KES {{ number_format($invoice->total_amount, 2) }} and activate service?', icon: 'question', confirmButtonText: 'Yes, mark paid'}); return false;">
+                        @csrf
+                        <button type="submit" class="pb-btn w-full justify-center border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                            Mark paid (cash)
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ route('isp.invoices.cancel', $invoice) }}"
+                          onsubmit="confirmFormSubmit(event, {title: 'Cancel invoice', text: 'Cancel this invoice? Pending payments will be marked failed.', icon: 'warning', confirmButtonText: 'Yes, cancel', confirmButtonColor: '#ef4444'}); return false;">
+                        @csrf
+                        <button type="submit" class="pb-btn w-full justify-center border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100">
+                            Cancel invoice
+                        </button>
+                    </form>
+                </div>
             </x-form-section>
         @endif
     </div>

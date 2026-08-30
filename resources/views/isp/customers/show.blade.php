@@ -109,6 +109,40 @@
             </dl>
         </x-form-section>
 
+        @include('isp.customers.partials.usage-summary', ['customer' => $customer, 'usageBreakdown' => $usageBreakdown])
+
+        <x-form-section title="Assigned equipment">
+            @if ($customer->inventoryItem)
+                <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Primary linked device</p>
+                    <a href="{{ route('isp.inventory.show', $customer->inventoryItem) }}" class="text-sm font-medium text-indigo-600">{{ $customer->inventoryItem->name }}</a>
+                    <p class="font-mono text-xs text-slate-500">{{ $customer->inventoryItem->serial_number }}</p>
+                    @if($customer->inventoryItem->mac_address)
+                        <p class="text-xs text-slate-500">MAC {{ $customer->inventoryItem->mac_address }}</p>
+                    @endif
+                </div>
+            @endif
+            @if ($customer->activeInventoryAssignments->isEmpty())
+                <p class="text-sm text-slate-500 dark:text-slate-400">No inventory devices assigned.</p>
+                <a href="{{ route('isp.inventory.assignments.create', ['customer_id' => $customer->id]) }}" class="pb-btn mt-3 text-xs">Assign device</a>
+            @else
+                <ul class="space-y-3">
+                    @foreach ($customer->activeInventoryAssignments as $assignment)
+                        <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--pb-border)] p-3">
+                            <div>
+                                <a href="{{ route('isp.inventory.show', $assignment->item) }}" class="text-sm font-medium text-indigo-600">{{ $assignment->item?->name }}</a>
+                                <p class="font-mono text-xs text-slate-500">{{ $assignment->item?->serial_number }}</p>
+                            </div>
+                            <div class="text-right text-xs text-slate-500">
+                                <p>{{ $assignment->installationStatusLabel() }}</p>
+                                <a href="{{ route('isp.inventory.assignments.show', $assignment) }}" class="text-indigo-600">Manage</a>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </x-form-section>
+
         @if($activeSubscription)
             <x-form-section title="Active subscription">
                 <dl class="grid grid-cols-1 gap-4 md:grid-cols-2">

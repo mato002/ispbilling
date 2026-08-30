@@ -13,8 +13,7 @@
 
     <x-isp-settings-workspace
         meta-title="Tax &amp; invoicing"
-        meta-description="Invoice sequencing, automation, penalties, and default VAT-style rates applied to new invoices."
-    >
+>
         <form
             method="POST"
             action="{{ route('isp.settings.billing.update') }}"
@@ -29,8 +28,7 @@
             <div class="pb-card isp-settings-panel p-4 sm:p-6">
                 <div class="mb-5 border-b border-dashed border-[var(--pb-border)] pb-4">
                     <h3 class="isp-settings-section-title">Invoice engine</h3>
-                    <p class="isp-settings-hint mt-1">Controls how documents are numbered and whether subscriptions spawn invoices automatically.</p>
-                </div>
+</div>
                 <div class="space-y-5">
                     <div>
                         <label class="isp-form-label" for="invoice_prefix">Invoice prefix</label>
@@ -42,13 +40,11 @@
                             value="{{ old('invoice_prefix', $b['invoice_prefix'] ?? 'INV') }}"
                             placeholder="INV"
                         />
-                        <p class="isp-settings-hint mt-1">Example: INV-2026-0148</p>
-                    </div>
+</div>
                     <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--pb-border)] bg-slate-50/60 px-3 py-3 dark:bg-slate-900/30">
                         <span>
                             <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">Auto-generate invoices</span>
-                            <span class="isp-settings-hint block">Create invoices when subscription cycles renew.</span>
-                        </span>
+</span>
                         <input
                             type="checkbox"
                             name="auto_generate_invoices"
@@ -63,8 +59,7 @@
             <div class="pb-card isp-settings-panel p-4 sm:p-6">
                 <div class="mb-5 border-b border-dashed border-[var(--pb-border)] pb-4">
                     <h3 class="isp-settings-section-title">Collections policy</h3>
-                    <p class="isp-settings-hint mt-1">Grace windows and penalties are advisory fields for finance automation.</p>
-                </div>
+</div>
                 <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
                     <div>
                         <label class="isp-form-label" for="grace_period_days">Grace period (days)</label>
@@ -101,11 +96,7 @@
                                 value="{{ number_format($platformTaxRate, 2) }}"
                                 disabled
                             />
-                            <p class="isp-settings-hint mt-1">
-                                The platform administrator is enforcing this rate on all new invoices. ISP overrides are suspended until enforcement is turned off in
-                                <span class="font-mono text-[11px]">Super Admin → Integrations</span>.
-                            </p>
-                        @else
+@else
                             <input
                                 id="tax_rate"
                                 class="isp-form-input"
@@ -116,8 +107,7 @@
                                 max="100"
                                 value="{{ old('tax_rate', $b['tax_rate'] ?? 0) }}"
                             />
-                            <p class="isp-settings-hint mt-1">Applied when generating invoices unless the platform enforces a global VAT policy.</p>
-                        @endif
+@endif
                     </div>
                 </div>
             </div>

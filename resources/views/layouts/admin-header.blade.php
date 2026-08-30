@@ -5,45 +5,31 @@
     $onboardingIsp = SaasOnboardingContext::resolveIsp($user);
     $ispName = $onboardingIsp?->name ?? $user->isp?->name ?? ($user->isSuperAdmin() ? 'PrimeBilling Admin' : 'Your ISP');
     $homeRoute = $user->isSuperAdmin() ? route('admin.dashboard') : route('isp.dashboard');
-    $pbIslandLayout = request()->routeIs('isp.saas-onboarding.*');
-    $onboardingHomeRoute = ($pbIslandLayout && $onboardingIsp)
-        ? SaasOnboardingContext::showUrl($onboardingIsp)
-        : $homeRoute;
+    $pbSaasOnboardingOverlay = (bool) ($pbSaasOnboardingOverlay ?? false);
+    $onboardingHomeRoute = $homeRoute;
 @endphp
 
 <header
     id="pb-admin-topbar"
     data-turbo-permanent
-    x-data="{
-        searchOpen: false,
-        quickActionsOpen: false,
-        profileOpen: false,
-        theme: (localStorage.getItem('pb.theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')),
-        toggleTheme() {
-            this.theme = this.theme === 'dark' ? 'light' : 'dark';
-            localStorage.setItem('pb.theme', this.theme);
-            if (this.theme === 'dark') document.documentElement.classList.add('dark');
-            else document.documentElement.classList.remove('dark');
-        }
-    }"
-    @keydown.window.cmd.k.prevent="searchOpen = true"
-    @keydown.window.ctrl.k.prevent="searchOpen = true"
-    @keydown.window.escape="searchOpen = false; quickActionsOpen = false; profileOpen = false; $store.sidebar.closeMobile()"
-    @class([
-        'pb-topbar fixed top-0 right-0 z-30 h-16 transition-all duration-300 ease-in-out left-0',
-        'md:left-64' => ! $pbIslandLayout,
-    ])
-    @unless($pbIslandLayout) :class="$store.sidebar.collapsed ? 'md:!left-16' : ''" @endunless
+    x-data="pbTopbar()"
+    @keydown.window.cmd.k.prevent="if (!document.body.classList.contains('pb-onboarding-locked')) searchOpen = true"
+    @keydown.window.ctrl.k.prevent="if (!document.body.classList.contains('pb-onboarding-locked')) searchOpen = true"
+    @keydown.window.escape="closePalette(); quickActionsOpen = false; profileOpen = false; $store.sidebar.closeMobile()"
+    class="pb-topbar fixed top-0 right-0 z-30 h-16 transition-all duration-300 ease-in-out left-0 md:left-64"
+    :class="$store.sidebar.collapsed ? 'md:!left-16' : ''"
 >
     <div class="flex h-full items-center gap-2 px-3 sm:gap-4 sm:px-6">
 
         {{-- ============= LEFT CLUSTER ============= --}}
         <div class="flex items-center gap-2 min-w-0">
-            @unless ($pbIslandLayout)
             {{-- Sidebar collapse toggle (desktop) --}}
             <button @click="$store.sidebar.toggle()"
                     class="hidden md:inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                    title="Toggle sidebar">
+                    title="Collapse sidebar"
+                    :title="$store.sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                    :aria-label="$store.sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                    :aria-expanded="(!$store.sidebar.collapsed).toString()">
                 <svg x-show="$store.sidebar.collapsed" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
                 </svg>
@@ -59,7 +45,6 @@
                     <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
                 </svg>
             </button>
-            @endunless
 
             {{-- Logo + brand --}}
             <a href="{{ $onboardingHomeRoute }}" class="flex items-center gap-2.5 min-w-0">
@@ -78,7 +63,7 @@
             </a>
         </div>
 
-        @if ($pbIslandLayout)
+        @if ($pbSaasOnboardingOverlay)
             <div class="hidden flex-1 justify-center px-2 sm:flex">
                 <span class="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-indigo-50/90 px-3 py-1.5 text-xs font-semibold text-indigo-800 shadow-sm dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
                     <span class="relative flex h-2 w-2">
@@ -88,10 +73,8 @@
                     Workspace setup in progress
                 </span>
             </div>
-        @endif
-
+        @else
         {{-- ============= GLOBAL SEARCH ============= --}}
-        @unless ($pbIslandLayout)
         <div class="hidden md:flex flex-1 justify-center px-2">
             <button
                 @click="searchOpen = true"
@@ -100,18 +83,21 @@
                 <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
                 </svg>
-                <span class="text-[13px]">Search customers, invoices, routers, sessions…</span>
+                <span class="text-[13px]">Search pages, settings, reports, network…</span>
                 <span class="ml-auto inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">
                     ⌘K
                 </span>
             </button>
         </div>
-        @endunless
+        @endif
 
         {{-- ============= RIGHT CLUSTER ============= --}}
         <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
 
-            @unless ($pbIslandLayout)
+            {{-- Context-aware Create (jana-prints quick-create pattern) --}}
+            <div id="pb-quick-create" class="hidden sm:contents"></div>
+
+            @unless ($pbSaasOnboardingOverlay)
             {{-- Mobile search trigger --}}
             <button @click="searchOpen = true"
                     class="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -129,7 +115,7 @@
 
             {{-- Quick actions --}}
             @if($user->isIspAdmin() || $user->isIspStaff())
-                <div class="relative" @click.outside="quickActionsOpen = false">
+                <div class="relative" data-pb-quick-actions @click.outside="quickActionsOpen = false">
                     <button @click="quickActionsOpen = !quickActionsOpen"
                             class="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 px-3 py-2 text-xs font-semibold text-white shadow-[0_8px_18px_-10px_rgba(99,102,241,0.6)] hover:from-indigo-600 hover:to-cyan-600">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -147,7 +133,7 @@
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="absolute right-0 mt-2 w-72 origin-top-right rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-900">
                         <div class="px-2 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Operations</div>
-                        <a href="{{ route('isp.customers.create') }}" class="pb-row !p-2 text-sm">
+                        <a href="{{ route('isp.customers.create') }}" data-pb-modal-open class="pb-row !p-2 text-sm">
                             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-300">
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                             </span>
@@ -165,7 +151,7 @@
                                 <span class="block text-[11px] text-slate-500 dark:text-slate-400">Initiate M-Pesa or manual</span>
                             </span>
                         </a>
-                        <a href="{{ route('isp.subscriptions.create') }}" class="pb-row !p-2 text-sm">
+                        <a href="{{ route('isp.subscriptions.create') }}" data-pb-modal-open class="pb-row !p-2 text-sm">
                             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-300">
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
                             </span>
@@ -174,7 +160,7 @@
                                 <span class="block text-[11px] text-slate-500 dark:text-slate-400">Activate a service plan</span>
                             </span>
                         </a>
-                        <a href="{{ route('isp.routers.create') }}" class="pb-row !p-2 text-sm">
+                        <a href="{{ route('isp.routers.create') }}" data-pb-modal-open class="pb-row !p-2 text-sm">
                             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-300">
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="9" rx="2"/><path d="M7 7v4M17 7v4M5 7h14"/></svg>
                             </span>
@@ -267,48 +253,5 @@
     </div>
 
     {{-- ============================ COMMAND-K SEARCH ============================ --}}
-    <div x-show="searchOpen" x-cloak
-         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-         class="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-24"
-         @click.self="searchOpen = false">
-        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
-        <div class="relative w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-900">
-            <div class="flex items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-                <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
-                </svg>
-                <input type="text" placeholder="Search customers, invoices, routers, sessions…"
-                       class="w-full border-0 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-0 dark:text-slate-100"
-                       x-ref="searchInput"
-                       x-init="$watch('searchOpen', v => v && setTimeout(() => $refs.searchInput.focus(), 30))">
-                <kbd class="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">ESC</kbd>
-            </div>
-            <div class="p-2">
-                <div class="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Quick navigation</div>
-                <a href="{{ route('isp.customers.index') }}" class="pb-row !p-2 text-sm text-slate-700 dark:text-slate-200">
-                    <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/></svg>
-                    All customers
-                </a>
-                <a href="{{ route('isp.invoices.index') }}" class="pb-row !p-2 text-sm text-slate-700 dark:text-slate-200">
-                    <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    Invoices
-                </a>
-                <a href="{{ route('isp.payments.index') }}" class="pb-row !p-2 text-sm text-slate-700 dark:text-slate-200">
-                    <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                    Payments
-                </a>
-                <a href="{{ route('isp.routers.index') }}" class="pb-row !p-2 text-sm text-slate-700 dark:text-slate-200">
-                    <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="9" rx="2"/><path d="M7 7v4M17 7v4M5 7h14"/></svg>
-                    Routers
-                </a>
-                <a href="{{ route('isp.sessions.index') }}" class="pb-row !p-2 text-sm text-slate-700 dark:text-slate-200">
-                    <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a10 10 0 0 1 20 0"/><path d="M5 12a7 7 0 0 1 14 0"/><path d="M8.5 12a3.5 3.5 0 0 1 7 0"/></svg>
-                    Active sessions
-                </a>
-            </div>
-            <div class="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400 dark:border-slate-800">
-                <span class="hidden md:inline">Tip: press </span><kbd class="rounded border border-slate-200 bg-slate-50 px-1 py-0.5 text-[9px] font-mono dark:border-slate-700 dark:bg-slate-800">⌘K</kbd> from anywhere
-            </div>
-        </div>
-    </div>
+    <x-command-palette />
 </header>

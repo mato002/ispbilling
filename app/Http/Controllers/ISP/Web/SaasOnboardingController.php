@@ -37,6 +37,11 @@ class SaasOnboardingController extends Controller
                 : redirect()->route('isp.dashboard');
         }
 
+        // Tenant admins continue on the live dashboard with the locking overlay.
+        if ($user->isIspAdmin() && ! $user->isSuperAdmin()) {
+            return redirect()->route('isp.dashboard');
+        }
+
         $plans = PlatformSaasPlan::query()
             ->where('is_active', true)
             ->orderBy('sort_order')

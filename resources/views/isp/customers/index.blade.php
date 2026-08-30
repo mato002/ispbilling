@@ -11,7 +11,6 @@
             ->all();
     };
     $qParams = request()->query();
-    $exportUrl = route('isp.customers.index', array_merge($qParams, ['export' => 'csv']));
 @endphp
 
 @section('header')
@@ -24,9 +23,6 @@
             <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
                 Customers &amp; subscribers
             </h1>
-            <p class="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                Operate your ISP subscriber base with network visibility, billing context, and MikroTik-ready actions — one surface for NOC and finance.
-            </p>
             <p class="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                 <span class="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-slate-800 dark:bg-slate-800 dark:text-slate-200">{{ number_format($stats['total'] ?? 0) }}</span>
                 <span class="text-slate-500 dark:text-slate-400"> subscribers in tenant scope</span>
@@ -62,7 +58,14 @@
     {{-- ========== OPERATIONAL TOOLBAR ========== --}}
     <div class="pb-card relative overflow-hidden p-4 sm:p-5">
         <div class="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-gradient-to-br from-indigo-500/15 to-cyan-400/10 blur-2xl"></div>
-        <form method="GET" action="{{ route('isp.customers.index') }}" id="customer-search-form" class="relative flex flex-col gap-4 xl:flex-row xl:items-center">
+        <form
+            method="GET"
+            action="{{ route('isp.customers.index') }}"
+            id="customer-search-form"
+            class="relative flex flex-col gap-4 xl:flex-row xl:items-center"
+            data-turbo-frame="pb-main"
+            x-data="pbFilterForm({ autoSearch: true })"
+        >
             @foreach(request()->except(['search','page','export']) as $k => $v)
                 @if(is_array($v))
                     @foreach($v as $vv)
@@ -97,9 +100,8 @@
                     </button>
                     <button type="button" @click="toggleAuto()" class="pb-btn py-2 text-xs" :class="autoRefresh ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10' : ''">
                         <span class="flex h-2 w-2 rounded-full" :class="autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'"></span>
-                        Auto
+                        Auto refresh
                     </button>
-                    <button type="submit" class="pb-btn-primary py-2 text-xs">Apply search</button>
                 </div>
             </div>
 
@@ -121,12 +123,14 @@
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                     Add customer
                 </a>
-                <a href="{{ $exportUrl }}" class="pb-btn py-2 text-xs">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Export CSV
-                </a>
+                <x-export-dropdown :formats="$exportFormats ?? []" label="Export" />
             </div>
         </form>
+        @if (count($filterChips ?? []) > 0)
+            <div class="relative mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                <x-filter-chips :chips="$filterChips" />
+            </div>
+        @endif
     </div>
 
     {{-- ========== KPI STRIP ========== --}}
@@ -182,7 +186,13 @@
                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
                 </button>
             </div>
-            <form method="GET" action="{{ route('isp.customers.index') }}" class="flex-1 overflow-y-auto p-5 space-y-4">
+            <form
+                method="GET"
+                action="{{ route('isp.customers.index') }}"
+                class="flex-1 overflow-y-auto p-5 space-y-4"
+                data-turbo-frame="pb-main"
+                x-data="pbFilterForm({ autoSearch: true })"
+            >
                 @if(request('search'))
                     <input type="hidden" name="search" value="{{ request('search') }}">
                 @endif
@@ -190,8 +200,8 @@
                     <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</label>
                     <select name="status" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                         <option value="">All</option>
-                        @foreach(['active','suspended','expired','inactive'] as $st)
-                            <option value="{{ $st }}" {{ request('status') === $st ? 'selected' : '' }}>{{ ucfirst($st) }}</option>
+                        @foreach(['active','suspended','expired','inactive','pending_installation'] as $st)
+                            <option value="{{ $st }}" {{ request('status') === $st ? 'selected' : '' }}>{{ $st === 'pending_installation' ? 'Pending installation' : ucfirst($st) }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -254,9 +264,16 @@
                         <input type="date" name="created_to" value="{{ request('created_to') }}" class="w-full rounded-xl border border-slate-200 bg-white py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                     </div>
                 </div>
-                <div class="flex gap-2 pt-2">
-                    <button type="submit" class="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25">Apply filters</button>
-                    <a href="{{ route('isp.customers.index') }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Reset</a>
+                <div>
+                    <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Per page</label>
+                    <select name="per_page" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                        @foreach ([10, 15, 25, 50] as $size)
+                            <option value="{{ $size }}" @selected((int) request('per_page', 15) === $size)>{{ $size }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="flex gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                    <a href="{{ route('isp.customers.index') }}" data-turbo-frame="pb-main" class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-center text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Reset filters</a>
                 </div>
             </form>
         </div>
@@ -354,7 +371,7 @@
                             ];
                             $util = $online ? 25 + ($customer->id % 50) : 90;
                         @endphp
-                        <tr class="align-middle">
+                        <x-listing-table.row class="align-middle" :href="route('isp.customers.show', $customer)">
                             <td>
                                 <button type="button" @click.stop="openDrawer(@js($payload))" class="group flex max-w-[220px] items-start gap-2 text-left sm:max-w-none">
                                     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-xs font-bold text-white shadow-md shadow-indigo-500/20">
@@ -433,13 +450,15 @@
                                 @elseif($customer->status === 'expired')
                                     <span class="inline-flex rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:text-rose-300">Expired</span>
                                 @elseif($customer->status === 'inactive')
-                                    <span class="inline-flex rounded-full bg-slate-500/15 px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:text-slate-300">Pending</span>
+                                    <span class="inline-flex rounded-full bg-slate-500/15 px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:text-slate-300">Inactive</span>
+                                @elseif($customer->status === 'pending_installation')
+                                    <span class="inline-flex rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:text-sky-300">Pending install</span>
                                 @else
                                     <span class="inline-flex rounded-full bg-slate-500/15 px-2 py-0.5 text-[11px] font-bold text-slate-600">{{ ucfirst($customer->status) }}</span>
                                 @endif
                             </td>
                             <td class="text-right whitespace-nowrap">
-                                <div class="relative inline-flex items-center gap-1" x-data="{ open: false }" @click.outside="open = false">
+                                <div class="relative inline-flex items-center gap-1" data-no-row-nav x-data="{ open: false }" @click.outside="open = false">
                                     <button type="button" @click="open = !open" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-500/40" title="Actions">
                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                                     </button>
@@ -472,14 +491,24 @@
                                     </a>
                                 </div>
                             </td>
-                        </tr>
+                        </x-listing-table.row>
                     @endforeach
                 </tbody>
             </x-data-table>
         </div>
 
-        <div class="pb-card px-4 py-3">
-            {{ $customers->withQueryString()->links() }}
+        <div class="pb-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+                Showing
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ $customers->firstItem() ?? 0 }}</span>
+                –
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ $customers->lastItem() ?? 0 }}</span>
+                of
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ number_format($customers->total()) }}</span>
+            </p>
+            @if ($customers->hasPages())
+                <div class="pb-pagination">{{ $customers->withQueryString()->links() }}</div>
+            @endif
         </div>
     @endif
 

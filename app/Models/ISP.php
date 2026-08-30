@@ -46,6 +46,7 @@ class ISP extends Model
         'saas_c2b_registered_at',
         'saas_setup_fee_paid_at',
         'saas_white_label_opt_in',
+        'sms_balance',
         'settings',
     ];
 
@@ -64,6 +65,7 @@ class ISP extends Model
         'saas_payment_verified_at' => 'datetime',
         'saas_c2b_registered_at' => 'datetime',
         'saas_setup_fee_paid_at' => 'datetime',
+        'sms_balance' => 'decimal:4',
     ];
 
     public function routers(): HasMany
@@ -134,6 +136,21 @@ class ISP extends Model
     public function pendingSaasPlan(): BelongsTo
     {
         return $this->belongsTo(PlatformSaasPlan::class, 'saas_pending_platform_plan_id');
+    }
+
+    public function pendingPlanDefersOnboardingPayment(?bool $whiteLabelOptIn = null): bool
+    {
+        $plan = $this->relationLoaded('pendingSaasPlan')
+            ? $this->pendingSaasPlan
+            : $this->pendingSaasPlan()->first();
+
+        if (! $plan) {
+            return false;
+        }
+
+        return $plan->defersOnboardingPaymentVerification(
+            $whiteLabelOptIn ?? (bool) $this->saas_white_label_opt_in
+        );
     }
 
     /**

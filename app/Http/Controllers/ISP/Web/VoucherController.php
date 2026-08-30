@@ -2,21 +2,27 @@
 
 namespace App\Http\Controllers\ISP\Web;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Http\Controllers\ISP\BaseController;
 use App\Models\Plan;
 use App\Models\Router;
 use App\Models\Voucher;
 use App\Services\VoucherService;
+use App\Support\Export\CsvExporter;
+use App\Support\FormSettingsService;
+use App\Support\Search\SearchHelper;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class VoucherController extends BaseController
 {
-    protected $voucherService;
+    use InteractsWithListings;
 
-    public function __construct(VoucherService $voucherService)
-    {
-        $this->voucherService = $voucherService;
-    }
+    public function __construct(
+        protected VoucherService $voucherService,
+        protected FormSettingsService $formSettings,
+    ) {}
 
     /**
      * Display a listing of vouchers
@@ -25,48 +31,115 @@ class VoucherController extends BaseController
     {
         $ispId = $this->getIspId();
 
+        $routers = Router::where('isp_id', $ispId)->get();
+        $routerLabels = $routers->pluck('name', 'id')->mapWithKeys(
+            fn (string $name, int $id): array => [(string) $id => $name]
+        )->all();
+
+        $query = $this->filteredVouchersQuery($request, $ispId);
+        $perPage = $this->resolvePerPage($request, 25);
+        $vouchers = $query->paginate($perPage)->withQueryString();
+
+        $filterChips = $this->listingFilterChips($request, route('isp.vouchers.index'), [
+            'search' => 'Search',
+            'status' => [
+                'label' => 'Status',
+                'values' => [
+                    'active' => 'Active',
+                    'used' => 'Used',
+                    'expired' => 'Expired',
+                ],
+            ],
+            'router_id' => [
+                'label' => 'Router',
+                'values' => $routerLabels,
+            ],
+            'voucher_type' => [
+                'label' => 'Type',
+                'values' => ['time' => 'Time', 'data' => 'Data'],
+            ],
+            'date_from' => 'From',
+            'date_to' => 'To',
+        ]);
+
+        $exportFormats = $this->listingExportFormats($request, route('isp.vouchers.export.csv'));
+
+        return view('isp.vouchers.index', compact('vouchers', 'routers', 'filterChips', 'exportFormats'));
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $ispId = $this->getIspId();
+        $query = $this->filteredVouchersQuery($request, $ispId)->with(['router', 'plan']);
+        $filename = 'vouchers-'.now()->format('Ymd-His').'.csv';
+
+        return CsvExporter::download($filename, [
+            'Voucher Code', 'Type', 'Time Limit (Hours)', 'Data Limit (MB)', 'Speed Profile',
+            'Price', 'Status', 'Expires At', 'Router', 'Plan', 'Created At', 'Used At',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($vouchers) use ($out) {
+                foreach ($vouchers as $voucher) {
+                    fputcsv($out, [
+                        $voucher->voucher_code,
+                        $voucher->voucher_type,
+                        $voucher->time_limit_hours ?? '',
+                        $voucher->data_limit_mb ?? '',
+                        $voucher->speed_profile ?? '',
+                        $voucher->price ?? '',
+                        $voucher->status,
+                        $voucher->expires_at?->format('Y-m-d H:i:s') ?? '',
+                        $voucher->router->name ?? '',
+                        $voucher->plan->name ?? '',
+                        $voucher->created_at->format('Y-m-d H:i:s'),
+                        $voucher->used_at?->format('Y-m-d H:i:s') ?? '',
+                    ]);
+                }
+            });
+        });
+    }
+
+    /**
+     * @deprecated Use exportCsv via isp.vouchers.export.csv
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        return $this->exportCsv($request);
+    }
+
+    protected function filteredVouchersQuery(Request $request, int $ispId): Builder
+    {
         $query = Voucher::where('isp_id', $ispId)
             ->with(['router', 'plan', 'creator', 'usedByCustomer'])
             ->latest();
 
-        // Filter by status
-        if ($request->has('status') && $request->status) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // Filter by router
-        if ($request->has('router_id') && $request->router_id) {
+        if ($request->filled('router_id')) {
             $query->where('router_id', $request->router_id);
         }
 
-        // Filter by voucher type
-        if ($request->has('voucher_type') && $request->voucher_type) {
+        if ($request->filled('voucher_type')) {
             $query->where('voucher_type', $request->voucher_type);
         }
 
-        // Search
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('voucher_code', 'like', "%{$search}%")
-                    ->orWhere('notes', 'like', "%{$search}%");
+        if ($pattern = SearchHelper::likePattern($request->search)) {
+            $query->where(function ($q) use ($pattern) {
+                $q->where('voucher_code', 'like', $pattern)
+                    ->orWhere('notes', 'like', $pattern);
             });
         }
 
-        // Date range
-        if ($request->has('date_from') && $request->date_from) {
+        if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->date_from);
         }
-        if ($request->has('date_to') && $request->date_to) {
+
+        if ($request->filled('date_to')) {
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $vouchers = $query->paginate(50)->appends($request->query());
-
-        // Get routers for filter dropdown
-        $routers = Router::where('isp_id', $ispId)->get();
-
-        return view('isp.vouchers.index', compact('vouchers', 'routers'));
+        return $query;
     }
 
     /**
@@ -80,8 +153,9 @@ class VoucherController extends BaseController
             ->where('access_type', 'hotspot')
             ->where('is_active', true)
             ->get();
+        $formFields = $this->formSettings->resolvedFields('voucher', $ispId);
 
-        return view('isp.vouchers.create', compact('routers', 'plans'));
+        return view('isp.vouchers.create', compact('routers', 'plans', 'formFields'));
     }
 
     /**
@@ -89,17 +163,20 @@ class VoucherController extends BaseController
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'router_id' => 'required|exists:routers,id',
-            'voucher_type' => 'required|in:time,data',
-            'time_limit_hours' => 'required_if:voucher_type,time|integer|min:1',
-            'data_limit_mb' => 'required_if:voucher_type,data|integer|min:1',
-            'speed_profile' => 'nullable|string',
-            'price' => 'nullable|numeric|min:0',
-            'expires_at' => 'nullable|date|after:now',
-            'assigned_to' => 'nullable|exists:customers,id',
-            'notes' => 'nullable|string|max:1000',
-        ]);
+        $ispId = $this->getIspId();
+
+        $this->formSettings->validateRequest($request, 'voucher', [
+            'router_id' => ['exists:routers,id'],
+            'plan_id' => ['nullable', 'exists:plans,id'],
+            'voucher_type' => ['in:time,data'],
+            'time_limit_hours' => ['required_if:voucher_type,time', 'integer', 'min:1'],
+            'data_limit_mb' => ['required_if:voucher_type,data', 'integer', 'min:1'],
+            'speed_profile' => ['nullable', 'string'],
+            'price' => ['nullable', 'numeric', 'min:0'],
+            'expires_at' => ['nullable', 'date', 'after:now'],
+            'assigned_to' => ['nullable', 'exists:customers,id'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ], $ispId);
 
         $isp = auth()->user()->isp;
         $router = Router::findOrFail($request->router_id);
@@ -256,6 +333,28 @@ class VoucherController extends BaseController
     }
 
     /**
+     * Cancel an unused active voucher.
+     */
+    public function deactivate(Voucher $voucher)
+    {
+        $this->ensureIspAccess($voucher);
+
+        if ($voucher->status !== 'active') {
+            return back()->with('error', 'Only active unused vouchers can be deactivated.');
+        }
+
+        try {
+            if (! $this->voucherService->deactivate($voucher)) {
+                return back()->with('error', 'Failed to deactivate voucher.');
+            }
+
+            return back()->with('success', 'Voucher deactivated and removed from router when applicable.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to deactivate voucher: '.$e->getMessage());
+        }
+    }
+
+    /**
      * Delete a voucher
      */
     public function destroy(Voucher $voucher)
@@ -273,74 +372,5 @@ class VoucherController extends BaseController
         } catch (\Exception $e) {
             return back()->with('error', 'Failed to delete voucher: '.$e->getMessage());
         }
-    }
-
-    /**
-     * Export vouchers (CSV)
-     */
-    public function export(Request $request)
-    {
-        $ispId = $this->getIspId();
-
-        $query = Voucher::where('isp_id', $ispId);
-
-        // Apply same filters as index
-        if ($request->has('status') && $request->status) {
-            $query->where('status', $request->status);
-        }
-        if ($request->has('router_id') && $request->router_id) {
-            $query->where('router_id', $request->router_id);
-        }
-
-        $vouchers = $query->with(['router', 'plan'])->get();
-
-        $filename = 'vouchers_'.date('Y-m-d_His').'.csv';
-
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
-
-        $callback = function () use ($vouchers) {
-            $file = fopen('php://output', 'w');
-
-            // Header row
-            fputcsv($file, [
-                'Voucher Code',
-                'Type',
-                'Time Limit (Hours)',
-                'Data Limit (MB)',
-                'Speed Profile',
-                'Price',
-                'Status',
-                'Expires At',
-                'Router',
-                'Plan',
-                'Created At',
-                'Used At',
-            ]);
-
-            // Data rows
-            foreach ($vouchers as $voucher) {
-                fputcsv($file, [
-                    $voucher->voucher_code,
-                    $voucher->voucher_type,
-                    $voucher->time_limit_hours ?? '',
-                    $voucher->data_limit_mb ?? '',
-                    $voucher->speed_profile ?? '',
-                    $voucher->price ?? '',
-                    $voucher->status,
-                    $voucher->expires_at?->format('Y-m-d H:i:s') ?? '',
-                    $voucher->router->name ?? '',
-                    $voucher->plan->name ?? '',
-                    $voucher->created_at->format('Y-m-d H:i:s'),
-                    $voucher->used_at?->format('Y-m-d H:i:s') ?? '',
-                ]);
-            }
-
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
     }
 }

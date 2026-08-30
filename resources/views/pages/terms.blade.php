@@ -3,7 +3,11 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Terms of Service - {{ config('app.name', 'ISP Billing') }}</title>
+        <x-seo-meta
+            title="Terms of Service · {{ config('app.name', 'PrimeBilling') }}"
+            description="Terms of Service for {{ config('app.name', 'PrimeBilling') }} — ISP billing platform usage, accounts, payments, and service availability."
+            robots="index, follow"
+        />
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
         @vite(['resources/css/app.css', 'resources/js/app.js'])

@@ -11,7 +11,7 @@
         :primaryHref="route('isp.routers.create')"
     >
         <x-slot name="actions">
-            <a href="{{ route('isp.routers.export.csv', request()->query()) }}" class="pb-btn" title="Download filtered fleet as CSV">Export CSV</a>
+            <x-export-dropdown :formats="$exportFormats ?? []" label="Export" />
             <span class="isp-noc-live-pill" title="Live telemetry polled every minute via PollRouterHealthJob">
                 <span class="isp-noc-live-pill__dot" aria-hidden="true"></span>
                 Live NOC
@@ -237,7 +237,13 @@
                 <span class="text-[10px] font-medium text-slate-400">Search · status · branch · health · transport</span>
             </div>
         </div>
-        <form action="{{ route('isp.routers.index') }}" method="GET" class="isp-noc-filter-form px-4 py-4 sm:px-5">
+        <form
+            action="{{ route('isp.routers.index') }}"
+            method="GET"
+            class="isp-noc-filter-form px-4 py-4 sm:px-5"
+            data-turbo-frame="pb-main"
+            x-data="pbFilterForm({ autoSearch: true })"
+        >
             <div class="isp-noc-filter-grid">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -275,13 +281,17 @@
                     <option value="health" @selected(request('sort') === 'health')>Health (high → low)</option>
                     <option value="customers" @selected(request('sort') === 'customers')>Most subscribers</option>
                 </select>
+                <select name="per_page" class="isp-noc-filter-select" aria-label="Per page">
+                    @foreach ([10, 15, 25, 50] as $size)
+                        <option value="{{ $size }}" @selected((int) request('per_page', 15) === $size)>{{ $size }} / page</option>
+                    @endforeach
+                </select>
             </div>
-            <div class="mt-4 flex flex-wrap gap-2">
-                <button type="submit" class="isp-noc-toolbar-btn isp-noc-toolbar-btn--primary">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-                    Apply filters
-                </button>
-                <a href="{{ route('isp.routers.index') }}" class="isp-noc-toolbar-btn">Reset</a>
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+                <a href="{{ route('isp.routers.index') }}" data-turbo-frame="pb-main" class="isp-noc-toolbar-btn">Reset</a>
+                @if (count($filterChips ?? []) > 0)
+                    <x-filter-chips :chips="$filterChips" class="flex-1" />
+                @endif
             </div>
         </form>
     </div>
@@ -542,7 +552,19 @@
             @endforeach
         </div>
 
-        <div class="pb-card p-4">{{ $routers->withQueryString()->links() }}</div>
+        <div class="pb-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+                Showing
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ $routers->firstItem() ?? 0 }}</span>
+                –
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ $routers->lastItem() ?? 0 }}</span>
+                of
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ number_format($routers->total()) }}</span>
+            </p>
+            @if ($routers->hasPages())
+                <div class="pb-pagination">{{ $routers->withQueryString()->links() }}</div>
+            @endif
+        </div>
     @endif
 
     {{-- Quick view modal --}}

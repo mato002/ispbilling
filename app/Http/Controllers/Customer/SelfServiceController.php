@@ -38,10 +38,24 @@ class SelfServiceController extends Controller
 
     public function registerStore(Request $request): RedirectResponse
     {
-        /** @var ISP $isp */
+        /** @var ISP|null $isp */
         $isp = $request->attributes->get('landing_isp');
         if (! $isp instanceof ISP) {
             abort(404);
+        }
+
+        $isp->loadMissing('saasPlan');
+        if (! empty(data_get($isp->settings, 'maintenance.pause_new_signups'))) {
+            return back()
+                ->withInput()
+                ->withErrors(['error' => 'New signups are temporarily paused for this network.']);
+        }
+
+        $currentCount = Customer::where('isp_id', $isp->id)->count();
+        if ($isp->saasPlan && ! $isp->saasPlan->allowsCustomerCount($currentCount + 1)) {
+            return back()
+                ->withInput()
+                ->withErrors(['error' => 'This network has reached its subscriber limit. Contact your provider for help.']);
         }
 
         $validated = $request->validate([
@@ -122,7 +136,7 @@ class SelfServiceController extends Controller
             return redirect()->route('customer.login');
         }
 
-        $customer = Customer::with(['activeSubscription.plan', 'router', 'isp'])
+        $customer = Customer::with(['subscriptions.plan', 'router', 'isp'])
             ->findOrFail($customerId);
 
         // Get active session
@@ -174,7 +188,7 @@ class SelfServiceController extends Controller
             return redirect()->route('customer.login');
         }
 
-        $customer = Customer::findOrFail($customerId);
+        $customer = Customer::with('isp')->findOrFail($customerId);
 
         $usageStats = CustomerUsageStat::where('customer_id', $customerId)
             ->orderBy('date', 'desc')
@@ -194,7 +208,7 @@ class SelfServiceController extends Controller
             return redirect()->route('customer.login');
         }
 
-        $customer = Customer::findOrFail($customerId);
+        $customer = Customer::with('isp')->findOrFail($customerId);
 
         $invoices = $customer->invoices()
             ->orderBy('created_at', 'desc')
@@ -214,7 +228,7 @@ class SelfServiceController extends Controller
             return redirect()->route('customer.login');
         }
 
-        $customer = Customer::findOrFail($customerId);
+        $customer = Customer::with('isp')->findOrFail($customerId);
 
         $sessions = HotspotSession::where('customer_id', $customerId)
             ->orderBy('started_at', 'desc')

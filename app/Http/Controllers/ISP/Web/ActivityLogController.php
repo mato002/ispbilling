@@ -91,10 +91,12 @@ class ActivityLogController extends BaseController
         $isDemoStream = false;
         $anyFilter = collect(['search', 'action', 'user_id', 'model_type', 'severity', 'module', 'event_type', 'date_from', 'date_to'])
             ->contains(fn (string $k) => $request->filled($k));
+        // Demo filler only when explicitly requested in local/dev — never masquerade as real audits.
         if (
             $logs->isEmpty()
             && ! $anyFilter
             && app()->environment(['local', 'development'])
+            && $request->boolean('demo')
         ) {
             $logs = $this->demoPaginator($ispId, $request);
             $isDemoStream = true;

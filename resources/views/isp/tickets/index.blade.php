@@ -13,69 +13,83 @@
 @endsection
 
 @section('content')
-    <div class="space-y-6">
-        <x-filter-bar :action="route('isp.tickets.index')">
-                <div>
-                    <label class="isp-form-label">Search</label>
-                    <input type="text" name="q" value="{{ request('q') }}" class="isp-form-input" placeholder="Subject, customer">
-                </div>
-                <div>
-                    <label class="isp-form-label">Status</label>
-                    <select name="status" class="isp-form-select">
-                        <option value="">All</option>
-                        @foreach (['open' => 'Open', 'in_progress' => 'In Progress', 'resolved' => 'Resolved', 'closed' => 'Closed'] as $value => $label)
-                            <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="isp-form-label">Priority</label>
-                    <select name="priority" class="isp-form-select">
-                        <option value="">All</option>
-                        @foreach (['low' => 'Low', 'normal' => 'Normal', 'high' => 'High'] as $value => $label)
-                            <option value="{{ $value }}" @selected(request('priority') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="flex items-end">
-                    <button type="submit" class="pb-btn pb-btn-primary">Apply</button>
-                    <a href="{{ route('isp.tickets.index') }}" class="pb-btn ml-2">Reset</a>
-                </div>
-        </x-filter-bar>
+    <x-resource-index
+        :filter-action="route('isp.tickets.index')"
+        :filter-chips="$filterChips ?? []"
+        :export-formats="$exportFormats ?? []"
+        :paginator="$tickets"
+        :empty="$tickets->isEmpty()"
+        empty-title="No tickets found"
+        empty-message="Create a ticket or adjust your filters."
+        empty-cta-label="New Ticket"
+        :empty-cta-href="route('isp.tickets.create')"
+    >
+        <x-slot:filters>
+            <x-listing-filters.search
+                name="q"
+                placeholder="Subject, customer…"
+            />
+            <x-listing-filters.select
+                name="status"
+                label="Status"
+                placeholder="All"
+                :options="[
+                    'open' => 'Open',
+                    'in_progress' => 'In Progress',
+                    'resolved' => 'Resolved',
+                    'closed' => 'Closed',
+                ]"
+            />
+            <x-listing-filters.select
+                name="priority"
+                label="Priority"
+                placeholder="All"
+                :options="[
+                    'low' => 'Low',
+                    'normal' => 'Normal',
+                    'high' => 'High',
+                ]"
+            />
+            <x-listing-filters.per-page />
+        </x-slot:filters>
 
-        <x-data-table>
-            <thead>
-                <tr>
-                    <th>ID</th><th>Subject</th><th>Customer</th><th>Priority</th><th>Status</th><th>Assigned To</th><th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($tickets as $ticket)
+        <x-slot:table>
+            <x-data-table>
+                <thead>
                     <tr>
-                        <td>#{{ $ticket->id }}</td>
-                        <td><a href="{{ route('isp.tickets.show', $ticket) }}" class="text-indigo-600 hover:text-indigo-700 font-semibold">{{ $ticket->subject }}</a></td>
-                        <td>
-                            @if($ticket->customer)
-                                {{ $ticket->customer->full_name }} ({{ $ticket->customer->username }})
-                            @else
-                                -
-                            @endif
-                        </td>
-                        <td><x-status-badge :status="$ticket->priority" /></td>
-                        <td><x-status-badge :status="str_replace('_', ' ', $ticket->status)" /></td>
-                        <td>{{ optional($ticket->assignedTo)->name ?? '-' }}</td>
-                        <td class="text-right"><a href="{{ route('isp.tickets.show', $ticket) }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-semibold">View</a></td>
+                        <th>ID</th>
+                        <th>Subject</th>
+                        <th>Customer</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <x-table-actions.header />
                     </tr>
-                @empty
-                    <tr>
-                        <td colspan="7" class="text-center text-sm text-slate-500 py-10">
-                            No tickets found.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </x-data-table>
-        <div class="pb-card p-4">{{ $tickets->links() }}</div>
-    </div>
+                </thead>
+                <tbody>
+                    @foreach ($tickets as $ticket)
+                        <x-listing-table.row :href="route('isp.tickets.show', $ticket)">
+                            <td>#{{ $ticket->id }}</td>
+                            <td><a href="{{ route('isp.tickets.show', $ticket) }}" class="text-indigo-600 hover:text-indigo-700 font-semibold">{{ $ticket->subject }}</a></td>
+                            <td>
+                                @if ($ticket->customer)
+                                    {{ $ticket->customer->full_name }} ({{ $ticket->customer->username }})
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td><x-status-badge :status="$ticket->priority" /></td>
+                            <td><x-status-badge :status="str_replace('_', ' ', $ticket->status)" /></td>
+                            <td>{{ optional($ticket->assignedTo)->name ?? '-' }}</td>
+                            <td class="text-right">
+                                <x-table-actions>
+                                    <x-table-actions.link :href="route('isp.tickets.show', $ticket)" label="View" />
+                                </x-table-actions>
+                            </td>
+                        </x-listing-table.row>
+                    @endforeach
+                </tbody>
+            </x-data-table>
+        </x-slot:table>
+    </x-resource-index>
 @endsection
-

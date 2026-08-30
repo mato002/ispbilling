@@ -32,10 +32,30 @@ class EnsureSaasOnboardingComplete
         }
 
         if (! $user->isIspAdmin()) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'message' => 'SaaS onboarding must be completed by your ISP administrator.',
+                    'code' => 'saas_onboarding_pending_staff',
+                ], 403);
+            }
+
             return response()
                 ->view('isp.saas-onboarding-pending-staff', ['isp' => $isp], 403);
         }
 
-        return redirect()->route('isp.saas-onboarding.show');
+        // Let the real dashboard render so setup can overlay it; lock other console routes.
+        if ($request->routeIs('isp.dashboard')) {
+            return $next($request);
+        }
+
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'message' => 'Complete platform SaaS onboarding before using the API.',
+                'code' => 'saas_onboarding_required',
+                'onboarding_url' => route('isp.dashboard'),
+            ], 403);
+        }
+
+        return redirect()->route('isp.dashboard');
     }
 }

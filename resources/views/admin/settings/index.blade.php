@@ -104,6 +104,18 @@
         <div class="space-y-6">
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Form controls</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        Manage field visibility, requirements, and defaults for platform admin forms.
+                    </p>
+                    <a href="{{ route('admin.settings.forms.index') }}" data-turbo-frame="pb-main" data-turbo-action="advance" class="inline-flex px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium">
+                        Open forms control center
+                    </a>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h3>
                     
                     <div class="space-y-3">

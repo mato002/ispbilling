@@ -2,43 +2,109 @@
 
 namespace App\Http\Controllers\ISP\Web;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Models\TicketReply;
+use App\Services\NotificationService;
+use App\Support\Export\CsvExporter;
+use App\Support\Search\SearchHelper;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HelpdeskController extends Controller
 {
+    use InteractsWithListings;
+
+    public function __construct(protected NotificationService $notifications) {}
+
     public function index(Request $request): View
     {
         $isp = Auth::user()->isp;
 
+        $query = $this->filteredHelpdeskQuery($request, $isp->id);
+        $perPage = $this->resolvePerPage($request);
+        $tickets = $query->paginate($perPage)->withQueryString();
+
+        $filterChips = $this->listingFilterChips($request, route('isp.helpdesk.index'), [
+            'q' => 'Search',
+            'status' => [
+                'label' => 'Status',
+                'values' => [
+                    'open' => 'Open',
+                    'in_progress' => 'In progress',
+                    'resolved' => 'Resolved',
+                    'closed' => 'Closed',
+                ],
+            ],
+            'priority' => [
+                'label' => 'Priority',
+                'values' => [
+                    'low' => 'Low',
+                    'normal' => 'Normal',
+                    'high' => 'High',
+                ],
+            ],
+        ]);
+
+        $exportFormats = $this->listingExportFormats($request, route('isp.helpdesk.export.csv'));
+
+        return view('isp.helpdesk.index', compact('tickets', 'filterChips', 'exportFormats'));
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $isp = Auth::user()->isp;
+        $query = $this->filteredHelpdeskQuery($request, $isp->id);
+        $filename = 'helpdesk-tickets-'.now()->format('Ymd-His').'.csv';
+
+        return CsvExporter::download($filename, [
+            'ID', 'Subject', 'Status', 'Priority', 'Created by', 'Assigned to', 'Created', 'Updated',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($tickets) use ($out) {
+                foreach ($tickets as $ticket) {
+                    fputcsv($out, [
+                        $ticket->id,
+                        $ticket->subject,
+                        $ticket->status,
+                        $ticket->priority,
+                        $ticket->createdBy?->name,
+                        $ticket->assignedTo?->name,
+                        $ticket->created_at?->format('Y-m-d H:i:s'),
+                        $ticket->updated_at?->format('Y-m-d H:i:s'),
+                    ]);
+                }
+            });
+        });
+    }
+
+    protected function filteredHelpdeskQuery(Request $request, int $ispId): Builder
+    {
         $query = Ticket::with(['createdBy', 'assignedTo'])
-            ->where('isp_id', $isp->id)
+            ->where('isp_id', $ispId)
             ->platformTickets()
             ->latest();
 
-        if ($status = $request->get('status')) {
-            $query->where('status', $status);
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
         }
 
-        if ($priority = $request->get('priority')) {
-            $query->where('priority', $priority);
+        if ($request->filled('priority')) {
+            $query->where('priority', $request->priority);
         }
 
-        if ($search = $request->get('q')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('subject', 'like', '%'.$search.'%')
-                    ->orWhere('message', 'like', '%'.$search.'%');
+        if ($pattern = SearchHelper::likePattern($request->q)) {
+            $query->where(function ($q) use ($pattern) {
+                $q->where('subject', 'like', $pattern)
+                    ->orWhere('message', 'like', $pattern);
             });
         }
 
-        $tickets = $query->paginate(20)->withQueryString();
-
-        return view('isp.helpdesk.index', compact('tickets'));
+        return $query;
     }
 
     public function create(): View
@@ -74,6 +140,8 @@ class HelpdeskController extends Controller
             'ticket_kind' => Ticket::KIND_PLATFORM,
         ]);
 
+        $this->notifications->supportTicketEvent($ticket, 'created', 'Opened by '.$user->name.' ('.$isp->name.')');
+
         return redirect()
             ->route('isp.helpdesk.show', $ticket)
             ->with('success', 'Your request was sent to PrimeBilling support.');
@@ -99,6 +167,12 @@ class HelpdeskController extends Controller
 
         $ticket->update($data);
 
+        $this->notifications->supportTicketEvent(
+            $ticket,
+            'status',
+            'Status set to '.$data['status'].' by '.Auth::user()->name
+        );
+
         return back()->with('success', 'Ticket updated successfully.');
     }
 
@@ -120,6 +194,12 @@ class HelpdeskController extends Controller
         if ($ticket->status === Ticket::STATUS_OPEN) {
             $ticket->update(['status' => Ticket::STATUS_IN_PROGRESS]);
         }
+
+        $this->notifications->supportTicketEvent(
+            $ticket,
+            'replied',
+            'ISP reply from '.Auth::user()->name
+        );
 
         return back()->with('success', 'Reply added successfully.');
     }

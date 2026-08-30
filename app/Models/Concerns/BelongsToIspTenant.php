@@ -44,4 +44,15 @@ trait BelongsToIspTenant
     {
         return $query->withoutGlobalScope('isp_tenant');
     }
+
+    /**
+     * Explicit tenant filter (e.g. admin tooling or cross-check queries).
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeForIsp(Builder $query, int|string $ispId): Builder
+    {
+        return $query->where($query->getModel()->getTable().'.isp_id', $ispId);
+    }
 }

@@ -21,6 +21,7 @@ class EnforceBandwidthCaps implements ShouldQueue
         // Find active subscriptions whose plans have a data limit
         $subscriptions = Subscription::with(['plan', 'customer.router'])
             ->where('status', 'active')
+            ->whereNull('data_exhausted_at')
             ->whereHas('plan', function ($q) {
                 $q->whereNotNull('data_limit_mb')
                     ->where('data_limit_mb', '>', 0);
@@ -63,9 +64,12 @@ class EnforceBandwidthCaps implements ShouldQueue
             $mikrotik->disableUser($customer);
 
             // Update subscription and customer status (track when cap was enforced)
+            $dataUsedMb = (int) ceil($totalBytes / (1024 * 1024));
             $subscription->update([
                 'status' => 'suspended_due_to_cap',
                 'last_cap_enforced_at' => now(),
+                'data_exhausted_at' => now(),
+                'data_used_mb' => $dataUsedMb,
             ]);
             $customer->suspend();
 

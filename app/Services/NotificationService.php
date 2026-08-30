@@ -203,6 +203,68 @@ class NotificationService
     }
 
     /**
+     * Fleet router migration batch finished (completed, failed, or rolled back).
+     */
+    public function routerMigrationFinished(\App\Models\RouterMigrationBatch $batch): Notification
+    {
+        $from = $batch->oldRouter?->name ?? ('#'.$batch->old_router_id);
+        $to = $batch->newRouter?->name ?? ('#'.$batch->new_router_id);
+
+        $title = match ($batch->status) {
+            \App\Models\RouterMigrationBatch::STATUS_FAILED => 'Router migration failed',
+            \App\Models\RouterMigrationBatch::STATUS_ROLLED_BACK => 'Router migration rolled back',
+            default => 'Router migration completed',
+        };
+
+        $message = "Batch #{$batch->id}: {$from} → {$to}. "
+            ."Success {$batch->success_count}/{$batch->total_customers}"
+            .($batch->failed_count ? ", failed {$batch->failed_count}" : '')
+            .'.';
+
+        if ($batch->status === \App\Models\RouterMigrationBatch::STATUS_ROLLED_BACK) {
+            $message = "Batch #{$batch->id} rolled back to {$from}. Previously moved {$batch->success_count} subscriber(s).";
+        }
+
+        $type = match ($batch->status) {
+            \App\Models\RouterMigrationBatch::STATUS_FAILED => 'error',
+            \App\Models\RouterMigrationBatch::STATUS_ROLLED_BACK => 'warning',
+            default => ($batch->failed_count > 0 ? 'warning' : 'success'),
+        };
+
+        return $this->createAndBroadcast($batch->isp_id, $title, $message, $type);
+    }
+
+    /**
+     * Customer support ticket created / updated / replied.
+     */
+    public function supportTicketEvent(\App\Models\Ticket $ticket, string $event, ?string $detail = null): Notification
+    {
+        $kindLabel = $ticket->isPlatformTicket() ? 'Platform helpdesk' : 'Support ticket';
+        $title = match ($event) {
+            'created' => "{$kindLabel} opened #{$ticket->id}",
+            'replied' => "{$kindLabel} reply #{$ticket->id}",
+            'assigned' => "{$kindLabel} assigned #{$ticket->id}",
+            'status' => "{$kindLabel} status #{$ticket->id}",
+            default => "{$kindLabel} #{$ticket->id}",
+        };
+
+        $message = $ticket->subject;
+        if ($detail) {
+            $message .= ' — '.$detail;
+        }
+
+        $type = match ($event) {
+            'created' => 'info',
+            'replied' => 'info',
+            'assigned' => 'warning',
+            'status' => ($ticket->status === 'closed' || $ticket->status === 'resolved') ? 'success' : 'info',
+            default => 'info',
+        };
+
+        return $this->createAndBroadcast($ticket->isp_id, $title, $message, $type);
+    }
+
+    /**
      * Router status notification
      */
     public function routerStatus($router, $status): Notification

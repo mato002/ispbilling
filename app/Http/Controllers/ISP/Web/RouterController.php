@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ISP\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Jobs\BackupRouterConfigJob;
 use App\Jobs\PollRouterHealthJob;
 use App\Jobs\RebootRouterJob;
@@ -12,6 +13,7 @@ use App\Models\RouterBackup;
 use App\Models\RouterMetric;
 use App\Models\User;
 use App\Services\MikroTikService;
+use App\Support\FormSettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
@@ -19,6 +21,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RouterController extends Controller
 {
+    use InteractsWithListings;
+
+    public function __construct(private readonly FormSettingsService $formSettings) {}
+
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
@@ -27,6 +33,67 @@ class RouterController extends Controller
         $fleetStats = $this->buildFleetStats(clone $fleetBase);
         $networkInsights = $this->buildNetworkInsights(clone $fleetBase);
 
+        $query = $this->filteredRoutersQuery($request, $ispId);
+
+        $perPage = $this->resolvePerPage($request);
+        $routers = $query->paginate($perPage)->withQueryString();
+
+        $routers->through(function (Router $router) {
+            $router->setAttribute('noc', $router->operationalSnapshot());
+
+            return $router;
+        });
+
+        $filterChips = $this->listingFilterChips($request, route('isp.routers.index'), [
+            'q' => 'Search',
+            'is_active' => [
+                'label' => 'Status',
+                'values' => ['1' => 'Active', '0' => 'Inactive'],
+            ],
+            'branch' => 'Branch',
+            'health' => [
+                'label' => 'Reachability',
+                'values' => [
+                    'online' => 'Online',
+                    'offline' => 'Offline',
+                    'warn' => 'Degraded',
+                    'ok' => 'Healthy',
+                    'unknown' => 'Unknown',
+                ],
+            ],
+            'conn_type' => [
+                'label' => 'Transport',
+                'values' => ['ssl' => 'SSL', 'plain' => 'Plain'],
+            ],
+            'lifecycle' => 'Lifecycle',
+            'sort' => [
+                'label' => 'Sort',
+                'values' => [
+                    'latest' => 'Newest',
+                    'name' => 'Name',
+                    'latency' => 'Latency',
+                    'health' => 'Health',
+                    'customers' => 'Customers',
+                ],
+            ],
+        ]);
+
+        $exportFormats = $this->listingExportFormats($request, route('isp.routers.export.csv'));
+
+        return view('isp.routers.index', compact(
+            'routers',
+            'fleetStats',
+            'networkInsights',
+            'filterChips',
+            'exportFormats',
+        ));
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<Router>
+     */
+    protected function filteredRoutersQuery(Request $request, int $ispId)
+    {
         $query = Router::where('isp_id', $ispId)->withCount('customers');
 
         if ($request->filled('q')) {
@@ -60,7 +127,6 @@ class RouterController extends Controller
             }
         }
 
-        // Real reachability filter (was synthetic before).
         if ($request->filled('health')) {
             match ($request->health) {
                 'offline' => $query->where(function ($w) {
@@ -89,15 +155,7 @@ class RouterController extends Controller
             default => $query->latest(),
         };
 
-        $routers = $query->paginate(20)->appends($request->query());
-
-        $routers->through(function (Router $router) {
-            $router->setAttribute('noc', $router->operationalSnapshot());
-
-            return $router;
-        });
-
-        return view('isp.routers.index', compact('routers', 'fleetStats', 'networkInsights'));
+        return $query;
     }
 
     /**
@@ -180,20 +238,33 @@ class RouterController extends Controller
 
     public function create()
     {
-        $owners = User::where('isp_id', auth()->user()->isp_id)
+        $ispId = auth()->user()->isp_id;
+        $owners = User::where('isp_id', $ispId)
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
+        $formFields = $this->formSettings->resolvedFields('router', $ispId);
+        $routerDefaults = data_get(auth()->user()->isp?->settings, 'network.router_defaults', []);
 
-        return view('isp.routers.create', compact('owners'));
+        return view('isp.routers.create', compact('owners', 'formFields', 'routerDefaults'));
     }
 
     public function store(Request $request)
     {
         $data = $this->validateRouterPayload($request);
 
+        $defaults = data_get(auth()->user()->isp?->settings, 'network.router_defaults', []);
         $data['isp_id'] = auth()->user()->isp_id;
-        $data['use_ssl'] = $request->boolean('use_ssl');
+        $data['use_ssl'] = $request->has('use_ssl')
+            ? $request->boolean('use_ssl')
+            : (bool) ($defaults['use_ssl_by_default'] ?? false);
         $data['is_active'] = $request->boolean('is_active', true);
+
+        if (empty($data['port']) && ! empty($defaults['default_api_port'])) {
+            $data['port'] = (int) $defaults['default_api_port'];
+        }
+        if (empty($data['lifecycle_status']) && ! empty($defaults['lifecycle_default'])) {
+            $data['lifecycle_status'] = $defaults['lifecycle_default'];
+        }
 
         $router = Router::create($data);
 
@@ -313,8 +384,9 @@ class RouterController extends Controller
         $owners = User::where('isp_id', auth()->user()->isp_id)
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
+        $formFields = $this->formSettings->resolvedFields('router', $router->isp_id);
 
-        return view('isp.routers.edit', compact('router', 'owners'));
+        return view('isp.routers.edit', compact('router', 'owners', 'formFields'));
     }
 
     public function update(Request $request, Router $router)
@@ -562,27 +634,7 @@ class RouterController extends Controller
     public function exportCsv(Request $request): StreamedResponse
     {
         $ispId = auth()->user()->isp_id;
-        $query = Router::where('isp_id', $ispId)->withCount('customers');
-
-        // Reuse the filters from index() in a lightweight way.
-        if ($request->filled('q')) {
-            $q = '%'.$request->q.'%';
-            $query->where(function ($w) use ($q) {
-                $w->where('name', 'like', $q)
-                    ->orWhere('ip_address', 'like', $q)
-                    ->orWhere('location', 'like', $q)
-                    ->orWhere('branch', 'like', $q);
-            });
-        }
-        if ($request->has('is_active') && $request->is_active !== '') {
-            $query->where('is_active', $request->is_active);
-        }
-        if ($request->filled('branch')) {
-            $query->where('branch', 'like', '%'.$request->branch.'%');
-        }
-        if ($request->filled('lifecycle')) {
-            $query->where('lifecycle_status', $request->lifecycle);
-        }
+        $query = $this->filteredRoutersQuery($request, $ispId);
 
         $filename = 'routers-'.now()->format('Ymd-His').'.csv';
 
@@ -658,29 +710,37 @@ class RouterController extends Controller
      */
     protected function validateRouterPayload(Request $request, ?Router $existing = null): array
     {
-        return $request->validate([
-            'name' => 'required|string|max:255',
-            'ip_address' => 'required|ip',
-            'port' => 'required|integer|min:1|max:65535',
-            'username' => 'required|string|max:255',
-            'password' => ($existing ? 'nullable' : 'required').'|string|max:255',
-            'location' => 'nullable|string|max:255',
-            'use_ssl' => 'nullable|boolean',
-            'is_active' => 'nullable|boolean',
-            // Asset
-            'vendor' => 'nullable|string|max:255',
-            'model' => 'nullable|string|max:255',
-            'serial_number' => 'nullable|string|max:255',
-            'mac_address' => 'nullable|string|max:32',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'branch' => 'nullable|string|max:255',
-            'tags' => 'nullable|string|max:512',
-            'owner_user_id' => 'nullable|integer|exists:users,id',
-            'lifecycle_status' => 'nullable|in:stock,live,maintenance,retired',
-            'purchase_date' => 'nullable|date',
-            'warranty_expiry' => 'nullable|date',
-            'monthly_cost' => 'nullable|numeric|min:0',
-        ]);
+        $ispId = auth()->user()->isp_id;
+
+        $rules = [
+            'name' => ['string', 'max:255'],
+            'ip_address' => ['ip'],
+            'port' => ['integer', 'min:1', 'max:65535'],
+            'username' => ['string', 'max:255'],
+            'password' => ['string', 'max:255'],
+            'location' => ['string', 'max:255'],
+            'is_active' => ['boolean'],
+            'use_ssl' => ['boolean'],
+            'vendor' => ['nullable', 'string', 'max:255'],
+            'model' => ['nullable', 'string', 'max:255'],
+            'serial_number' => ['nullable', 'string', 'max:255'],
+            'mac_address' => ['nullable', 'string', 'max:32'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'branch' => ['nullable', 'string', 'max:255'],
+            'tags' => ['nullable', 'string', 'max:512'],
+            'owner_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'lifecycle_status' => ['nullable', 'in:stock,live,maintenance,retired'],
+            'purchase_date' => ['nullable', 'date'],
+            'warranty_expiry' => ['nullable', 'date'],
+            'monthly_cost' => ['nullable', 'numeric', 'min:0'],
+        ];
+
+        if ($existing && ! $request->filled('password')) {
+            unset($rules['password']);
+            $request->request->remove('password');
+        }
+
+        return $this->formSettings->validateRequest($request, 'router', $rules, $ispId);
     }
 }

@@ -1,7 +1,11 @@
 <?php
 
 use App\Http\Middleware\CustomerSession;
+use App\Http\Middleware\HandleModalFormResponse;
+use App\Http\Middleware\HandleTurboFrameResponse;
+use App\Http\Middleware\EnsureIspPermission;
 use App\Http\Middleware\EnsureIspPlatformAccess;
+use App\Http\Middleware\EnsureIspWorkspaceAccess;
 use App\Http\Middleware\EnsureLandingIspPresent;
 use App\Http\Middleware\EnsureSaasOnboardingComplete;
 use App\Http\Middleware\EnsureSuperAdmin;
@@ -27,12 +31,18 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             ShareNotifications::class,
+            HandleModalFormResponse::class,
+            HandleTurboFrameResponse::class,
         ]);
 
         $middleware->alias([
             'customer.session' => CustomerSession::class,
             'validate.isp' => ValidateIsp::class,
             'ensure.isp.platform' => EnsureIspPlatformAccess::class,
+            'ensure.isp.workspace' => EnsureIspWorkspaceAccess::class,
+            'ensure.isp.can' => EnsureIspPermission::class,
+            'ensure.isp.operator' => \App\Http\Middleware\EnsureIspWorkspaceOperator::class,
+            'ensure.isp.technician' => \App\Http\Middleware\EnsureIspTechnician::class,
             'ensure.saas.onboarding' => EnsureSaasOnboardingComplete::class,
             'ensure.landing.isp' => EnsureLandingIspPresent::class,
             'ensure.superadmin' => EnsureSuperAdmin::class,

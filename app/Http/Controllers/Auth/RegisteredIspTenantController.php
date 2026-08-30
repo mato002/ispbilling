@@ -68,6 +68,6 @@ class RegisteredIspTenantController extends Controller
 
         Auth::login($user);
 
-        return redirect()->route('isp.saas-onboarding.show');
+        return redirect()->route('isp.dashboard');
     }
 }

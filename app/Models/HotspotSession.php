@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToIspTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Carbon\Carbon;
 
 class HotspotSession extends Model
@@ -49,6 +50,11 @@ class HotspotSession extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id');
+    }
+
+    public function dataUsageRecord(): HasOne
+    {
+        return $this->hasOne(DataUsage::class, 'hotspot_session_id');
     }
 
     public function getTotalBytesAttribute(): int

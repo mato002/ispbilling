@@ -2,19 +2,93 @@
 
 namespace App\Http\Controllers\ISP\Web;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
+use App\Support\Export\CsvExporter;
+use App\Support\FormSettingsService;
+use App\Support\PlanPackageTypes;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PlanController extends Controller
 {
+    use InteractsWithListings;
+
+    public function __construct(private readonly FormSettingsService $formSettings) {}
+
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
 
+        $query = $this->filteredPlansQuery($request, $ispId);
+        $perPage = $this->resolvePerPage($request);
+        $plans = $query->latest()->paginate($perPage)->withQueryString();
+
+        $filterChips = $this->listingFilterChips($request, route('isp.plans.index'), [
+            'package_type' => [
+                'label' => 'Package type',
+                'values' => PlanPackageTypes::labels(),
+            ],
+            'access_type' => [
+                'label' => 'Access type',
+                'values' => ['hotspot' => 'Hotspot', 'pppoe' => 'PPPoE'],
+            ],
+            'is_active' => [
+                'label' => 'Status',
+                'values' => ['1' => 'Active', '0' => 'Inactive'],
+            ],
+        ]);
+
+        $exportFormats = $this->listingExportFormats($request, route('isp.plans.export.csv'));
+
+        return view('isp.plans.index', compact('plans', 'filterChips', 'exportFormats'));
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $ispId = auth()->user()->isp_id;
+        $query = $this->filteredPlansQuery($request, $ispId)->latest();
+        $filename = 'plans-'.now()->format('Ymd-His').'.csv';
+
+        return CsvExporter::download($filename, [
+            'ID', 'Name', 'Package type', 'Access type', 'Billing type', 'Price', 'Duration (days)',
+            'Download (Kbps)', 'Upload (Kbps)', 'Data limit (MB)', 'One-time', 'Recurring', 'Active', 'Subscriptions', 'Created',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($plans) use ($out) {
+                foreach ($plans as $plan) {
+                    fputcsv($out, [
+                        $plan->id,
+                        $plan->name,
+                        $plan->package_type,
+                        $plan->access_type,
+                        $plan->billing_type,
+                        $plan->price,
+                        $plan->duration_days,
+                        $plan->download_speed_kbps,
+                        $plan->upload_speed_kbps,
+                        $plan->data_limit_mb,
+                        $plan->is_one_time ? 'Yes' : 'No',
+                        $plan->is_recurring ? 'Yes' : 'No',
+                        $plan->is_active ? 'Active' : 'Inactive',
+                        $plan->subscriptions_count,
+                        $plan->created_at?->format('Y-m-d H:i:s'),
+                    ]);
+                }
+            });
+        });
+    }
+
+    protected function filteredPlansQuery(Request $request, int $ispId): Builder
+    {
         $query = Plan::where('isp_id', $ispId)->withCount('subscriptions');
 
-        if ($request->has('access_type') && $request->access_type) {
+        if ($request->filled('package_type')) {
+            $query->where('package_type', $request->package_type);
+        }
+
+        if ($request->filled('access_type')) {
             $query->where('access_type', $request->access_type);
         }
 
@@ -22,38 +96,30 @@ class PlanController extends Controller
             $query->where('is_active', $request->is_active);
         }
 
-        $plans = $query->latest()->paginate(20)->appends($request->query());
-
-        return view('isp.plans.index', compact('plans'));
+        return $query;
     }
 
     public function create()
     {
-        return view('isp.plans.create');
+        $ispId = auth()->user()->isp_id;
+        $formFields = $this->formSettings->resolvedFields('plan', $ispId);
+
+        return view('isp.plans.create', compact('formFields'));
     }
 
     public function store(Request $request)
     {
         $ispId = auth()->user()->isp_id;
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'access_type' => 'required|in:hotspot,pppoe',
-            'price' => 'required|numeric|min:0',
-            'duration_days' => 'required|integer|min:1',
-            'speed_profile' => 'nullable|string',
-            'upload_speed_kbps' => 'nullable|integer|min:0',
-            'download_speed_kbps' => 'nullable|integer|min:0',
-            'billing_type' => 'required|in:time,data,unlimited',
-            'data_limit_mb' => 'nullable|integer|min:0|required_if:billing_type,data',
-            'time_limit_hours' => 'nullable|integer|min:0|required_if:billing_type,time',
-            'device_limit' => 'nullable|integer|min:0',
-            'is_active' => 'nullable|boolean',
-        ]);
-
-        $validated['isp_id'] = $ispId;
+        $validated = $this->formSettings->validateRequest(
+            $request,
+            'plan',
+            PlanPackageTypes::validationRules($request),
+            $ispId
+        );
         $validated['is_active'] = $request->has('is_active');
+        $validated = PlanPackageTypes::normalizePayload($validated);
+        $validated['isp_id'] = $ispId;
 
         Plan::create($validated);
 
@@ -76,7 +142,9 @@ class PlanController extends Controller
             abort(403);
         }
 
-        return view('isp.plans.edit', compact('plan'));
+        $formFields = $this->formSettings->resolvedFields('plan', $plan->isp_id);
+
+        return view('isp.plans.edit', compact('plan', 'formFields'));
     }
 
     public function update(Request $request, Plan $plan)
@@ -85,32 +153,20 @@ class PlanController extends Controller
             abort(403);
         }
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'access_type' => 'required|in:hotspot,pppoe',
-            'price' => 'required|numeric|min:0',
-            'duration_days' => 'required|integer|min:1',
-            'speed_profile' => 'nullable|string',
-            'upload_speed_kbps' => 'nullable|integer|min:0',
-            'download_speed_kbps' => 'nullable|integer|min:0',
-            'billing_type' => 'required|in:time,data,unlimited',
-            'data_limit_mb' => 'nullable|integer|min:0|required_if:billing_type,data',
-            'time_limit_hours' => 'nullable|integer|min:0|required_if:billing_type,time',
-            'device_limit' => 'nullable|integer|min:0',
-            'is_active' => 'nullable|boolean',
-        ]);
-
+        $validated = $this->formSettings->validateRequest(
+            $request,
+            'plan',
+            PlanPackageTypes::validationRules($request),
+            $plan->isp_id
+        );
         $validated['is_active'] = $request->has('is_active');
+        $validated = PlanPackageTypes::normalizePayload($validated);
 
         $plan->update($validated);
 
         return redirect()->route('isp.plans.index')->with('success', 'Plan updated successfully');
     }
 
-    /**
-     * Toggle plan active status
-     */
     public function toggleActive(Plan $plan)
     {
         if ($plan->isp_id !== auth()->user()->isp_id) {
@@ -126,9 +182,6 @@ class PlanController extends Controller
         return back()->with('success', $message);
     }
 
-    /**
-     * Activate plan
-     */
     public function activate(Plan $plan)
     {
         if ($plan->isp_id !== auth()->user()->isp_id) {
@@ -140,9 +193,6 @@ class PlanController extends Controller
         return back()->with('success', 'Plan activated successfully.');
     }
 
-    /**
-     * Deactivate plan
-     */
     public function deactivate(Plan $plan)
     {
         if ($plan->isp_id !== auth()->user()->isp_id) {

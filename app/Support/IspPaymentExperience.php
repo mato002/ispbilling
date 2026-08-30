@@ -18,6 +18,15 @@ class IspPaymentExperience
             'stk_account_reference' => 'payment_ref',
             'auto_activate_on_payment' => true,
             'sms_sender_id' => '',
+            'grace_period_days' => 0,
+            'auto_reconnect_on_payment' => true,
+            'auto_receipt_email' => true,
+            'auto_receipt_sms' => false,
+            'partial_payment_policy' => 'proportional',
+            'manual_payments_enabled' => true,
+            'offline_cash_enabled' => true,
+            'offline_bank_enabled' => true,
+            'credit_apply_next_cycle' => true,
         ];
     }
 

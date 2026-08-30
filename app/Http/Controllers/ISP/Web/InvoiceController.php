@@ -2,40 +2,103 @@
 
 namespace App\Http\Controllers\ISP\Web;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use App\Models\Payment;
+use App\Services\PaymentCompletionService;
+use App\Support\Export\CsvExporter;
 use App\Support\InvoiceTax;
+use App\Support\Search\SearchHelper;
 use Dompdf\Dompdf;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends Controller
 {
+    use InteractsWithListings;
+
+    public function __construct(protected PaymentCompletionService $paymentCompletionService) {}
+
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
 
+        $query = $this->filteredInvoicesQuery($request, $ispId);
+        $perPage = $this->resolvePerPage($request);
+        $invoices = $query->latest()->paginate($perPage)->withQueryString();
+
+        $filterChips = $this->listingFilterChips($request, route('isp.invoices.index'), [
+            'search' => 'Search',
+            'status' => [
+                'label' => 'Status',
+                'values' => [
+                    'pending' => 'Pending',
+                    'paid' => 'Paid',
+                    'overdue' => 'Overdue',
+                    'cancelled' => 'Cancelled',
+                ],
+            ],
+        ]);
+
+        $exportFormats = $this->listingExportFormats($request, route('isp.invoices.export.csv'));
+
+        return view('isp.invoices.index', compact('invoices', 'filterChips', 'exportFormats'));
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $ispId = auth()->user()->isp_id;
+        $query = $this->filteredInvoicesQuery($request, $ispId)->latest();
+        $filename = 'invoices-'.now()->format('Ymd-His').'.csv';
+
+        return CsvExporter::download($filename, [
+            'Invoice #', 'Customer', 'Phone', 'Status', 'Amount', 'Tax', 'Total',
+            'Issue date', 'Due date', 'Paid at',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($invoices) use ($out) {
+                foreach ($invoices as $invoice) {
+                    fputcsv($out, [
+                        $invoice->invoice_number,
+                        $invoice->customer?->full_name,
+                        $invoice->customer?->phone_number,
+                        $invoice->status,
+                        $invoice->amount,
+                        $invoice->tax,
+                        $invoice->total_amount,
+                        $invoice->issue_date?->format('Y-m-d'),
+                        $invoice->due_date?->format('Y-m-d'),
+                        $invoice->paid_at?->format('Y-m-d H:i:s'),
+                    ]);
+                }
+            });
+        });
+    }
+
+    protected function filteredInvoicesQuery(Request $request, int $ispId): Builder
+    {
         $query = Invoice::where('isp_id', $ispId)
             ->with(['customer', 'subscription']);
 
-        if ($request->has('status') && $request->status) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('invoice_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($customerQuery) use ($search) {
-                        $customerQuery->where('full_name', 'like', "%{$search}%")
-                            ->orWhere('phone_number', 'like', "%{$search}%");
+        if ($pattern = SearchHelper::likePattern($request->search)) {
+            $query->where(function ($q) use ($pattern) {
+                $q->where('invoice_number', 'like', $pattern)
+                    ->orWhereHas('customer', function ($customerQuery) use ($pattern) {
+                        $customerQuery->where('full_name', 'like', $pattern)
+                            ->orWhere('phone_number', 'like', $pattern);
                     });
             });
         }
 
-        $invoices = $query->latest()->paginate(20)->appends($request->query());
-
-        return view('isp.invoices.index', compact('invoices'));
+        return $query;
     }
 
     public function show(Invoice $invoice, Request $request)
@@ -154,5 +217,94 @@ class InvoiceController extends Controller
 
         return redirect()->route('isp.invoices.index')
             ->with('success', 'Invoice created successfully.');
+    }
+
+    public function cancel(Invoice $invoice): RedirectResponse
+    {
+        if ($invoice->isp_id !== auth()->user()->isp_id) {
+            abort(403);
+        }
+
+        if ($invoice->status === 'paid') {
+            return back()->with('error', 'Paid invoices cannot be cancelled.');
+        }
+
+        if ($invoice->status === 'cancelled') {
+            return back()->with('info', 'Invoice is already cancelled.');
+        }
+
+        if ($invoice->payments()->where('status', 'completed')->exists()) {
+            return back()->with('error', 'Cannot cancel an invoice that already has a completed payment.');
+        }
+
+        $invoice->payments()
+            ->where('status', 'pending')
+            ->get()
+            ->each(fn (Payment $payment) => $payment->markAsFailed());
+
+        $invoice->cancel('Cancelled by '.auth()->user()->name);
+
+        return redirect()
+            ->route('isp.invoices.show', $invoice)
+            ->with('success', 'Invoice cancelled.');
+    }
+
+    /**
+     * Record cash / manual payment and complete the invoice immediately.
+     */
+    public function markPaid(Request $request, Invoice $invoice): RedirectResponse
+    {
+        if ($invoice->isp_id !== auth()->user()->isp_id) {
+            abort(403);
+        }
+
+        if (! in_array($invoice->status, ['pending', 'overdue'], true)) {
+            return back()->with('error', 'Only pending or overdue invoices can be marked paid.');
+        }
+
+        $request->validate([
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $payment = DB::transaction(function () use ($invoice, $request) {
+            $pending = Payment::query()
+                ->where('invoice_id', $invoice->id)
+                ->where('status', 'pending')
+                ->where('payment_method', 'manual')
+                ->lockForUpdate()
+                ->latest('id')
+                ->first();
+
+            if ($pending) {
+                $pending->markAsCompleted();
+
+                return $pending->fresh();
+            }
+
+            $payment = Payment::create([
+                'isp_id' => $invoice->isp_id,
+                'customer_id' => $invoice->customer_id,
+                'invoice_id' => $invoice->id,
+                'payment_method' => 'manual',
+                'amount' => $invoice->total_amount,
+                'phone_number' => $invoice->customer?->phone_number,
+                'status' => 'pending',
+                'metadata' => [
+                    'recorded_by' => auth()->id(),
+                    'cash_mark_paid' => true,
+                    'notes' => $request->input('notes'),
+                ],
+            ]);
+
+            $payment->markAsCompleted();
+
+            return $payment->fresh();
+        });
+
+        $this->paymentCompletionService->processTenantPaymentSuccess($payment, true);
+
+        return redirect()
+            ->route('isp.invoices.show', $invoice)
+            ->with('success', 'Invoice marked paid. Subscription/service updated if linked.');
     }
 }

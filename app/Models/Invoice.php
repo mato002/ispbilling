@@ -76,6 +76,24 @@ class Invoice extends Model
         ]);
     }
 
+    public function cancel(?string $reason = null): void
+    {
+        if ($this->status === 'paid') {
+            throw new \RuntimeException('Paid invoices cannot be cancelled.');
+        }
+
+        if ($this->status === 'cancelled') {
+            return;
+        }
+
+        $notes = trim(($this->notes ? $this->notes."\n" : '').($reason ?: 'Cancelled by staff.'));
+
+        $this->update([
+            'status' => 'cancelled',
+            'notes' => $notes,
+        ]);
+    }
+
     public function calculatePenalty(float $penaltyRate = 0.05): float
     {
         if (!$this->isOverdue()) {

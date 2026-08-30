@@ -171,7 +171,7 @@ class MpesaService
     public function initiateStkPush(Payment $payment): array
     {
         $purpose = $payment->metadata['purpose'] ?? null;
-        $isPlatformCollection = in_array($purpose, ['platform_saas', 'saas_onboarding_verification'], true);
+        $isPlatformCollection = in_array($purpose, ['platform_saas', 'saas_onboarding_verification', 'sms_wallet_topup'], true);
 
         if ($this->isp === null && ! $isPlatformCollection) {
             Log::warning('Platform M-Pesa credentials used for a tenant customer payment', [
@@ -277,6 +277,7 @@ class MpesaService
                 'TransactionDesc' => match ($payment->metadata['purpose'] ?? null) {
                     'platform_saas' => 'PrimeBilling SaaS',
                     'saas_onboarding_verification' => 'PrimeBilling verify',
+                    'sms_wallet_topup' => 'PrimeBilling SMS wallet',
                     default => 'ISP Billing Payment - '.$payment->payment_reference,
                 },
             ];

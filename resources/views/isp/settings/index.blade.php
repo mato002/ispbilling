@@ -9,7 +9,7 @@
 @section('content')
     @php $S = $ispSettingsShell; @endphp
 
-    <x-isp-settings-workspace hide-meta="true">
+    <x-isp-settings-workspace hide-meta="true" :show-health="true">
         @if ($S)
             {{-- Mission metrics --}}
             <div class="isp-cc-hero pb-card isp-settings-panel overflow-hidden">
@@ -19,10 +19,7 @@
                         <div class="min-w-0">
                             <p class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Workspace posture</p>
                             <h2 class="mt-2 text-lg font-bold tracking-tight text-slate-900 dark:text-white sm:text-xl">Operational readiness</h2>
-                            <p class="isp-settings-hint mt-1 max-w-xl">
-                                Live signals for revenue rails, messaging, and edge network coverage. Jump into any module to change configuration.
-                            </p>
-                        </div>
+</div>
                         <div class="grid w-full max-w-xl shrink-0 grid-cols-2 gap-2 sm:grid-cols-4 lg:w-auto">
                             <div class="isp-cc-kpi">
                                 <p class="isp-cc-kpi__label">Onboarding</p>
@@ -61,8 +58,7 @@
                             <span class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">M-Pesa / Daraja</span>
                         </div>
                         <p class="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{{ $S['mpesa']['label'] }}</p>
-                        <p class="isp-settings-hint mt-1">{{ $S['mpesa']['detail'] }}</p>
-                        <a href="{{ route('isp.settings.payment') }}" class="isp-cc-live-cell__link">Open payments →</a>
+<a href="{{ route('isp.settings.payment') }}" class="isp-cc-live-cell__link">Open payments →</a>
                     </div>
                     @php
                         $eTone = $S['smtp']['tone'];
@@ -74,8 +70,7 @@
                             <span class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email transport</span>
                         </div>
                         <p class="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{{ $S['smtp']['label'] }}</p>
-                        <p class="isp-settings-hint mt-1">{{ $S['smtp']['detail'] }}</p>
-                        <a href="{{ route('isp.settings.notifications') }}" class="isp-cc-live-cell__link">Communications →</a>
+<a href="{{ route('isp.settings.notifications') }}" class="isp-cc-live-cell__link">Communications →</a>
                     </div>
                     @php
                         $sTone = $S['sms']['tone'] ?? 'warn';
@@ -87,8 +82,7 @@
                             <span class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">SMS channel</span>
                         </div>
                         <p class="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{{ $S['sms']['label'] }}</p>
-                        <p class="isp-settings-hint mt-1">{{ $S['sms']['detail'] }}</p>
-                        <a href="{{ route('isp.settings.notifications') }}" class="isp-cc-live-cell__link">SMS settings →</a>
+<a href="{{ route('isp.settings.notifications') }}" class="isp-cc-live-cell__link">SMS settings →</a>
                     </div>
                 </div>
             </div>
@@ -100,22 +94,19 @@
                         @if ($S['mpesa']['tone'] === 'bad')
                             <div class="isp-cc-setup-card isp-cc-setup-card--danger">
                                 <p class="text-sm font-bold text-slate-900 dark:text-white">M-Pesa API not configured</p>
-                                <p class="isp-settings-hint mt-1">Provision Daraja credentials before accepting STK or callbacks.</p>
-                                <a href="{{ route('isp.settings.payment') }}" class="isp-cc-setup-card__cta">Configure Daraja</a>
+<a href="{{ route('isp.settings.payment') }}" class="isp-cc-setup-card__cta">Configure Daraja</a>
                             </div>
                         @endif
                         @if ($S['smtp']['tone'] !== 'ok')
                             <div class="isp-cc-setup-card isp-cc-setup-card--warn">
                                 <p class="text-sm font-bold text-slate-900 dark:text-white">SMTP credentials missing or dev mode</p>
-                                <p class="isp-settings-hint mt-1">Point <span class="font-mono text-[11px]">MAIL_MAILER</span> at production SMTP for invoice delivery.</p>
-                                <span class="isp-cc-setup-card__cta isp-cc-setup-card__cta--muted">Environment-level</span>
+<span class="isp-cc-setup-card__cta isp-cc-setup-card__cta--muted">Environment-level</span>
                             </div>
                         @endif
                         @if (($S['stats']['routers_total'] ?? 0) === 0)
                             <div class="isp-cc-setup-card">
                                 <p class="text-sm font-bold text-slate-900 dark:text-white">No edge routers linked</p>
-                                <p class="isp-settings-hint mt-1">Attach MikroTik endpoints to synchronize subscribers and hotspot context.</p>
-                                <a href="{{ route('isp.routers.index') }}" class="isp-cc-setup-card__cta">Open routers</a>
+<a href="{{ route('isp.routers.index') }}" class="isp-cc-setup-card__cta">Open routers</a>
                             </div>
                         @endif
                     </div>
@@ -133,8 +124,7 @@
             <section class="isp-cc-section">
                 <header class="isp-cc-section__head">
                     <h3 class="isp-cc-section__title">Business</h3>
-                    <p class="isp-cc-section__sub">Legal identity, brand surfaces, and footprint (branches ship next).</p>
-                </header>
+</header>
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <a href="{{ route('isp.settings.company') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
                         <span class="isp-cc-module__accent isp-cc-module__accent--indigo"></span>
@@ -142,30 +132,57 @@
                             <div>
                                 <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Company</p>
                                 <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Company information</h4>
-                                <p class="isp-settings-hint mt-2">Tax IDs, registration, contacts, and regional defaults.</p>
-                            </div>
+</div>
                             <span class="pb-pill pb-pill-info text-[10px]">Profile</span>
                         </div>
                     </a>
-                    <span class="isp-cc-module isp-cc-module--disabled pb-card isp-settings-panel block p-4 sm:p-5">
-                        <span class="isp-cc-module__accent isp-cc-module__accent--muted"></span>
-                        <div class="relative flex items-start justify-between gap-3 opacity-70">
+                    <a href="{{ route('isp.settings.company') }}#branding" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--violet"></span>
+                        <div class="relative flex items-start justify-between gap-3">
                             <div>
                                 <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Brand</p>
                                 <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Branding &amp; portals</h4>
-                                <p class="isp-settings-hint mt-2">Logos, customer portal themes, and invoice stationery.</p>
-                            </div>
-                            <span class="pb-pill pb-pill-warn text-[10px]">Soon</span>
+</div>
+                            <span class="pb-pill pb-pill-ok text-[10px]">Configure</span>
                         </div>
-                    </span>
+                    </a>
+                    <a href="{{ route('isp.settings.branches') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--cyan"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Locations</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Branches</h4>
+</div>
+                            <span class="pb-pill pb-pill-info text-[10px]">Map</span>
+                        </div>
+                    </a>
+                    <a href="{{ route('isp.settings.custom-fields') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--slate"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">ERP</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Custom fields</h4>
+</div>
+                            <span class="pb-pill pb-pill-info text-[10px]">Extend</span>
+                        </div>
+                    </a>
+                    <a href="{{ route('isp.settings.forms.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5 md:col-span-2">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--violet"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Forms</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Form controls</h4>
+</div>
+                            <span class="pb-pill pb-pill-info shrink-0 text-[10px]">Configure</span>
+                        </div>
+                    </a>
                 </div>
             </section>
 
             <section class="isp-cc-section">
                 <header class="isp-cc-section__head">
                     <h3 class="isp-cc-section__title">Payments</h3>
-                    <p class="isp-cc-section__sub">Collections, tax policy, and how money hits your ledger.</p>
-                </header>
+</header>
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <a href="{{ route('isp.settings.payment') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
                         <span class="isp-cc-module__accent isp-cc-module__accent--emerald"></span>
@@ -173,8 +190,7 @@
                             <div>
                                 <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Safaricom</p>
                                 <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">M-Pesa Daraja</h4>
-                                <p class="isp-settings-hint mt-2">{{ $S ? $S['mpesa']['detail'] : 'Connect Daraja for STK push and callbacks.' }}</p>
-                            </div>
+</div>
                             @if ($S)
                                 @php
                                     $tone = $S['mpesa']['tone'];
@@ -189,26 +205,24 @@
                             @endif
                         </div>
                     </a>
-                    <a href="{{ route('isp.settings.billing') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
-                        <span class="isp-cc-module__accent isp-cc-module__accent--cyan"></span>
-                        <div class="relative flex items-start justify-between gap-3">
-                            <div>
-                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Finance</p>
-                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Tax &amp; invoicing</h4>
-                                <p class="isp-settings-hint mt-2">Prefixes, automation, grace windows, penalties, and default VAT-style rates.</p>
-                            </div>
-                            <span class="pb-pill pb-pill-cyan text-[10px]">Policy</span>
-                        </div>
-                    </a>
                     <a href="{{ route('isp.payment-settings.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
                         <span class="isp-cc-module__accent isp-cc-module__accent--violet"></span>
                         <div class="relative flex items-start justify-between gap-3">
                             <div>
                                 <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Catalog</p>
                                 <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Payment methods</h4>
-                                <p class="isp-settings-hint mt-2">Encrypted credentials and activation per collection rail.</p>
-                            </div>
+</div>
                             <span class="pb-pill pb-pill-info text-[10px]">Manage</span>
+                        </div>
+                    </a>
+                    <a href="{{ route('isp.settings.billing') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--cyan"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Finance</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Tax &amp; invoicing</h4>
+</div>
+                            <span class="pb-pill pb-pill-cyan text-[10px]">Policy</span>
                         </div>
                     </a>
                     <a href="{{ route('isp.settings.payment-gateways') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
@@ -217,8 +231,7 @@
                             <div>
                                 <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Legacy</p>
                                 <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">JSON gateway store</h4>
-                                <p class="isp-settings-hint mt-2">Backward-compatible flags — prefer Daraja profile for new setups.</p>
-                            </div>
+</div>
                             <span class="pb-pill pb-pill-warn text-[10px]">Migrate</span>
                         </div>
                     </a>
@@ -228,17 +241,15 @@
             <section class="isp-cc-section">
                 <header class="isp-cc-section__head">
                     <h3 class="isp-cc-section__title">Communications</h3>
-                    <p class="isp-cc-section__sub">Operational mail, SMS, and invoice reminder cadence.</p>
-                </header>
+</header>
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <a href="{{ route('isp.settings.notifications') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5 md:col-span-2">
+                    <a href="{{ route('isp.settings.notifications') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
                         <span class="isp-cc-module__accent isp-cc-module__accent--sky"></span>
                         <div class="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Channels</p>
                                 <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Notification preferences</h4>
-                                <p class="isp-settings-hint mt-2 max-w-3xl">Route alerts through SMTP and SMS providers; tune invoice reminder windows.</p>
-                            </div>
+</div>
                             @if ($S)
                                 @php
                                     $tone = $S['sms']['tone'] ?? 'info';
@@ -252,14 +263,23 @@
                             @endif
                         </div>
                     </a>
+                    <a href="{{ route('isp.notifications.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--indigo"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Inbox</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Staff alerts</h4>
+</div>
+                            <span class="pb-pill pb-pill-info text-[10px]">Open</span>
+                        </div>
+                    </a>
                 </div>
             </section>
 
             <section class="isp-cc-section">
                 <header class="isp-cc-section__head">
                     <h3 class="isp-cc-section__title">Users &amp; security</h3>
-                    <p class="isp-cc-section__sub">Who can touch billing, network, and subscriber records.</p>
-                </header>
+</header>
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <a href="{{ route('isp.settings.users') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
                         <span class="isp-cc-module__accent isp-cc-module__accent--rose"></span>
@@ -267,21 +287,39 @@
                             <div>
                                 <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Access</p>
                                 <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">User management</h4>
-                                <p class="isp-settings-hint mt-2">Workspace operators and future role-based policies.</p>
-                            </div>
+</div>
                             @if ($S)
                                 <span class="pb-pill pb-pill-info shrink-0 text-[10px]">{{ $S['stats']['admin_users'] }} admins</span>
                             @endif
                         </div>
                     </a>
-                    <a href="{{ route('isp.logs.activity.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                    <a href="{{ route('isp.settings.roles') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--slate"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Governance</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Roles &amp; permissions</h4>
+</div>
+                            <span class="pb-pill pb-pill-ok text-[10px]">Policy</span>
+                        </div>
+                    </a>
+                    <a href="{{ route('isp.settings.security') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--rose"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Protection</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Security preferences</h4>
+</div>
+                            <span class="pb-pill pb-pill-warn text-[10px]">Policy</span>
+                        </div>
+                    </a>
+                    <a href="{{ route('isp.logs.activity.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5 md:col-span-2">
                         <span class="isp-cc-module__accent isp-cc-module__accent--slate"></span>
                         <div class="relative flex items-start justify-between gap-3">
                             <div>
                                 <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Governance</p>
                                 <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Audit logs</h4>
-                                <p class="isp-settings-hint mt-2">Immutable trail of privileged actions across this ISP.</p>
-                            </div>
+</div>
                             <span class="pb-pill pb-pill-ok text-[10px]">Review</span>
                         </div>
                     </a>
@@ -290,33 +328,29 @@
 
             <section class="isp-cc-section">
                 <header class="isp-cc-section__head">
-                    <h3 class="isp-cc-section__title">Network</h3>
-                    <p class="isp-cc-section__sub">Defaults for routers, PPPoE, and hotspot experiences ship next — use live network modules today.</p>
-                </header>
+                    <h3 class="isp-cc-section__title">Network defaults</h3>
+</header>
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <a href="{{ route('isp.routers.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                    <a href="{{ route('isp.settings.router-defaults') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
                         <span class="isp-cc-module__accent isp-cc-module__accent--indigo"></span>
                         <div class="relative">
                             <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Edge</p>
-                            <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Routers</h4>
-                            <p class="isp-settings-hint mt-2">MikroTik endpoints and API attachment points.</p>
-                        </div>
+                            <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Router defaults</h4>
+</div>
                     </a>
-                    <a href="{{ route('isp.user-connections.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                    <a href="{{ route('isp.settings.pppoe-defaults') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
                         <span class="isp-cc-module__accent isp-cc-module__accent--cyan"></span>
                         <div class="relative">
                             <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Access</p>
-                            <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">PPPoE &amp; connections</h4>
-                            <p class="isp-settings-hint mt-2">Subscriber sessions and line state.</p>
-                        </div>
+                            <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">PPPoE defaults</h4>
+</div>
                     </a>
-                    <a href="{{ route('isp.hotspot-servers.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                    <a href="{{ route('isp.settings.hotspot') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
                         <span class="isp-cc-module__accent isp-cc-module__accent--amber"></span>
                         <div class="relative">
                             <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Guest</p>
-                            <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Hotspot servers</h4>
-                            <p class="isp-settings-hint mt-2">Captive portal profiles synced from routers.</p>
-                        </div>
+                            <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Hotspot settings</h4>
+</div>
                     </a>
                 </div>
             </section>
@@ -324,29 +358,58 @@
             <section class="isp-cc-section">
                 <header class="isp-cc-section__head">
                     <h3 class="isp-cc-section__title">System</h3>
-                    <p class="isp-cc-section__sub">Observability, router automation history, and future maintenance windows.</p>
-                </header>
+</header>
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <a href="{{ route('isp.logs.router-actions.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                    <a href="{{ route('isp.settings.backups') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--slate"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Reliability</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Backups</h4>
+</div>
+                            <span class="pb-pill pb-pill-info text-[10px]">Configure</span>
+                        </div>
+                    </a>
+                    <a href="{{ route('isp.settings.maintenance') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--amber"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Operations</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Maintenance</h4>
+</div>
+                            <span class="pb-pill pb-pill-warn text-[10px]">Portal</span>
+                        </div>
+                    </a>
+                    <a href="{{ route('isp.settings.api-integrations') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--violet"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Developers</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">API integrations</h4>
+</div>
+                            <span class="pb-pill pb-pill-info text-[10px]">Keys</span>
+                        </div>
+                    </a>
+                    <a href="{{ route('isp.platform-subscription.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5">
+                        <span class="isp-cc-module__accent isp-cc-module__accent--indigo"></span>
+                        <div class="relative flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Platform</p>
+                                <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">PrimeBilling subscription</h4>
+</div>
+                            <span class="pb-pill pb-pill-cyan text-[10px]">Plan</span>
+                        </div>
+                    </a>
+                    <a href="{{ route('isp.logs.router-actions.index') }}" class="isp-cc-module pb-card isp-settings-panel isp-settings-panel--lift block p-4 sm:p-5 md:col-span-2">
                         <span class="isp-cc-module__accent isp-cc-module__accent--slate"></span>
                         <div class="relative flex items-start justify-between gap-3">
                             <div>
                                 <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Telemetry</p>
                                 <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Router action logs</h4>
-                                <p class="isp-settings-hint mt-2">API jobs issued against MikroTik from this workspace.</p>
-                            </div>
+</div>
                             <span class="pb-pill pb-pill-info text-[10px]">Logs</span>
                         </div>
                     </a>
-                    <span class="isp-cc-module isp-cc-module--disabled pb-card isp-settings-panel block p-4 sm:p-5">
-                        <span class="isp-cc-module__accent isp-cc-module__accent--muted"></span>
-                        <div class="relative opacity-70">
-                            <p class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Reliability</p>
-                            <h4 class="mt-1 text-base font-bold text-slate-900 dark:text-white">Backups &amp; maintenance</h4>
-                            <p class="isp-settings-hint mt-2">Snapshot schedules and freeze windows for change control.</p>
-                            <span class="mt-3 inline-flex pb-pill pb-pill-warn text-[10px]">Planned</span>
-                        </div>
-                    </span>
                 </div>
             </section>
         </div>

@@ -22,8 +22,7 @@
 
     <x-isp-settings-workspace
         meta-title="Company profile"
-        meta-description="Legal identity, contact channels, and regional operating defaults for this ISP workspace."
-    >
+>
         @if ($S)
             <div class="space-y-3">
                 @if ($S['mpesa']['tone'] === 'bad')
@@ -93,14 +92,50 @@
             <div id="branding" class="pb-card isp-settings-panel p-4 sm:p-6 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
                 <div class="mb-6 border-b border-dashed border-[var(--pb-border)] pb-5">
                     <h3 class="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">Branding &amp; workspace</h3>
-                    <p class="isp-settings-hint mt-1 max-w-3xl">Logo and favicon apply to the ISP admin console. Workspace title appears in the sidebar.</p>
+</div>
+
+                <div class="mb-6 flex flex-wrap gap-4 rounded-xl border border-[var(--pb-border)] bg-slate-50/50 p-4 dark:bg-slate-900/30">
+                    <div class="text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Admin logo</p>
+                        @if (! empty($isp->logo))
+                            <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($isp->logo) }}" alt="" class="mt-2 h-14 w-14 rounded-xl border border-[var(--pb-border)] object-cover" />
+                        @else
+                            <div class="mt-2 flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-400">None</div>
+                        @endif
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Favicon</p>
+                        @if (! empty($branding['favicon_path']))
+                            <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($branding['favicon_path']) }}" alt="" class="mt-2 h-14 w-14 rounded-xl border border-[var(--pb-border)] object-contain p-1" />
+                        @else
+                            <div class="mt-2 flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-400">None</div>
+                        @endif
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Portal logo</p>
+                        @if (! empty($branding['portal_logo_path']))
+                            <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($branding['portal_logo_path']) }}" alt="" class="mt-2 h-14 w-14 rounded-xl border border-[var(--pb-border)] object-cover" />
+                        @elseif (! empty($isp->logo))
+                            <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($isp->logo) }}" alt="" class="mt-2 h-14 w-14 rounded-xl border border-[var(--pb-border)] object-cover opacity-70" title="Falls back to company logo" />
+                        @else
+                            <div class="mt-2 flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-400">None</div>
+                        @endif
+                    </div>
+                    <div class="min-w-[8rem] flex-1">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Preview</p>
+                        <p class="mt-2 text-sm font-bold text-slate-900 dark:text-white">{{ $branding['workspace_title'] ?? config('app.name') }}</p>
+                        <p class="text-xs text-slate-500">{{ $branding['workspace_tagline'] ?? $isp->name }}</p>
+                        <span class="mt-2 inline-block h-3 w-12 rounded-full" style="background: {{ $branding['accent_hex'] ?? '#6366f1' }}"></span>
+                    </div>
                 </div>
+
+                <p class="mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Admin console</p>
                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <div>
                         <label class="isp-form-label" for="logo">Company logo</label>
                         <input id="logo" class="isp-form-input" type="file" name="logo" accept="image/jpeg,image/png,image/webp,image/svg+xml" />
-                        <p class="isp-settings-hint mt-1">PNG or WebP recommended, max 4&nbsp;MB.</p>
-                        @if (! empty($isp->logo))
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PNG or WebP, max 4&nbsp;MB.</p>
+@if (! empty($isp->logo))
                             <label class="mt-3 flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
                                 <input type="checkbox" name="remove_logo" value="1" class="rounded border-slate-300" @checked(old('remove_logo')) />
                                 Remove current logo
@@ -110,8 +145,8 @@
                     <div>
                         <label class="isp-form-label" for="favicon">Favicon</label>
                         <input id="favicon" class="isp-form-input" type="file" name="favicon" accept=".ico,image/png,image/svg+xml,image/jpeg" />
-                        <p class="isp-settings-hint mt-1">Square icon for browser tabs; ICO or PNG, max 1&nbsp;MB.</p>
-                        @if (! empty($branding['favicon_path']))
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">ICO or PNG, max 1&nbsp;MB.</p>
+@if (! empty($branding['favicon_path']))
                             <label class="mt-3 flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
                                 <input type="checkbox" name="remove_favicon" value="1" class="rounded border-slate-300" @checked(old('remove_favicon')) />
                                 Remove current favicon
@@ -132,7 +167,38 @@
                             <input id="accent_hex" class="isp-form-input max-w-[11rem] font-mono" type="text" name="accent_hex" value="{{ old('accent_hex', $branding['accent_hex'] ?? '#6366f1') }}" pattern="^#[0-9A-Fa-f]{6}$" placeholder="#6366f1" />
                             <input type="color" class="h-10 w-14 cursor-pointer rounded-lg border border-[var(--pb-border)] bg-[var(--pb-panel)] p-1" value="{{ old('accent_hex', $branding['accent_hex'] ?? '#6366f1') }}" oninput="document.getElementById('accent_hex').value = this.value" aria-label="Pick accent color" />
                         </div>
-                        <p class="isp-settings-hint mt-1">Used for primary buttons and highlights in this workspace.</p>
+</div>
+                </div>
+
+                <div class="mt-8 border-t border-dashed border-[var(--pb-border)] pt-6">
+                    <p class="mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Customer portal &amp; invoices</p>
+                    <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <div>
+                            <label class="isp-form-label" for="portal_logo">Portal logo</label>
+                            <input id="portal_logo" class="isp-form-input" type="file" name="portal_logo" accept="image/jpeg,image/png,image/webp,image/svg+xml" />
+@if (! empty($branding['portal_logo_path']))
+                                <label class="mt-3 flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+                                    <input type="checkbox" name="remove_portal_logo" value="1" class="rounded border-slate-300" @checked(old('remove_portal_logo')) />
+                                    Remove portal logo
+                                </label>
+                            @endif
+                        </div>
+                        <div>
+                            <label class="isp-form-label" for="portal_title">Portal title</label>
+                            <input id="portal_title" class="isp-form-input" type="text" name="portal_title" value="{{ old('portal_title', $branding['portal_title'] ?? $isp->company_name) }}" placeholder="Customer-facing brand name" />
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="isp-form-label" for="portal_welcome_message">Portal welcome message</label>
+                            <textarea id="portal_welcome_message" class="isp-form-textarea" name="portal_welcome_message" rows="2" placeholder="Short greeting on login or splash screens">{{ old('portal_welcome_message', $branding['portal_welcome_message'] ?? '') }}</textarea>
+                        </div>
+                        <div>
+                            <label class="isp-form-label" for="portal_support_email">Portal support email</label>
+                            <input id="portal_support_email" class="isp-form-input" type="email" name="portal_support_email" value="{{ old('portal_support_email', $branding['portal_support_email'] ?? $isp->email) }}" />
+                        </div>
+                        <div>
+                            <label class="isp-form-label" for="invoice_footer">Invoice footer text</label>
+                            <input id="invoice_footer" class="isp-form-input" type="text" name="invoice_footer" value="{{ old('invoice_footer', $branding['invoice_footer'] ?? '') }}" placeholder="Thank you for your business." />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -140,8 +206,7 @@
             <div class="pb-card isp-settings-panel p-4 sm:p-6 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
                 <div class="mb-6 border-b border-dashed border-[var(--pb-border)] pb-5">
                     <h3 class="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">Identity &amp; contact</h3>
-                    <p class="isp-settings-hint mt-1 max-w-3xl">These fields power invoices, customer communications, and regulatory references.</p>
-                </div>
+</div>
 
                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <div class="md:col-span-2">
@@ -151,8 +216,7 @@
                     <div>
                         <label class="isp-form-label" for="email">Email</label>
                         <input id="email" class="isp-form-input" type="email" name="email" value="{{ old('email', $isp->email) }}" required />
-                        <p class="isp-settings-hint mt-1">Primary billing and system mailbox.</p>
-                    </div>
+</div>
                     <div>
                         <label class="isp-form-label" for="phone">Phone</label>
                         <input id="phone" class="isp-form-input" type="text" name="phone" value="{{ old('phone', $isp->phone) }}" />
@@ -190,8 +254,7 @@
             <div class="pb-card isp-settings-panel p-4 sm:p-6 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
                 <div class="mb-6 border-b border-dashed border-[var(--pb-border)] pb-5">
                     <h3 class="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">Regional operations</h3>
-                    <p class="isp-settings-hint mt-1">Currency and timezone affect billing cycles, proration, and scheduled jobs.</p>
-                </div>
+</div>
                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <div>
                         <label class="isp-form-label" for="currency">Currency</label>

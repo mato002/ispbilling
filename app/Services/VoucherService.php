@@ -40,10 +40,17 @@ class VoucherService
             'metadata' => $data['metadata'] ?? null,
         ]);
 
-        // Create voucher user on MikroTik router
-        $this->createVoucherOnRouter($voucher, $router);
+            // Create voucher user on MikroTik router
+            $createdOnRouter = $this->createVoucherOnRouter($voucher, $router);
+            if (! $createdOnRouter) {
+                Log::warning('Voucher saved but MikroTik user was not created', [
+                    'voucher_id' => $voucher->id,
+                    'router_id' => $router->id,
+                    'voucher_code' => $voucher->voucher_code,
+                ]);
+            }
 
-        return $voucher;
+            return $voucher;
     }
 
     /**
@@ -203,6 +210,21 @@ class VoucherService
                 Log::error("Failed to enable voucher user on router: " . $e->getMessage());
             }
         }
+
+        return true;
+    }
+
+    /**
+     * Cancel/deactivate an unused active voucher and remove RouterOS user when present.
+     */
+    public function deactivate(Voucher $voucher): bool
+    {
+        if (! in_array($voucher->status, ['active'], true)) {
+            return false;
+        }
+
+        $this->deleteFromRouter($voucher);
+        $voucher->markAsCancelled();
 
         return true;
     }

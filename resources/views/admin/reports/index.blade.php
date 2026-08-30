@@ -220,6 +220,19 @@
             </div>
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">By Package Type</h3>
+                    <div class="space-y-2">
+                        @foreach($data['by_package_type'] ?? [] as $type)
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600 dark:text-gray-400">{{ \App\Support\PlanPackageTypes::label($type->package_type) }}</span>
+                                <span class="font-semibold text-gray-900 dark:text-gray-100">{{ $type->count }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">By Access Type</h3>
                     <div class="space-y-2">
                         @foreach($data['by_access_type'] ?? [] as $type)

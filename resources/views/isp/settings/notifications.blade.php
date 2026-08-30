@@ -12,10 +12,19 @@
         $S = $ispSettingsShell;
     @endphp
 
-    <x-isp-settings-workspace
-        meta-title="Notification preferences"
-        meta-description="Route operational notifications through email and SMS, and tune invoice reminder automation."
-    >
+    <x-isp-settings-workspace>
+        @if (session('success'))
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-100">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-500/30 dark:bg-rose-950/40 dark:text-rose-100">
+                {{ session('error') }}
+            </div>
+        @endif
+
         @if ($S && $S['smtp']['tone'] !== 'ok')
             <div class="rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                 <span class="font-semibold">SMTP credentials may be missing.</span>
@@ -29,6 +38,8 @@
                 <span class="text-slate-600 dark:text-slate-300"> Select Africa's Talking, Twilio, or custom integration to finish setup.</span>
             </div>
         @endif
+
+        <x-isp.sms-wallet-hub :isp="$isp" />
 
         <form
             method="POST"
@@ -44,7 +55,6 @@
             <div class="pb-card isp-settings-panel p-4 sm:p-6">
                 <div class="mb-5 border-b border-dashed border-[var(--pb-border)] pb-4">
                     <h3 class="isp-settings-section-title">Email</h3>
-                    <p class="isp-settings-hint mt-1">Workspace-level alerts and copies of critical billing events.</p>
                     @if ($S)
                         <p class="mt-2 inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
                             <span class="pb-dot {{ $S['smtp']['tone'] === 'ok' ? 'pb-dot-ok' : 'pb-dot-warn' }}"></span>
@@ -54,10 +64,7 @@
                 </div>
                 <div class="space-y-4">
                     <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--pb-border)] bg-slate-50/60 px-3 py-3 dark:bg-slate-900/30">
-                        <span>
-                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">Email notifications</span>
-                            <span class="isp-settings-hint block">Deliver alerts to the operations mailbox.</span>
-                        </span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">Email notifications</span>
                         <input
                             type="checkbox"
                             name="email_notifications"
@@ -83,7 +90,6 @@
             <div class="pb-card isp-settings-panel p-4 sm:p-6">
                 <div class="mb-5 border-b border-dashed border-[var(--pb-border)] pb-4">
                     <h3 class="isp-settings-section-title">SMS</h3>
-                    <p class="isp-settings-hint mt-1">High-priority SMS for field teams and automated subscriber notices.</p>
                     @if ($S)
                         <p class="mt-2 inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
                             <span class="pb-dot {{ ($S['sms']['tone'] ?? '') === 'ok' ? 'pb-dot-ok' : 'pb-dot-warn' }}"></span>
@@ -93,10 +99,7 @@
                 </div>
                 <div class="space-y-4">
                     <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--pb-border)] bg-slate-50/60 px-3 py-3 dark:bg-slate-900/30">
-                        <span>
-                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">SMS notifications</span>
-                            <span class="isp-settings-hint block">Requires a configured provider in your deployment.</span>
-                        </span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">SMS notifications</span>
                         <input
                             type="checkbox"
                             name="sms_notifications"
@@ -122,14 +125,10 @@
             <div class="pb-card isp-settings-panel p-4 sm:p-6">
                 <div class="mb-5 border-b border-dashed border-[var(--pb-border)] pb-4">
                     <h3 class="isp-settings-section-title">Invoice reminders</h3>
-                    <p class="isp-settings-hint mt-1">Automatic nudges before invoices cross the due window.</p>
                 </div>
                 <div class="space-y-4">
                     <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--pb-border)] bg-slate-50/60 px-3 py-3 dark:bg-slate-900/30">
-                        <span>
-                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">Send invoice reminders</span>
-                            <span class="isp-settings-hint block">Uses the channels enabled above.</span>
-                        </span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">Send invoice reminders</span>
                         <input
                             type="checkbox"
                             name="invoice_reminders"

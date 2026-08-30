@@ -3,14 +3,20 @@
 namespace App\Http\Controllers\ISP\Web;
 
 use App\Events\NewNotification;
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Services\NotificationService;
+use App\Support\Export\CsvExporter;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class NotificationController extends Controller
 {
+    use InteractsWithListings;
+
     protected $notificationService;
 
     public function __construct(NotificationService $notificationService)
@@ -29,36 +35,97 @@ class NotificationController extends Controller
             abort(403, 'Only ISP admins can access notifications');
         }
 
+        $query = $this->filteredNotificationsQuery($request, $ispId);
+        $perPage = $this->resolvePerPage($request);
+        $notifications = $query->latest()->paginate($perPage)->withQueryString();
+
+        $unreadCount = Notification::forIsp($ispId)->unread()->count();
+        $totalCount = Notification::forIsp($ispId)->count();
+
+        $filterChips = $this->listingFilterChips($request, route('isp.notifications.index'), [
+            'status' => [
+                'label' => 'Status',
+                'values' => ['unread' => 'Unread', 'read' => 'Read'],
+            ],
+            'type' => [
+                'label' => 'Type',
+                'values' => [
+                    'payment' => 'Payment',
+                    'subscription' => 'Subscription',
+                    'system' => 'System',
+                    'hotspot' => 'Hotspot',
+                    'success' => 'Success',
+                    'warning' => 'Warning',
+                    'error' => 'Error',
+                    'info' => 'Info',
+                ],
+            ],
+            'date_from' => 'From',
+            'date_to' => 'To',
+        ]);
+
+        $exportFormats = $this->listingExportFormats($request, route('isp.notifications.export.csv'));
+
+        return view('isp.notifications.index', compact(
+            'notifications',
+            'unreadCount',
+            'totalCount',
+            'filterChips',
+            'exportFormats'
+        ));
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $ispId = auth()->user()->isp_id;
+
+        if (! $ispId) {
+            abort(403, 'Only ISP admins can access notifications');
+        }
+
+        $query = $this->filteredNotificationsQuery($request, $ispId)->latest();
+        $filename = 'notifications-'.now()->format('Ymd-His').'.csv';
+
+        return CsvExporter::download($filename, [
+            'Title', 'Message', 'Type', 'Read', 'Created',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($notifications) use ($out) {
+                foreach ($notifications as $notification) {
+                    fputcsv($out, [
+                        $notification->title,
+                        $notification->message,
+                        $notification->type,
+                        $notification->is_read ? 'Yes' : 'No',
+                        $notification->created_at?->format('Y-m-d H:i:s'),
+                    ]);
+                }
+            });
+        });
+    }
+
+    protected function filteredNotificationsQuery(Request $request, int $ispId): Builder
+    {
         $query = Notification::forIsp($ispId);
 
-        // Filter by read status
-        if ($request->has('status') && $request->status === 'unread') {
+        if ($request->filled('status') && $request->status === 'unread') {
             $query->unread();
-        } elseif ($request->has('status') && $request->status === 'read') {
+        } elseif ($request->filled('status') && $request->status === 'read') {
             $query->read();
         }
 
-        // Filter by type
-        if ($request->has('type') && $request->type) {
+        if ($request->filled('type')) {
             $query->byType($request->type);
         }
 
-        // Filter by date range
-        if ($request->has('date_from') && $request->date_from) {
+        if ($request->filled('date_from')) {
             $startDate = Carbon::parse($request->date_from)->startOfDay();
-            $endDate = $request->has('date_to') && $request->date_to
+            $endDate = $request->filled('date_to')
                 ? Carbon::parse($request->date_to)->endOfDay()
                 : Carbon::now()->endOfDay();
             $query->dateRange($startDate, $endDate);
         }
 
-        $notifications = $query->latest()->paginate(20)->appends($request->query());
-
-        // Get counts for filters
-        $unreadCount = Notification::forIsp($ispId)->unread()->count();
-        $totalCount = Notification::forIsp($ispId)->count();
-
-        return view('isp.notifications.index', compact('notifications', 'unreadCount', 'totalCount'));
+        return $query;
     }
 
     /**

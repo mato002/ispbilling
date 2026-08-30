@@ -14,7 +14,7 @@
         if ($active) {
             $iconWrap .= ' border-indigo-200/90 bg-indigo-50 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200';
         }
-        echo '<a href="'.e($href).'" class="'.$base.' '.$state.'">';
+        echo '<a href="'.e($href).'" data-turbo-frame="pb-main" data-turbo-action="advance" class="'.$base.' '.$state.'">';
         echo '<span class="'.$iconWrap.'">'.$icon.'</span>';
         echo '<span class="min-w-0 truncate">'.e($label).'</span>';
         echo '</a>';
@@ -76,8 +76,9 @@
         <p class="isp-settings-nav__group-label">Business</p>
         {!! $navItem(route('isp.settings.company'), 'Company information', 'isp.settings.company*', $iBuilding) !!}
         {!! $navItem(route('isp.settings.company').'#branding', 'Branding & logo', 'isp.settings.company*', $iPalette) !!}
+        {!! $navItem(route('isp.settings.branches'), 'Branches', 'isp.settings.branches*', $iMap) !!}
         {!! $navItem(route('isp.settings.custom-fields'), 'Custom fields (ERP)', 'isp.settings.custom-fields*', $iClipboard) !!}
-        {!! $navSoon('Branches', $iMap) !!}
+        {!! $navItem(route('isp.settings.forms.index'), 'Form controls', 'isp.settings.forms.*', $iGauge) !!}
 
         <p class="isp-settings-nav__group-label">Payments</p>
         {!! $navItem(route('isp.settings.payment'), 'M-Pesa Daraja', 'isp.settings.payment*', $iCard) !!}
@@ -87,22 +88,24 @@
 
         <p class="isp-settings-nav__group-label">Users &amp; security</p>
         {!! $navItem(route('isp.settings.users'), 'User management', 'isp.settings.users*', $iUsers) !!}
-        {!! $navSoon('Roles &amp; permissions', $iShield) !!}
+        {!! $navItem(route('isp.settings.roles'), 'Roles &amp; permissions', 'isp.settings.roles*', $iShield) !!}
+        {!! $navItem(route('isp.settings.security'), 'Security preferences', 'isp.settings.security*', $iShield) !!}
         {!! $navItem(route('isp.logs.activity.index'), 'Audit logs', 'isp.logs.activity*', $iClipboard) !!}
-        {!! $navSoon('Security preferences', $iShield) !!}
 
         <p class="isp-settings-nav__group-label">Communications</p>
         {!! $navItem(route('isp.settings.notifications'), 'Notification preferences', 'isp.settings.notifications*', $iBell) !!}
+        {!! $navItem(route('isp.notifications.index'), 'Alerts inbox', 'isp.notifications.*', $iMail) !!}
 
         <p class="isp-settings-nav__group-label">Network</p>
-        {!! $navSoon('Router defaults', $iDevice) !!}
-        {!! $navSoon('PPPoE defaults', $iDevice) !!}
-        {!! $navSoon('Hotspot settings', $iDevice) !!}
+        {!! $navItem(route('isp.settings.router-defaults'), 'Router defaults', 'isp.settings.router-defaults*', $iDevice) !!}
+        {!! $navItem(route('isp.settings.pppoe-defaults'), 'PPPoE defaults', 'isp.settings.pppoe-defaults*', $iDevice) !!}
+        {!! $navItem(route('isp.settings.hotspot'), 'Hotspot settings', 'isp.settings.hotspot*', $iDevice) !!}
 
         <p class="isp-settings-nav__group-label">System</p>
-        {!! $navSoon('Backups', $iCog) !!}
+        {!! $navItem(route('isp.settings.backups'), 'Backups', 'isp.settings.backups*', $iCog) !!}
+        {!! $navItem(route('isp.settings.maintenance'), 'Maintenance', 'isp.settings.maintenance*', $iCog) !!}
+        {!! $navItem(route('isp.settings.api-integrations'), 'API integrations', 'isp.settings.api-integrations*', $iKey) !!}
+        {!! $navItem(route('isp.platform-subscription.index'), 'PrimeBilling subscription', 'isp.platform-subscription.*', $iReceipt) !!}
         {!! $navItem(route('isp.logs.router-actions.index'), 'Router action logs', 'isp.logs.router-actions*', $iClipboard) !!}
-        {!! $navSoon('Maintenance', $iCog) !!}
-        {!! $navSoon('API integrations', $iKey) !!}
     </div>
 </div>

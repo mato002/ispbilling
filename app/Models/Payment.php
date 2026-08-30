@@ -11,6 +11,10 @@ class Payment extends Model
 {
     use BelongsToIspTenant;
 
+    public const POSTING_POSTED = 'posted';
+
+    public const POSTING_UNPOSTED = 'unposted';
+
     protected $fillable = [
         'isp_id',
         'customer_id',
@@ -24,6 +28,9 @@ class Payment extends Model
         'transaction_id',
         'phone_number',
         'status',
+        'posting_status',
+        'assigned_by',
+        'assigned_at',
         'notes',
         'metadata',
         'processed_at',
@@ -35,6 +42,7 @@ class Payment extends Model
         'platform_fee_rate' => 'decimal:4',
         'metadata' => 'array',
         'processed_at' => 'datetime',
+        'assigned_at' => 'datetime',
     ];
 
     public function isp(): BelongsTo
@@ -57,6 +65,26 @@ class Payment extends Model
         return $this->belongsTo(Voucher::class, 'voucher_id');
     }
 
+    public function assignedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_by');
+    }
+
+    public function scopePosted($query)
+    {
+        return $query->where('posting_status', self::POSTING_POSTED);
+    }
+
+    public function scopeUnposted($query)
+    {
+        return $query->where('posting_status', self::POSTING_UNPOSTED);
+    }
+
+    public function isUnposted(): bool
+    {
+        return $this->posting_status === self::POSTING_UNPOSTED;
+    }
+
     public function isPlatformSaasPayment(): bool
     {
         return ($this->metadata['purpose'] ?? null) === 'platform_saas';
@@ -65,6 +93,11 @@ class Payment extends Model
     public function isSaasOnboardingVerification(): bool
     {
         return ($this->metadata['purpose'] ?? null) === 'saas_onboarding_verification';
+    }
+
+    public function isSmsWalletTopUp(): bool
+    {
+        return ($this->metadata['purpose'] ?? null) === \App\Services\PlatformSmsWalletService::PURPOSE;
     }
 
     /**
@@ -104,6 +137,17 @@ class Payment extends Model
         }
 
         if ($this->isSaasOnboardingVerification()) {
+            $this->update([
+                'status' => 'completed',
+                'processed_at' => now(),
+                'platform_fee_rate' => null,
+                'platform_fee_amount' => null,
+            ]);
+
+            return;
+        }
+
+        if ($this->isSmsWalletTopUp()) {
             $this->update([
                 'status' => 'completed',
                 'processed_at' => now(),
@@ -181,6 +225,12 @@ class Payment extends Model
         static::creating(function ($payment) {
             if (empty($payment->payment_reference)) {
                 $payment->payment_reference = static::generatePaymentReference();
+            }
+
+            if (empty($payment->posting_status)) {
+                $payment->posting_status = ($payment->customer_id === null && $payment->status === 'completed')
+                    ? self::POSTING_UNPOSTED
+                    : self::POSTING_POSTED;
             }
         });
     }

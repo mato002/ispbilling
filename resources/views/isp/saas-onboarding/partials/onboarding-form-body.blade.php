@@ -3,6 +3,7 @@
     $current = min(4, max(1, (int) ($isp->saas_onboarding_step ?? 1)));
     $pending = $isp->pendingSaasPlan;
     $verifyAmount = $verifyAmount ?? max(1, (int) ceil((float) config('services.mpesa.saas_onboarding_verification_amount', 1)));
+    $trialDeferred = $pending && $pending->defersOnboardingPaymentVerification((bool) old('saas_white_label_opt_in', $isp->saas_white_label_opt_in));
     $onboardingRouter = $isp->relationLoaded('routers') ? $isp->routers->sortBy('id')->first() : $isp->routers()->orderBy('id')->first();
     $billingPhoneRaw = old('saas_billing_phone', $isp->saas_billing_phone ?? $isp->phone);
     $billingPhoneDigits = preg_replace('/[^0-9]/', '', (string) $billingPhoneRaw);
@@ -23,7 +24,6 @@
     <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-8">
         <div class="mb-6">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Choose your plan</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Pick the capacity that fits your subscriber base. You can upgrade anytime.</p>
         </div>
         <div class="space-y-3">
             @foreach ($plans as $plan)
@@ -214,6 +214,15 @@
                 <label for="saas_billing_phone" class="pb-onboarding-label !left-[3.75rem] peer-focus:!left-3.5 peer-[:not(:placeholder-shown)]:!left-3.5">M-Pesa number</label>
             </div>
             @error('saas_billing_phone')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+            @if ($trialDeferred)
+                <p class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-100">
+                    Your {{ (int) $pending->trial_days }}-day free trial is active — we save your M-Pesa number for billing after the trial. No payment is required during setup.
+                </p>
+            @else
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                    We send a one-time KES {{ $verifyAmount }} STK push to confirm this number before your first platform invoice.
+                </p>
+            @endif
         </div>
 
         <div class="hidden space-y-4" id="pb-onboarding-pay-bank" data-billing-panel="bank">
@@ -282,11 +291,11 @@
                 type="submit"
                 id="pb-onboarding-step2-submit"
                 class="pb-btn pb-btn-primary px-8"
-                data-label-mpesa="Pay"
+                data-label-mpesa="{{ $trialDeferred ? 'Continue' : 'Verify M-Pesa' }}"
                 data-label-default="Continue"
             >
-                @if (($isp->saas_billing_method ?? 'mpesa') === 'mpesa' && ! $isp->saas_payment_verified_at)
-                    Pay
+                @if (($isp->saas_billing_method ?? 'mpesa') === 'mpesa' && ! $isp->saas_payment_verified_at && ! $trialDeferred)
+                    Verify M-Pesa
                 @else
                     Continue
                 @endif
@@ -299,7 +308,9 @@
     <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-8 space-y-6">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Connect your router</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Link your MikroTik device so PrimeBilling can manage subscribers.</p>
+            <p class="mt-3 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-100">
+                Use an IP or hostname that <strong>this server can reach</strong>. Private addresses like <code class="font-mono">192.168.x.x</code> only work when PrimeBilling runs on the same network as the router.
+            </p>
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
@@ -357,7 +368,12 @@
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-6 dark:border-slate-800">
-            <button type="submit" formnovalidate name="wizard_action" value="go_back" class="pb-btn px-6">Back</button>
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="submit" formnovalidate name="wizard_action" value="go_back" class="pb-btn px-6">Back</button>
+                <button type="submit" formnovalidate name="wizard_action" value="skip_router" class="text-sm font-medium text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline dark:text-slate-400 dark:hover:text-slate-200">
+                    Skip for now
+                </button>
+            </div>
             <button type="submit" class="pb-btn pb-btn-primary px-8">Continue</button>
         </div>
     </div>
@@ -367,7 +383,6 @@
     <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-8 space-y-6">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Customer M-Pesa</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Connect Daraja so your subscribers can pay via M-Pesa STK.</p>
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
@@ -408,7 +423,12 @@
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-6 dark:border-slate-800">
-            <button type="submit" formnovalidate name="wizard_action" value="go_back" class="pb-btn px-6">Back</button>
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="submit" formnovalidate name="wizard_action" value="go_back" class="pb-btn px-6">Back</button>
+                <button type="submit" formnovalidate name="wizard_action" value="skip_mpesa_and_finish" class="text-sm font-medium text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline dark:text-slate-400 dark:hover:text-slate-200">
+                    Finish without M-Pesa
+                </button>
+            </div>
             <button type="submit" class="pb-btn pb-btn-primary px-8">Finish setup</button>
         </div>
     </div>
@@ -432,7 +452,7 @@
         if (!btn) return;
         var method = document.querySelector('input[name="saas_billing_method"]:checked');
         btn.textContent = method && method.value === 'mpesa'
-            ? btn.getAttribute('data-label-mpesa') || 'Pay'
+            ? btn.getAttribute('data-label-mpesa') || 'Verify M-Pesa'
             : btn.getAttribute('data-label-default') || 'Continue';
     }
 
@@ -545,6 +565,8 @@
 
         form.addEventListener('submit', function (e) {
             if (form.dataset.onboardingStep !== '2') return;
+
+            if (form.dataset.mpesaAsync !== '1') return;
 
             var method = document.querySelector('input[name="saas_billing_method"]:checked');
             if (!method || method.value !== 'mpesa') return;

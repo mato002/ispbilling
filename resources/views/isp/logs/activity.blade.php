@@ -15,13 +15,6 @@
                     </span>
                 </div>
                 <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">Activity logs</h1>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                    Enterprise audit trail for your ISP — staff actions, billing, network, and security events with full accountability.
-                </p>
-                <p class="mt-2 text-xs font-medium text-slate-500 dark:text-slate-500">
-                    <span class="isp-audit-pulse-bar" aria-hidden="true"></span>
-                    Monitoring ISP operations · timestamps in your app timezone
-                </p>
             </div>
             @php
                 $exportQuery = http_build_query(request()->except('page'));
@@ -300,10 +293,6 @@
                         <span class="font-bold text-slate-900 dark:text-white">{{ number_format($sidebarMetrics['system_changes_today']) }}</span>
                     </li>
                 </ul>
-            </div>
-            <div class="pb-card border border-slate-200/80 bg-slate-50/80 p-4 text-xs leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
-                <strong class="font-semibold text-slate-800 dark:text-slate-200">Compliance note</strong>
-                <p class="mt-2">Audit entries are append-only in normal operation. Export and retention policies can be layered for regulators and insurers.</p>
             </div>
         </aside>
     </div>

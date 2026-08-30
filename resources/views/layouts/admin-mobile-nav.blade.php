@@ -248,6 +248,11 @@
                            class="block px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg ml-8">
                             Payments
                         </a>
+                        <a href="{{ route('isp.reports.index') }}" 
+                           @click="closeMenu()"
+                           class="block px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg ml-8">
+                            Reports
+                        </a>
                     </div>
                 </div>
             @endif

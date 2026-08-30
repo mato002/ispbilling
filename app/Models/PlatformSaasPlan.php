@@ -43,6 +43,11 @@ class PlatformSaasPlan extends Model
         return $this->hasMany(PlatformSaasInvoice::class, 'platform_saas_plan_id');
     }
 
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(PlatformSaasSubscription::class, 'platform_saas_plan_id');
+    }
+
     public function hasFeature(string $key): bool
     {
         return (bool) ($this->features[$key] ?? false);
@@ -55,5 +60,18 @@ class PlatformSaasPlan extends Model
         }
 
         return $count <= $this->max_customers;
+    }
+
+    /**
+     * Whether onboarding can continue without the M-Pesa STK verification charge.
+     * Trial plans defer verification until the first billable invoice.
+     */
+    public function defersOnboardingPaymentVerification(bool $whiteLabelOptIn = false): bool
+    {
+        if ((int) $this->trial_days > 0) {
+            return ! ($whiteLabelOptIn && (float) $this->setup_fee > 0);
+        }
+
+        return (float) $this->monthly_price <= 0 && (float) $this->setup_fee <= 0;
     }
 }

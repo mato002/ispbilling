@@ -194,7 +194,7 @@
                     <button type="submit" 
                             class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                             onclick="return confirm('Are you sure you want to create ' + document.getElementById('quantity').value + ' vouchers?')">
-                        Create {{ document.getElementById('quantity')?.value ?? 10 }} Vouchers
+                        Create 10 Vouchers
                     </button>
                 </div>
             </form>

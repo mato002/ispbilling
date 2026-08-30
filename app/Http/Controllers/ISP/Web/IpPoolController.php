@@ -2,53 +2,106 @@
 
 namespace App\Http\Controllers\ISP\Web;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Http\Controllers\Controller;
 use App\Models\IpPool;
 use App\Models\Router;
 use App\Services\MikroTikService;
+use App\Support\Export\CsvExporter;
+use App\Support\FormSettingsService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IpPoolController extends Controller
 {
+    use InteractsWithListings;
+
+    public function __construct(private readonly FormSettingsService $formSettings) {}
+
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
-        $ipPools = IpPool::forIsp($ispId)
+
+        $query = $this->filteredIpPoolsQuery($request, $ispId);
+        $perPage = $this->resolvePerPage($request);
+        $ipPools = $query->paginate($perPage)->withQueryString();
+
+        $routers = Router::forIsp($ispId)->active()->get();
+
+        $filterChips = $this->listingFilterChips($request, route('isp.ip-pools.index'), [
+            'is_active' => [
+                'label' => 'Status',
+                'values' => ['1' => 'Active', '0' => 'Inactive'],
+            ],
+        ]);
+
+        $exportFormats = $this->listingExportFormats($request, route('isp.ip-pools.export.csv'));
+
+        return view('isp.ip-pools.index', compact('ipPools', 'routers', 'filterChips', 'exportFormats'));
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $ispId = auth()->user()->isp_id;
+        $query = $this->filteredIpPoolsQuery($request, $ispId)->with('router');
+        $filename = 'ip-pools-'.now()->format('Ymd-His').'.csv';
+
+        return CsvExporter::download($filename, [
+            'Name', 'Router', 'Ranges', 'Gateway', 'Netmask', 'Lease time', 'Active', 'Comment',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($pools) use ($out) {
+                foreach ($pools as $pool) {
+                    fputcsv($out, [
+                        $pool->name,
+                        $pool->router?->name,
+                        $pool->formatted_range ?? json_encode($pool->ranges),
+                        $pool->gateway_address,
+                        $pool->netmask,
+                        $pool->lease_time,
+                        $pool->is_active ? 'Active' : 'Inactive',
+                        $pool->comment,
+                    ]);
+                }
+            });
+        });
+    }
+
+    protected function filteredIpPoolsQuery(Request $request, int $ispId): Builder
+    {
+        return IpPool::forIsp($ispId)
             ->with('router')
             ->when($request->filled('is_active'), function ($query) use ($request) {
                 $query->where('is_active', $request->is_active);
             })
-            ->orderBy('name')
-            ->paginate(10)
-            ->appends($request->query());
-
-        $routers = Router::forIsp($ispId)->active()->get();
-
-        return view('isp.ip-pools.index', compact('ipPools', 'routers'));
+            ->orderBy('name');
     }
 
     public function create()
     {
         $ispId = auth()->user()->isp_id;
         $routers = Router::forIsp($ispId)->active()->get();
+        $formFields = $this->formSettings->resolvedFields('ip_pool', $ispId);
 
-        return view('isp.ip-pools.create', compact('routers'));
+        return view('isp.ip-pools.create', compact('routers', 'formFields'));
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'router_id' => 'required|exists:routers,id',
-            'name' => 'required|string|max:255',
-            'ranges' => 'required|array|min:1',
-            'ranges.*.start' => 'required|ip',
-            'ranges.*.end' => 'required|ip|after:ranges.*.start',
-            'gateway_address' => 'nullable|ip',
-            'netmask' => 'nullable|ip',
-            'lease_time' => 'nullable|integer|min:60',
-            'comment' => 'nullable|string|max:500',
-        ]);
+        $ispId = auth()->user()->isp_id;
+
+        $this->formSettings->validateRequest($request, 'ip_pool', [
+            'router_id' => ['exists:routers,id'],
+            'name' => ['string', 'max:255'],
+            'ranges' => ['required', 'array', 'min:1'],
+            'ranges.*.start' => ['required', 'ip'],
+            'ranges.*.end' => ['required', 'ip', 'after:ranges.*.start'],
+            'gateway_address' => ['nullable', 'ip'],
+            'netmask' => ['nullable', 'ip'],
+            'lease_time' => ['nullable', 'integer', 'min:60'],
+            'comment' => ['nullable', 'string', 'max:500'],
+        ], $ispId);
 
         $router = Router::findOrFail($request->router_id);
 
@@ -212,11 +265,6 @@ class IpPoolController extends Controller
     {
         if ($ipPool->isp_id !== auth()->user()->isp_id) {
             abort(403);
-        }
-
-        // Check if pool is being used by customers
-        if ($ipPool->customers()->count() > 0) {
-            return back()->with('error', 'Cannot delete IP pool. It is being used by customers.');
         }
 
         $ipPool->delete();

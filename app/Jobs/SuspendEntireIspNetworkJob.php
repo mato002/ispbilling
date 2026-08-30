@@ -19,7 +19,10 @@ class SuspendEntireIspNetworkJob implements ShouldQueue
 
     public int $timeout = 600;
 
-    public function __construct(public int $ispId) {}
+    public function __construct(
+        public int $ispId,
+        public bool $markPlatformSuspension = false,
+    ) {}
 
     public function handle(): void
     {
@@ -64,10 +67,16 @@ class SuspendEntireIspNetworkJob implements ShouldQueue
                         ]);
                     }
 
+                    $attrs = $customer->custom_attributes ?? [];
+                    if ($this->markPlatformSuspension) {
+                        $attrs['platform_service_suspended'] = true;
+                    }
+
                     $customer->update([
                         'status' => 'suspended',
                         'connection_status' => 'suspended',
                         'suspended_at' => now(),
+                        'custom_attributes' => $attrs,
                     ]);
                 }
             });

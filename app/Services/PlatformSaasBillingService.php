@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Jobs\RestoreEntireIspNetworkJob;
+use App\Jobs\SuspendEntireIspNetworkJob;
 use App\Models\ISP;
 use App\Models\Payment;
 use App\Models\PlatformSaasInvoice;
@@ -17,7 +19,22 @@ class PlatformSaasBillingService
 {
     public function graceDays(): int
     {
-        return max(0, (int) PlatformSetting::get('saas_payment_grace_days', '3'));
+        return max(0, PlatformSetting::getInt('saas_payment_grace_days', 3));
+    }
+
+    public function defaultTrialDays(): int
+    {
+        return max(0, PlatformSetting::getInt('saas_default_trial_days', 14));
+    }
+
+    public function lockOnPastDue(): bool
+    {
+        return PlatformSetting::getBool('saas_lock_on_past_due', false);
+    }
+
+    public function suspendCustomerServicesOnPlatformSuspend(): bool
+    {
+        return PlatformSetting::getBool('saas_suspend_customer_services', false);
     }
 
     public static function normalizeKenyanMsisdn(?string $raw): ?string
@@ -135,14 +152,20 @@ class PlatformSaasBillingService
         ];
     }
 
-    public function createPendingInvoice(ISP $isp, Carbon $billingAnchor): PlatformSaasInvoice
+    public function createPendingInvoice(ISP $isp, Carbon $billingAnchor, ?PlatformSaasPlan $plan = null, bool $planChange = false): PlatformSaasInvoice
     {
-        $plan = $isp->saasPlan;
+        $plan ??= $isp->saasPlan;
         if (! $plan) {
             throw new \RuntimeException('ISP has no SaaS plan assigned.');
         }
 
+        $previousPlan = $isp->saasPlan;
+        $isp->setRelation('saasPlan', $plan);
         $parts = $this->buildUpcomingInvoiceAmounts($isp);
+        if ($previousPlan) {
+            $isp->setRelation('saasPlan', $previousPlan);
+        }
+
         $periodStart = $billingAnchor->copy()->startOfDay();
         $periodEnd = $billingAnchor->copy()->addMonth()->subDay();
 
@@ -157,10 +180,78 @@ class PlatformSaasBillingService
             'period_end' => $periodEnd->toDateString(),
             'due_date' => $periodStart->copy()->addDays($this->graceDays())->toDateString(),
             'status' => PlatformSaasInvoice::STATUS_PENDING,
-            'metadata' => [
+            'metadata' => array_filter([
                 'billing_anchor' => $billingAnchor->toIso8601String(),
-            ],
+                'plan_change' => $planChange ?: null,
+            ]),
         ]);
+    }
+
+    /**
+     * @return array{applied: bool, invoice: ?PlatformSaasInvoice, message: string}
+     */
+    public function changePlan(ISP $isp, PlatformSaasPlan $newPlan): array
+    {
+        if (! $newPlan->is_active) {
+            throw new \InvalidArgumentException('That plan is not available.');
+        }
+
+        if ((int) $isp->platform_saas_plan_id === (int) $newPlan->id) {
+            return [
+                'applied' => true,
+                'invoice' => null,
+                'message' => 'You are already on this plan.',
+            ];
+        }
+
+        $currentCount = $isp->customers()->count();
+        if (! $newPlan->allowsCustomerCount($currentCount)) {
+            throw new \InvalidArgumentException(
+                'Cannot switch to this plan: you currently have '.$currentCount.' subscribers, above its max of '.$newPlan->max_customers.'.'
+            );
+        }
+
+        $requiresPayment = (float) $newPlan->monthly_price > 0
+            && ! in_array($isp->saas_subscription_status, ['trialing'], true);
+
+        if (! $requiresPayment) {
+            $this->applyPlan($isp, $newPlan);
+
+            return [
+                'applied' => true,
+                'invoice' => null,
+                'message' => 'Plan updated to '.$newPlan->name.'.',
+            ];
+        }
+
+        $isp->update(['saas_pending_platform_plan_id' => $newPlan->id]);
+
+        $invoice = $this->createPendingInvoice($isp, now(), $newPlan, true);
+
+        return [
+            'applied' => false,
+            'invoice' => $invoice,
+            'message' => 'Plan change reserved. Pay the pending invoice to activate '.$newPlan->name.'.',
+        ];
+    }
+
+    public function applyPlan(ISP $isp, PlatformSaasPlan $plan): void
+    {
+        $isp->update([
+            'platform_saas_plan_id' => $plan->id,
+            'saas_pending_platform_plan_id' => null,
+            'saas_tier' => $plan->slug,
+        ]);
+
+        PlatformSaasSubscription::query()->updateOrCreate(
+            ['isp_id' => $isp->id],
+            [
+                'platform_saas_plan_id' => $plan->id,
+                'status' => $isp->saas_subscription_status === 'trialing'
+                    ? PlatformSaasSubscription::STATUS_TRIALING
+                    : PlatformSaasSubscription::STATUS_ACTIVE,
+            ]
+        );
     }
 
     public function initiateStkForInvoice(PlatformSaasInvoice $invoice): array
@@ -224,7 +315,7 @@ class PlatformSaasBillingService
 
             $setupPaid = $invoice->setup_fee_amount > 0;
 
-            $isp->update([
+            $planUpdates = [
                 'saas_subscription_status' => 'active',
                 'saas_current_period_start' => $periodStart->toDateString(),
                 'saas_current_period_end' => $periodEnd->toDateString(),
@@ -233,10 +324,38 @@ class PlatformSaasBillingService
                 'platform_access_locked' => false,
                 'is_active' => true,
                 'saas_setup_fee_paid_at' => $setupPaid ? now() : $isp->saas_setup_fee_paid_at,
-            ]);
+            ];
+
+            $pendingPlanId = $isp->saas_pending_platform_plan_id ?: $invoice->platform_saas_plan_id;
+            if ($pendingPlanId && (int) $pendingPlanId !== (int) $isp->platform_saas_plan_id) {
+                $pendingPlan = PlatformSaasPlan::query()->find($pendingPlanId);
+                if ($pendingPlan) {
+                    $planUpdates['platform_saas_plan_id'] = $pendingPlan->id;
+                    $planUpdates['saas_tier'] = $pendingPlan->slug;
+                    $planUpdates['saas_pending_platform_plan_id'] = null;
+                }
+            } elseif ($isp->saas_pending_platform_plan_id) {
+                $planUpdates['saas_pending_platform_plan_id'] = null;
+            }
+
+            $isp->update($planUpdates);
+
+            if (! empty($planUpdates['platform_saas_plan_id'])) {
+                PlatformSaasSubscription::query()->updateOrCreate(
+                    ['isp_id' => $isp->id],
+                    [
+                        'platform_saas_plan_id' => $planUpdates['platform_saas_plan_id'],
+                        'status' => PlatformSaasSubscription::STATUS_ACTIVE,
+                    ]
+                );
+            }
 
             User::where('isp_id', $isp->id)->update(['is_active' => true]);
         });
+
+        if ($this->suspendCustomerServicesOnPlatformSuspend()) {
+            RestoreEntireIspNetworkJob::dispatch($isp->id);
+        }
     }
 
     public function suspendIspForOverdueSaas(ISP $isp, ?string $message = null): void
@@ -249,6 +368,10 @@ class PlatformSaasBillingService
         ]);
 
         User::where('isp_id', $isp->id)->update(['is_active' => false]);
+
+        if ($this->suspendCustomerServicesOnPlatformSuspend()) {
+            SuspendEntireIspNetworkJob::dispatch($isp->id, markPlatformSuspension: true);
+        }
     }
 
     /**
@@ -280,6 +403,21 @@ class PlatformSaasBillingService
         $this->suspendTenantsPastGrace();
     }
 
+    protected function applyPastDueState(ISP $isp, Carbon $graceEnds): void
+    {
+        $updates = [
+            'saas_subscription_status' => 'past_due',
+            'saas_grace_ends_at' => $graceEnds,
+        ];
+
+        if ($this->lockOnPastDue()) {
+            $updates['platform_access_locked'] = true;
+            $updates['platform_access_message'] = 'Your PrimeBilling platform invoice is unpaid. Pay from Platform subscription to restore console access.';
+        }
+
+        $isp->update($updates);
+    }
+
     protected function processIspBillingDay(ISP $isp, Carbon $today): void
     {
         if (! $isp->saas_next_billing_at) {
@@ -305,12 +443,11 @@ class PlatformSaasBillingService
                 $pending->update(['metadata' => $meta]);
             }
 
-            $isp->update([
-                'saas_subscription_status' => 'past_due',
-                'saas_grace_ends_at' => $pending->due_date
-                    ? Carbon::parse($pending->due_date)->endOfDay()
-                    : $today->copy()->addDays($this->graceDays())->endOfDay(),
-            ]);
+            $graceEnds = $pending->due_date
+                ? Carbon::parse($pending->due_date)->endOfDay()
+                : $today->copy()->addDays($this->graceDays())->endOfDay();
+
+            $this->applyPastDueState($isp, $graceEnds);
 
             return;
         }
@@ -325,12 +462,11 @@ class PlatformSaasBillingService
             ]),
         ]);
 
-        $isp->update([
-            'saas_subscription_status' => $isp->saas_subscription_status === 'trialing' ? 'past_due' : 'past_due',
-            'saas_grace_ends_at' => $invoice->due_date
-                ? Carbon::parse($invoice->due_date)->endOfDay()
-                : $today->copy()->addDays($this->graceDays())->endOfDay(),
-        ]);
+        $graceEnds = $invoice->due_date
+            ? Carbon::parse($invoice->due_date)->endOfDay()
+            : $today->copy()->addDays($this->graceDays())->endOfDay();
+
+        $this->applyPastDueState($isp, $graceEnds);
     }
 
     protected function suspendTenantsPastGrace(): void

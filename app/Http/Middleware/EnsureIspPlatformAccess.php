@@ -24,8 +24,19 @@ class EnsureIspPlatformAccess
             ?? ISP::query()->find($user->isp_id);
 
         if ($isp && $isp->platform_access_locked) {
-            if ($request->routeIs('isp.platform-subscription.*')) {
+            if ($request->routeIs('isp.platform-subscription.*', 'isp.saas-onboarding.*')) {
                 return $next($request);
+            }
+
+            $message = $isp->platform_access_message
+                ?? 'Your PrimeBilling platform subscription is suspended. Please pay your invoice to restore access.';
+
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'message' => $message,
+                    'code' => 'platform_access_locked',
+                    'renewal_url' => route('isp.platform-subscription.index'),
+                ], 403);
             }
 
             return response()
