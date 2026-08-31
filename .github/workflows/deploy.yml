@@ -74,6 +74,23 @@ jobs:
             echo "$DEPLOY_EXTRACT_TOKEN" > storage/app/.deploy-extract-token
           fi
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, bcmath, ctype, curl, dom, fileinfo, json, openssl, pdo, tokenizer, xml, gd, zip
+          coverage: none
+
+      - name: Generate production bootstrap cache (no dev providers)
+        run: |
+          cp .env.example .env
+          composer install --no-dev --no-scripts --no-interaction --prefer-dist --no-progress
+          php artisan key:generate --force
+          php artisan package:discover --ansi
+          php artisan config:clear
+          rm -f bootstrap/cache/routes*.php bootstrap/cache/events.php
+          grep -i pail bootstrap/cache/packages.php && exit 1 || echo "packages.php OK (no Pail)"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
