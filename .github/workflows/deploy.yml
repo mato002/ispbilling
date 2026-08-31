@@ -38,6 +38,8 @@ jobs:
           INPUT_PROTOCOL: ${{ github.event.inputs.protocol }}
           SECRET_PROTOCOL: ${{ secrets.FTP_PROTOCOL }}
           SECRET_PORT: ${{ secrets.FTP_PORT }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+          FTP_PUBLIC_DIR: ${{ secrets.FTP_PUBLIC_DIR }}
         run: |
           PROTO="${INPUT_PROTOCOL:-${SECRET_PROTOCOL:-ftps}}"
           case "$PROTO" in
@@ -52,6 +54,22 @@ jobs:
           echo "port=${PORT}" >> "$GITHUB_OUTPUT"
           echo "host=${HOST}" >> "$GITHUB_OUTPUT"
           echo "Using ${PROTO}://${HOST}:${PORT}"
+
+          PUBLIC_DIR="${FTP_PUBLIC_DIR}"
+          if [ -z "$PUBLIC_DIR" ]; then
+            case "${FTP_SERVER_DIR}" in
+              */ispbilling/|*/ispbilling)
+                PUBLIC_DIR="/public_html/ispbilling/"
+                echo "FTP_PUBLIC_DIR not set — defaulting to ${PUBLIC_DIR}"
+                ;;
+              *)
+                echo "::error::FTP_PUBLIC_DIR secret is required (e.g. /public_html/ispbilling/)"
+                exit 1
+                ;;
+            esac
+          fi
+          echo "public_dir=${PUBLIC_DIR}" >> "$GITHUB_OUTPUT"
+          echo "Public web root: ${PUBLIC_DIR}"
 
       - name: Preflight — test server port
         run: |
@@ -165,7 +183,7 @@ jobs:
           port: ${{ steps.ftp.outputs.port }}
           protocol: ${{ steps.ftp.outputs.protocol }}
           local-dir: ./public/
-          server-dir: ${{ secrets.FTP_PUBLIC_DIR }}
+          server-dir: ${{ steps.ftp.outputs.public_dir }}
           state-name: ftp-deploy-public-state.json
           timeout: 1200000
           log-level: verbose
