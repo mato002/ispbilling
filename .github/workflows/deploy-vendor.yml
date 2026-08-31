@@ -46,21 +46,27 @@ jobs:
           FTP_USER: ${{ secrets.FTP_USERNAME }}
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
           FTP_DIR: ${{ secrets.FTP_SERVER_DIR }}
-          FTP_PROTOCOL: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftp' }}
+          FTP_PROTOCOL: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftps' }}
           FTP_PORT: ${{ secrets.FTP_PORT != '' && secrets.FTP_PORT || '21' }}
         run: |
           set -euo pipefail
+          HOST="${FTP_SERVER#ftp://}"; HOST="${HOST#ftps://}"; HOST="${HOST#sftp://}"; HOST="${HOST%%/*}"
           REMOTE_DIR="${FTP_DIR#/}"
           REMOTE_DIR="${REMOTE_DIR%/}"
 
+          if [ "$FTP_PROTOCOL" = "sftp" ]; then
+            echo "::error::SFTP vendor upload via curl is not supported. Set FTP_PROTOCOL=ftps for vendor chunks, or upload vendor.zip via cPanel File Manager."
+            exit 1
+          fi
+
           CURL_OPTS=(--ftp-pasv --connect-timeout 30 --max-time 900 --retry 5 --retry-delay 10 --retry-all-errors)
-          if [ "$FTP_PROTOCOL" = "ftps" ]; then
+          if [ "$FTP_PROTOCOL" = "ftps" ] || [ "$FTP_PROTOCOL" = "ftps-legacy" ]; then
             CURL_OPTS+=(--ssl-reqd)
           fi
 
           upload() {
             local file="$1"
-            local url="${FTP_PROTOCOL}://${FTP_SERVER}:${FTP_PORT}/${REMOTE_DIR}/${file}"
+            local url="${FTP_PROTOCOL}://${HOST}:${FTP_PORT}/${REMOTE_DIR}/${file}"
             echo "Uploading ${file} ..."
             curl "${CURL_OPTS[@]}" -T "$file" --user "${FTP_USER}:${FTP_PASS}" "$url"
           }
@@ -79,7 +85,7 @@ jobs:
           FTP_USER: ${{ secrets.FTP_USERNAME }}
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
           FTP_DIR: ${{ secrets.FTP_SERVER_DIR }}
-          FTP_PROTOCOL: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftp' }}
+          FTP_PROTOCOL: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftps' }}
           FTP_PORT: ${{ secrets.FTP_PORT != '' && secrets.FTP_PORT || '21' }}
         run: |
           if [ -z "${DEPLOY_EXTRACT_TOKEN:-}" ]; then

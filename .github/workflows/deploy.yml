@@ -5,6 +5,18 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      protocol:
+        description: Override protocol (blank = use FTP_PROTOCOL secret)
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - ftps
+          - ftp
+          - ftps-legacy
+          - sftp
 
 concurrency:
   group: production-ftp-deploy
@@ -14,18 +26,44 @@ jobs:
   deploy:
     name: Deploy application (FTP)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, bcmath, ctype, curl, dom, fileinfo, json, openssl, pdo, tokenizer, xml, gd, zip
-          coverage: none
+      - name: Resolve FTP settings
+        id: ftp
+        env:
+          INPUT_PROTOCOL: ${{ github.event.inputs.protocol }}
+          SECRET_PROTOCOL: ${{ secrets.FTP_PROTOCOL }}
+          SECRET_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          PROTO="${INPUT_PROTOCOL:-${SECRET_PROTOCOL:-ftps}}"
+          case "$PROTO" in
+            sftp) PORT="${SECRET_PORT:-22}" ;;
+            ftps-legacy) PORT="${SECRET_PORT:-990}" ;;
+            *) PORT="${SECRET_PORT:-21}" ;;
+          esac
+          HOST="${{ secrets.FTP_SERVER }}"
+          HOST="${HOST#ftp://}"; HOST="${HOST#ftps://}"; HOST="${HOST#sftp://}"
+          HOST="${HOST%%/*}"
+          echo "protocol=${PROTO}" >> "$GITHUB_OUTPUT"
+          echo "port=${PORT}" >> "$GITHUB_OUTPUT"
+          echo "host=${HOST}" >> "$GITHUB_OUTPUT"
+          echo "Using ${PROTO}://${HOST}:${PORT}"
+
+      - name: Preflight — test server port
+        run: |
+          HOST="${{ steps.ftp.outputs.host }}"
+          PORT="${{ steps.ftp.outputs.port }}"
+          echo "Testing TCP ${HOST}:${PORT} ..."
+          if timeout 25 bash -c "echo >/dev/tcp/${HOST}/${PORT}" 2>/dev/null; then
+            echo "Port is reachable from GitHub Actions."
+          else
+            echo "::error::Cannot reach ${HOST}:${PORT}. Your host may block GitHub IPs, or FTP_PORT / FTP_SERVER is wrong."
+            exit 1
+          fi
 
       - name: Write deploy extract token
         env:
@@ -50,16 +88,16 @@ jobs:
       - name: Deploy application files
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          server: ${{ steps.ftp.outputs.host }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ secrets.FTP_PORT != '' && secrets.FTP_PORT || '21' }}
-          protocol: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftp' }}
+          port: ${{ steps.ftp.outputs.port }}
+          protocol: ${{ steps.ftp.outputs.protocol }}
           local-dir: ./
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           state-name: ftp-deploy-sync-state.json
-          timeout: 600000
-          log-level: minimal
+          timeout: 1200000
+          log-level: verbose
           exclude: |
             **/.git*
             **/.github/**
@@ -68,6 +106,7 @@ jobs:
             **/vendor.part.*
             **/vendor.zip
             **/vendor.manifest.json
+            **/scripts/**
             **/tests/**
             **/.env
             **/.env.*
@@ -79,6 +118,7 @@ jobs:
             **/README.md
             **/*.zip
             **/*.sql
+            **/*.ps1
             **/Homestead.*
             **/.idea/**
             **/.vscode/**
