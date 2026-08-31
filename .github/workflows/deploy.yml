@@ -12,9 +12,9 @@ concurrency:
 
 jobs:
   deploy:
-    name: Build & FTP deploy
+    name: Deploy application (FTP)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -27,29 +27,12 @@ jobs:
           extensions: mbstring, bcmath, ctype, curl, dom, fileinfo, json, openssl, pdo, tokenizer, xml, gd, zip
           coverage: none
 
-      - name: Get Composer cache directory
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Composer dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-composer-
-
-      - name: Install Composer dependencies (production)
-        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress --no-scripts
-
-      - name: Archive vendor folder (single ZIP for FTP)
-        run: zip -r -q vendor.zip vendor/
-
       - name: Write deploy extract token
         env:
           DEPLOY_EXTRACT_TOKEN: ${{ secrets.DEPLOY_EXTRACT_TOKEN }}
         run: |
           if [ -n "$DEPLOY_EXTRACT_TOKEN" ]; then
+            mkdir -p storage/app
             echo "$DEPLOY_EXTRACT_TOKEN" > storage/app/.deploy-extract-token
           fi
 
@@ -64,7 +47,7 @@ jobs:
           npm ci
           npm run build
 
-      - name: Deploy application files (no vendor tree)
+      - name: Deploy application files
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -82,6 +65,9 @@ jobs:
             **/.github/**
             **/node_modules/**
             **/vendor/**
+            **/vendor.part.*
+            **/vendor.zip
+            **/vendor.manifest.json
             **/tests/**
             **/.env
             **/.env.*
@@ -103,18 +89,3 @@ jobs:
             **/storage/pail/**
             **/public/hot
             **/public/storage
-
-      - name: Upload vendor.zip
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ secrets.FTP_PORT != '' && secrets.FTP_PORT || '21' }}
-          protocol: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftp' }}
-          local-dir: ./
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}
-          timeout: 600000
-          log-level: minimal
-          include: |
-            vendor.zip

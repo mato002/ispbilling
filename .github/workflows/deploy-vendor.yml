@@ -1,0 +1,105 @@
+name: Upload vendor (FTP chunks)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  vendor:
+    name: Build & upload vendor archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, bcmath, ctype, curl, dom, fileinfo, json, openssl, pdo, tokenizer, xml, gd, zip
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies (production)
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress --no-scripts
+
+      - name: Create vendor archive chunks (5 MB each)
+        run: |
+          zip -r -q vendor.zip vendor/
+          split -b 5m vendor.zip vendor.part.
+          rm vendor.zip
+          PARTS=$(ls -1 vendor.part.* 2>/dev/null | wc -l | tr -d ' ')
+          echo "{\"parts\": ${PARTS}, \"chunk_bytes\": 5242880}" > vendor.manifest.json
+          ls -lh vendor.part.*
+
+      - name: Upload vendor chunks via curl FTP
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_USERNAME }}
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+          FTP_DIR: ${{ secrets.FTP_SERVER_DIR }}
+          FTP_PROTOCOL: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftp' }}
+          FTP_PORT: ${{ secrets.FTP_PORT != '' && secrets.FTP_PORT || '21' }}
+        run: |
+          set -euo pipefail
+          REMOTE_DIR="${FTP_DIR#/}"
+          REMOTE_DIR="${REMOTE_DIR%/}"
+
+          CURL_OPTS=(--ftp-pasv --connect-timeout 30 --max-time 900 --retry 5 --retry-delay 10 --retry-all-errors)
+          if [ "$FTP_PROTOCOL" = "ftps" ]; then
+            CURL_OPTS+=(--ssl-reqd)
+          fi
+
+          upload() {
+            local file="$1"
+            local url="${FTP_PROTOCOL}://${FTP_SERVER}:${FTP_PORT}/${REMOTE_DIR}/${file}"
+            echo "Uploading ${file} ..."
+            curl "${CURL_OPTS[@]}" -T "$file" --user "${FTP_USER}:${FTP_PASS}" "$url"
+          }
+
+          for part in vendor.part.*; do
+            [ -f "$part" ] || continue
+            upload "$part"
+          done
+
+          upload vendor.manifest.json
+
+      - name: Write deploy extract token on server
+        env:
+          DEPLOY_EXTRACT_TOKEN: ${{ secrets.DEPLOY_EXTRACT_TOKEN }}
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_USERNAME }}
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+          FTP_DIR: ${{ secrets.FTP_SERVER_DIR }}
+          FTP_PROTOCOL: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftp' }}
+          FTP_PORT: ${{ secrets.FTP_PORT != '' && secrets.FTP_PORT || '21' }}
+        run: |
+          if [ -z "${DEPLOY_EXTRACT_TOKEN:-}" ]; then
+            echo "DEPLOY_EXTRACT_TOKEN not set — skip token upload"
+            exit 0
+          fi
+          echo "$DEPLOY_EXTRACT_TOKEN" > .deploy-extract-token
+          REMOTE_DIR="${FTP_DIR#/}"
+          REMOTE_DIR="${REMOTE_DIR%/}"
+          CURL_OPTS=(--ftp-pasv --connect-timeout 30 --max-time 120)
+          if [ "$FTP_PROTOCOL" = "ftps" ]; then CURL_OPTS+=(--ssl-reqd); fi
+          curl "${CURL_OPTS[@]}" -T .deploy-extract-token --user "${FTP_USER}:${FTP_PASS}" \
+            "${FTP_PROTOCOL}://${FTP_SERVER}:${FTP_PORT}/${REMOTE_DIR}/storage/app/.deploy-extract-token" \
+            --ftp-create-dirs
+
+      - name: Next step reminder
+        run: |
+          echo "=============================================="
+          echo "Vendor chunks uploaded."
+          echo "Open in your browser (replace domain and token):"
+          echo "  https://YOUR-DOMAIN/deploy-extract-vendor.php?token=YOUR_DEPLOY_EXTRACT_TOKEN"
+          echo "Or merge parts in cPanel File Manager is NOT needed — use the URL above."
+          echo "=============================================="

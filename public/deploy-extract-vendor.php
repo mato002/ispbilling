@@ -1,12 +1,12 @@
 <?php
 
 /**
- * FTP-only deploy helper: extract vendor.zip uploaded by GitHub Actions.
+ * FTP-only deploy helper: merge vendor.part.* chunks and extract vendor/.
  *
- * Usage (after deploy): /deploy-extract-vendor.php?token=YOUR_TOKEN
- * Token is written to storage/app/.deploy-extract-token during CI deploy.
+ * After running the "Upload vendor (FTP chunks)" GitHub Action, open:
+ *   /deploy-extract-vendor.php?token=YOUR_DEPLOY_EXTRACT_TOKEN
  *
- * Alternative without this URL: cPanel File Manager → select vendor.zip → Extract.
+ * Token file: storage/app/.deploy-extract-token (uploaded during deploy).
  */
 declare(strict_types=1);
 
@@ -19,14 +19,7 @@ $expected = is_readable($tokenFile) ? trim((string) file_get_contents($tokenFile
 
 if ($expected === '' || $provided === '' || ! hash_equals($expected, $provided)) {
     http_response_code(403);
-    exit("Forbidden.\n");
-}
-
-$zipPath = $root.'/vendor.zip';
-
-if (! is_file($zipPath)) {
-    http_response_code(404);
-    exit("vendor.zip not found in the application root. Run deploy first or extract via cPanel File Manager.\n");
+    exit("Forbidden. Set DEPLOY_EXTRACT_TOKEN in GitHub secrets and re-run deploy.\n");
 }
 
 if (! class_exists(ZipArchive::class)) {
@@ -34,10 +27,46 @@ if (! class_exists(ZipArchive::class)) {
     exit("PHP ZipArchive extension is not enabled on this host.\n");
 }
 
+$zipPath = $root.'/vendor.zip';
+$parts = glob($root.'/vendor.part.*') ?: [];
+
+if ($parts !== []) {
+    sort($parts, SORT_NATURAL);
+    $out = fopen($zipPath, 'wb');
+    if ($out === false) {
+        http_response_code(500);
+        exit("Could not create vendor.zip for merge.\n");
+    }
+
+    foreach ($parts as $part) {
+        $in = fopen($part, 'rb');
+        if ($in === false) {
+            fclose($out);
+            @unlink($zipPath);
+            http_response_code(500);
+            exit("Could not read {$part}.\n");
+        }
+        stream_copy_to_stream($in, $out);
+        fclose($in);
+    }
+
+    fclose($out);
+
+    foreach ($parts as $part) {
+        @unlink($part);
+    }
+
+    @unlink($root.'/vendor.manifest.json');
+    echo 'Merged '.count($parts)." chunk(s) into vendor.zip.\n";
+} elseif (! is_file($zipPath)) {
+    http_response_code(404);
+    exit("No vendor.zip or vendor.part.* files found. Run the Upload vendor (FTP chunks) workflow first.\n");
+}
+
 $zip = new ZipArchive();
 if ($zip->open($zipPath) !== true) {
     http_response_code(500);
-    exit("Could not open vendor.zip.\n");
+    exit("Could not open vendor.zip after merge.\n");
 }
 
 if (! $zip->extractTo($root)) {
@@ -50,4 +79,3 @@ $zip->close();
 @unlink($zipPath);
 
 echo "vendor/ extracted successfully.\n";
-echo "You can remove vendor.zip from the server if it still appears in File Manager.\n";
