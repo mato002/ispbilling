@@ -55,19 +55,7 @@ jobs:
           echo "host=${HOST}" >> "$GITHUB_OUTPUT"
           echo "Using ${PROTO}://${HOST}:${PORT}"
 
-          PUBLIC_DIR="${FTP_PUBLIC_DIR}"
-          if [ -z "$PUBLIC_DIR" ]; then
-            case "${FTP_SERVER_DIR}" in
-              */ispbilling/|*/ispbilling)
-                PUBLIC_DIR="/public_html/ispbilling/"
-                echo "FTP_PUBLIC_DIR not set — defaulting to ${PUBLIC_DIR}"
-                ;;
-              *)
-                echo "::error::FTP_PUBLIC_DIR secret is required (e.g. /public_html/ispbilling/)"
-                exit 1
-                ;;
-            esac
-          fi
+          PUBLIC_DIR="${FTP_PUBLIC_DIR:-/public_html/ispbilling/}"
           echo "public_dir=${PUBLIC_DIR}" >> "$GITHUB_OUTPUT"
           echo "Public web root: ${PUBLIC_DIR}"
 
@@ -174,6 +162,20 @@ jobs:
             **/public/hot
             **/public/storage
 
+      - name: Deploy public build assets (document root)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ steps.ftp.outputs.host }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ steps.ftp.outputs.port }}
+          protocol: ${{ steps.ftp.outputs.protocol }}
+          local-dir: ./public/build/
+          server-dir: ${{ steps.ftp.outputs.public_dir }}build/
+          state-name: ftp-deploy-public-build-state.json
+          timeout: 1200000
+          log-level: verbose
+
       - name: Deploy public web files (document root)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
@@ -188,5 +190,7 @@ jobs:
           timeout: 1200000
           log-level: verbose
           exclude: |
+            **/build/**
+            **/favicon.ico
             **/hot
             **/storage
