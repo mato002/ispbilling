@@ -53,6 +53,7 @@ use App\Http\Controllers\ISP\Web\SubscriptionController;
 use App\Http\Controllers\ISP\Web\TicketController;
 use App\Http\Controllers\ISP\Web\UserConnectionController;
 use App\Http\Controllers\ISP\Web\VoucherController;
+use App\Http\Controllers\DeployMigrateController;
 use App\Http\Controllers\DeploySyncController;
 use App\Http\Controllers\FeatureDiscoveryController;
 use App\Http\Controllers\LandingController;
@@ -69,6 +70,7 @@ Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 
 Route::get('/deploy/sync-public', [DeploySyncController::class, 'syncPublic'])->name('deploy.sync-public');
+Route::get('/deploy/migrate', [DeployMigrateController::class, 'migrate'])->name('deploy.migrate');
 
 // Static Pages
 Route::get('/terms', [StaticPageController::class, 'terms'])->name('terms');

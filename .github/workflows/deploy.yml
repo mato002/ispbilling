@@ -162,6 +162,40 @@ jobs:
             **/public/hot
             **/public/storage
 
+      - name: Run database migrations (HTTP)
+        env:
+          DEPLOY_EXTRACT_TOKEN: ${{ secrets.DEPLOY_EXTRACT_TOKEN }}
+          DEPLOY_SITE_URL: ${{ secrets.DEPLOY_SITE_URL }}
+        run: |
+          if [ -z "$DEPLOY_EXTRACT_TOKEN" ]; then
+            echo "::error::Add DEPLOY_EXTRACT_TOKEN to GitHub Secrets (same value as production .env)"
+            exit 1
+          fi
+          BASE="${DEPLOY_SITE_URL:-https://ispbilling.zhengkyc.com}"
+          BASE="${BASE%/}"
+          migrate_ok=0
+          for path in /deploy/migrate /deploy-migrate.php; do
+            URL="${BASE}${path}?token=${DEPLOY_EXTRACT_TOKEN}"
+            echo "Trying ${URL} ..."
+            for attempt in 1 2 3; do
+              HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -o /tmp/deploy-migrate.out -w "%{http_code}" "$URL" || echo "000")
+              echo "HTTP ${HTTP}"
+              cat /tmp/deploy-migrate.out || true
+              echo ""
+              if [ "$HTTP" = "200" ]; then
+                migrate_ok=1
+                break 2
+              fi
+              echo "Attempt ${attempt} failed, retrying in 15s..."
+              sleep 15
+            done
+          done
+          if [ "$migrate_ok" -ne 1 ]; then
+            echo "::error::HTTP migration failed. Check production .env DB_* settings and DEPLOY_EXTRACT_TOKEN."
+            exit 1
+          fi
+          echo "Migrations OK."
+
       - name: Deploy public build assets (document root)
         continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
