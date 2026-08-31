@@ -203,21 +203,30 @@ jobs:
           DEPLOY_SITE_URL: ${{ secrets.DEPLOY_SITE_URL }}
         run: |
           if [ -z "$DEPLOY_EXTRACT_TOKEN" ]; then
-            echo "::error::Set DEPLOY_EXTRACT_TOKEN in GitHub Secrets (same value as in production .env)"
+            echo "::error::Add DEPLOY_EXTRACT_TOKEN to GitHub Secrets (same value as production .env)"
             exit 1
           fi
           BASE="${DEPLOY_SITE_URL:-https://ispbilling.zhengkyc.com}"
           BASE="${BASE%/}"
-          URL="${BASE}/deploy/sync-public?token=${DEPLOY_EXTRACT_TOKEN}"
-          echo "Calling ${BASE}/deploy/sync-public ..."
-          for attempt in 1 2 3; do
-            if curl -fsS --connect-timeout 30 --max-time 120 "$URL"; then
+          sync_ok=0
+          for path in /deploy/sync-public /deploy-sync-public.php; do
+            URL="${BASE}${path}?token=${DEPLOY_EXTRACT_TOKEN}"
+            echo "Trying ${URL} ..."
+            for attempt in 1 2 3; do
+              HTTP=$(curl -sS --connect-timeout 30 --max-time 120 -o /tmp/deploy-sync.out -w "%{http_code}" "$URL" || echo "000")
+              echo "HTTP ${HTTP}"
+              cat /tmp/deploy-sync.out || true
               echo ""
-              echo "Public sync OK."
-              exit 0
-            fi
-            echo "Attempt ${attempt} failed, retrying in 15s..."
-            sleep 15
+              if [ "$HTTP" = "200" ]; then
+                sync_ok=1
+                break 2
+              fi
+              echo "Attempt ${attempt} failed, retrying in 15s..."
+              sleep 15
+            done
           done
-          echo "::error::HTTP public sync failed. Add DEPLOY_EXTRACT_TOKEN to production .env and retry."
-          exit 1
+          if [ "$sync_ok" -ne 1 ]; then
+            echo "::error::HTTP public sync failed. Ensure DEPLOY_EXTRACT_TOKEN is in production .env and GitHub Secrets."
+            exit 1
+          fi
+          echo "Public sync OK."
