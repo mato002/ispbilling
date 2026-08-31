@@ -3,23 +3,23 @@
 /**
  * FTP-only deploy helper: merge vendor.part.* chunks and extract vendor/.
  *
- * After running the "Upload vendor (FTP chunks)" GitHub Action, open:
- *   /deploy-extract-vendor.php?token=YOUR_DEPLOY_EXTRACT_TOKEN
+ *   /deploy-extract-vendor.php?token=YOUR_TOKEN
  *
- * Token file: storage/app/.deploy-extract-token (uploaded during deploy).
+ * Token: DEPLOY_EXTRACT_TOKEN in .env OR GitHub secret + deploy.
  */
 declare(strict_types=1);
+
+require __DIR__.'/deploy-token.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 
 $provided = (string) ($_GET['token'] ?? '');
 $root = dirname(__DIR__);
-$tokenFile = $root.'/storage/app/.deploy-extract-token';
-$expected = is_readable($tokenFile) ? trim((string) file_get_contents($tokenFile)) : '';
+$expected = deploy_extract_expected_token($root);
 
 if ($expected === '' || $provided === '' || ! hash_equals($expected, $provided)) {
     http_response_code(403);
-    exit("Forbidden. Set DEPLOY_EXTRACT_TOKEN in GitHub secrets and re-run deploy.\n");
+    exit(deploy_extract_forbidden_message());
 }
 
 if (! class_exists(ZipArchive::class)) {
@@ -60,7 +60,7 @@ if ($parts !== []) {
     echo 'Merged '.count($parts)." chunk(s) into vendor.zip.\n";
 } elseif (! is_file($zipPath)) {
     http_response_code(404);
-    exit("No vendor.zip or vendor.part.* files found. Run the Upload vendor (FTP chunks) workflow first.\n");
+    exit("No vendor.zip or vendor.part.* on server.\nUpload vendor.zip via cPanel File Manager and Extract instead.\n");
 }
 
 $zip = new ZipArchive();
