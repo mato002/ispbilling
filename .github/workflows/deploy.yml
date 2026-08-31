@@ -163,6 +163,7 @@ jobs:
             **/public/storage
 
       - name: Deploy public build assets (document root)
+        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ steps.ftp.outputs.host }}
@@ -177,6 +178,7 @@ jobs:
           log-level: verbose
 
       - name: Deploy public web files (document root)
+        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ steps.ftp.outputs.host }}
@@ -194,3 +196,28 @@ jobs:
             **/favicon.ico
             **/hot
             **/storage
+
+      - name: Sync public files on server (HTTP)
+        env:
+          DEPLOY_EXTRACT_TOKEN: ${{ secrets.DEPLOY_EXTRACT_TOKEN }}
+          DEPLOY_SITE_URL: ${{ secrets.DEPLOY_SITE_URL }}
+        run: |
+          if [ -z "$DEPLOY_EXTRACT_TOKEN" ]; then
+            echo "::error::Set DEPLOY_EXTRACT_TOKEN in GitHub Secrets (same value as in production .env)"
+            exit 1
+          fi
+          BASE="${DEPLOY_SITE_URL:-https://ispbilling.zhengkyc.com}"
+          BASE="${BASE%/}"
+          URL="${BASE}/deploy/sync-public?token=${DEPLOY_EXTRACT_TOKEN}"
+          echo "Calling ${BASE}/deploy/sync-public ..."
+          for attempt in 1 2 3; do
+            if curl -fsS --connect-timeout 30 --max-time 120 "$URL"; then
+              echo ""
+              echo "Public sync OK."
+              exit 0
+            fi
+            echo "Attempt ${attempt} failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "::error::HTTP public sync failed. Add DEPLOY_EXTRACT_TOKEN to production .env and retry."
+          exit 1
