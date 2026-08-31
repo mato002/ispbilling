@@ -7,7 +7,7 @@
     <title>{{ $customer->isp->company_name ?? $customer->isp->name ?? 'Select a Plan' }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <x-vite-assets />
 </head>
 <body class="font-sans antialiased">
 <div class="min-h-screen bg-gradient-to-br from-purple-500 via-blue-500 to-indigo-600 flex items-center justify-center p-2 sm:p-4">

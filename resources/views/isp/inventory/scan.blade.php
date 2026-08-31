@@ -15,7 +15,7 @@
 @endsection
 
 @push('scripts')
-    @vite('resources/js/inventory-scanner.js')
+    <x-vite-assets :assets="['resources/js/inventory-scanner.js']" />
 @endpush
 
 @section('content')

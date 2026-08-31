@@ -101,6 +101,15 @@ jobs:
         run: |
           npm ci
           npm run build
+          test -f public/build/manifest.json || (echo "::error::manifest.json missing" && exit 1)
+          CSS_COUNT=$(find public/build/assets -name '*.css' 2>/dev/null | wc -l)
+          JS_COUNT=$(find public/build/assets -name '*.js' 2>/dev/null | wc -l)
+          echo "Built ${CSS_COUNT} CSS and ${JS_COUNT} JS asset(s)"
+          if [ "$CSS_COUNT" -lt 1 ] || [ "$JS_COUNT" -lt 1 ]; then
+            echo "::error::public/build/assets is incomplete"
+            exit 1
+          fi
+          ls -la public/build/assets/
 
       - name: Deploy application files
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
@@ -146,3 +155,20 @@ jobs:
             **/storage/pail/**
             **/public/hot
             **/public/storage
+
+      - name: Deploy public web files (document root)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ steps.ftp.outputs.host }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ steps.ftp.outputs.port }}
+          protocol: ${{ steps.ftp.outputs.protocol }}
+          local-dir: ./public/
+          server-dir: ${{ secrets.FTP_PUBLIC_DIR }}
+          state-name: ftp-deploy-public-state.json
+          timeout: 1200000
+          log-level: verbose
+          exclude: |
+            **/hot
+            **/storage
