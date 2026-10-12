@@ -43,28 +43,34 @@ class CheckExpiredVouchers implements ShouldQueue
                 $customer = $voucher->usedByCustomer;
 
                 if ($customer && $customer->status === 'active' && $customer->router) {
-                    try {
-                        $mikrotik = new MikroTikService($customer->router);
-                        $mikrotik->disconnectSession($customer);
-                        $mikrotik->disableUser($customer);
+                    $mikrotik = new MikroTikService($customer->router);
+                    if (! $mikrotik->disconnectSession($customer) || ! $mikrotik->disableUser($customer)) {
+                        Log::warning("Router enforcement failed for expired voucher {$voucher->id}; will retry");
+                        continue;
+                    }
                         $customer->suspend();
 
                         Log::info("Suspended customer {$customer->id} due to expired voucher {$voucher->id}");
-                    } catch (\Exception $e) {
-                        Log::error("Failed to suspend customer {$customer->id} for expired voucher {$voucher->id}: ".$e->getMessage());
-                    }
                 } elseif (! $customer && $voucher->router && isset($voucher->metadata['mikrotik_user_id'])) {
                     try {
                         $mikrotik = new MikroTikService($voucher->router);
-                        if ($mikrotik->connect() && $mikrotik->getConnection()) {
-                            $mikrotik->getConnection()->comm('/ip/hotspot/user/disable', [
-                                '.id' => $voucher->metadata['mikrotik_user_id'],
-                            ]);
+                        if (! $mikrotik->connect() || ! $mikrotik->getConnection()) {
+                            Log::warning("Router unavailable for expired voucher {$voucher->id}; will retry");
+                            continue;
                         }
+                        $connection = $mikrotik->getConnection();
+                        $sessions = $connection->comm('/ip/hotspot/active/print', ['?user' => $voucher->voucher_code]);
+                        foreach ($sessions as $session) {
+                            if (! empty($session['.id'])) {
+                                $connection->comm('/ip/hotspot/active/remove', ['.id' => $session['.id']]);
+                            }
+                        }
+                        $connection->comm('/ip/hotspot/user/disable', ['.id' => $voucher->metadata['mikrotik_user_id']]);
                     } catch (\Exception $e) {
                         Log::warning("Failed to disable expired voucher user on router: ".$e->getMessage(), [
                             'voucher_id' => $voucher->id,
                         ]);
+                        continue;
                     }
                 }
 

@@ -116,6 +116,7 @@ class CustomerController extends Controller
                 'plan_id' => $plan->id,
                 'start_date' => now(),
                 'end_date' => now()->addDays($plan->duration_days),
+                'ends_at' => now()->addDays($plan->duration_days),
                 'renewal_date' => now()->addDays($plan->duration_days),
                 'status' => 'active',
                 'auto_renew' => true,

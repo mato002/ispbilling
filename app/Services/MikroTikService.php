@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Customer;
+use App\Models\HotspotServer;
 use App\Models\InventoryItem;
 use App\Models\Plan;
 use App\Models\Router;
@@ -231,6 +232,37 @@ class MikroTikService
         }
     }
 
+    /** Push idle and keepalive behavior to the Hotspot user profile used by this server. */
+    public function syncHotspotSessionTimeouts(HotspotServer $server): bool
+    {
+        $profileName = trim((string) $server->default_profile);
+        if ($profileName === '' || ! $this->routerOsLibraryAvailable() || ! $this->connect()) {
+            return false;
+        }
+
+        try {
+            $profiles = $this->apiPrint('/ip/hotspot/user/profile/print');
+            $profile = collect($profiles)->first(fn ($row) => is_array($row) && ($row['name'] ?? null) === $profileName);
+            if (! $profile || empty($profile['.id'])) {
+                return false;
+            }
+
+            $duration = static fn ($seconds) => (int) $seconds > 0 ? (int) $seconds.'s' : 'none';
+            return $this->apiCommand('/ip/hotspot/user/profile/set', [
+                '.id' => $profile['.id'],
+                'idle-timeout' => $duration($server->idle_timeout),
+                'keepalive-timeout' => $duration($server->keepalive_timeout),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik hotspot timeout profile sync failed', [
+                'router_id' => $this->router->id,
+                'hotspot_server_id' => $server->id,
+                'exception' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
     /** @param array<string, string|null> $params */
     protected function apiCommand(string $path, array $params): bool
     {
@@ -414,16 +446,14 @@ class MikroTikService
                 $params['rate-limit'] = ($plan->upload_speed_kbps ?: 0).'k/'.($plan->download_speed_kbps ?: 0).'k';
             }
 
-            if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
+            if ($plan->tracksDataUsage() && $plan->data_limit_mb > 0) {
                 $params['limit-bytes-total'] = (string) ((int) $plan->data_limit_mb * 1024 * 1024);
+            } else {
+                $params['limit-bytes-total'] = '0';
             }
 
             if ($plan->billing_type === 'time' && $plan->time_limit_hours) {
                 $params['limit-uptime'] = $plan->time_limit_hours.'h';
-            }
-
-            if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
-                $params['limit-bytes-total'] = $plan->data_limit_mb.'M';
             }
 
             // Check if connection has comm method (old API) or query method (new API)
@@ -608,8 +638,11 @@ class MikroTikService
             }
 
             // Set data limit if specified
-            if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
+            if ($plan->tracksDataUsage() && $plan->data_limit_mb > 0) {
                 $params['limit-bytes-total'] = (string) ((int) $plan->data_limit_mb * 1024 * 1024);
+            } else {
+                // Clear a prior data quota when a customer changes to an unlimited plan.
+                $params['limit-bytes-total'] = '0';
             }
 
             if ($plan->upload_speed_kbps || $plan->download_speed_kbps) {
@@ -664,7 +697,7 @@ class MikroTikService
                 $params['limit-uptime'] = $plan->time_limit_hours.'h';
             }
 
-            if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
+            if ($plan->tracksDataUsage() && $plan->data_limit_mb > 0) {
                 $params['limit-bytes-total'] = (string) ((int) $plan->data_limit_mb * 1024 * 1024);
             }
 
@@ -1027,9 +1060,19 @@ class MikroTikService
 
         try {
             if ($customer->connection_type === 'hotspot') {
-                $this->connection->comm('/ip/hotspot/active/remove', ['user' => $customer->username]);
+                $sessions = $this->connection->comm('/ip/hotspot/active/print', ['?user' => $customer->username]);
+                foreach ($sessions as $session) {
+                    if (! empty($session['.id'])) {
+                        $this->connection->comm('/ip/hotspot/active/remove', ['.id' => $session['.id']]);
+                    }
+                }
             } else {
-                $this->connection->comm('/ppp/active/remove', ['name' => $customer->username]);
+                $sessions = $this->connection->comm('/ppp/active/print', ['?name' => $customer->username]);
+                foreach ($sessions as $session) {
+                    if (! empty($session['.id'])) {
+                        $this->connection->comm('/ppp/active/remove', ['.id' => $session['.id']]);
+                    }
+                }
             }
 
             $this->logAction('disconnect_session', $customer, 'success',
@@ -1041,6 +1084,31 @@ class MikroTikService
             $this->logAction('disconnect_session', $customer, 'failed',
                 'Failed to disconnect session: '.$e->getMessage(), null, null, $e->getMessage());
 
+            return false;
+        }
+    }
+
+    /** Reset RouterOS' cumulative hotspot uptime and traffic counters at paid renewal. */
+    public function resetHotspotUserCounters(Customer $customer): bool
+    {
+        if (! $customer->mikrotik_user_id) {
+            return true;
+        }
+        if (! $this->connect()) {
+            return false;
+        }
+
+        try {
+            $this->connection->comm('/ip/hotspot/user/reset-counters', [
+                '.id' => $customer->mikrotik_user_id,
+            ]);
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Failed to reset RouterOS hotspot counters', [
+                'customer_id' => $customer->id,
+                'router_id' => $this->router->id,
+                'exception' => $e->getMessage(),
+            ]);
             return false;
         }
     }

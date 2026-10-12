@@ -20,38 +20,32 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Daily Automation Schedule
+// Daily billing and notification automation
 // Run this command via cron: * * * * * cd /path-to-project && php artisan schedule:run >> /dev/null 2>&1
 
 Schedule::call(function () {
-    // 1. Check expired subscriptions (runs first)
-    // Marks expired subscriptions and suspends customers with unpaid invoices
-    CheckExpiredSubscriptions::dispatch();
-
-    // 2. Generate invoices for expired subscriptions
+    // Generate invoices for expired subscriptions
     // Creates invoices when subscriptions expire (if not already created)
     GenerateInvoices::dispatch();
 
-    // 3. Suspend unpaid users
+    // Suspend unpaid users
     // Suspends MikroTik users with overdue invoices
     SuspendUnpaidUsers::dispatch();
 
-    // 4. Check expired vouchers
-    // Suspends hotspot users with expired vouchers
-    CheckExpiredVouchers::dispatch();
-
-    // 5. Send payment reminders
+    // Send payment reminders
     // Sends reminders for upcoming or overdue invoices
     SendPaymentReminders::dispatch();
 
-    // 6. Enforce bandwidth/data caps
-    // Suspends customers who exceeded plan data limit
-    EnforceBandwidthCaps::dispatch();
-
-    // 7. Reactivate paid users (catch-up for payments completed outside daily run)
+    // Reactivate paid users (catch-up for payments completed outside daily run)
     // Re-enables MikroTik users for customers who paid
     ReactivatePaidUsers::dispatch();
 })->dailyAt('02:00')->name('daily-automation')->withoutOverlapping();
+
+// Apply access expiry promptly. RouterOS enforces per-user uptime and byte
+// limits directly; these jobs enforce calendar expiry and reconcile DB usage.
+Schedule::job(new CheckExpiredSubscriptions())->everyMinute()->name('subscriptions:expire')->withoutOverlapping();
+Schedule::job(new CheckExpiredVouchers())->everyMinute()->name('vouchers:expire')->withoutOverlapping();
+Schedule::job(new EnforceBandwidthCaps())->everyFiveMinutes()->name('subscriptions:data-caps')->withoutOverlapping(4);
 
 // Live NOC: poll every active router for telemetry every minute.
 // Each router becomes its own queued PollRouterHealthJob so a slow / unreachable

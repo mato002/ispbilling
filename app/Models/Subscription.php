@@ -49,6 +49,7 @@ class Subscription extends Model
         'plan_id',
         'start_date',
         'end_date',
+        'ends_at',
         'renewal_date',
         'status',
         'auto_renew',
@@ -64,6 +65,7 @@ class Subscription extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'ends_at' => 'datetime',
         'renewal_date' => 'date',
         'auto_renew' => 'boolean',
         'last_cap_enforced_at' => 'datetime',
@@ -99,19 +101,28 @@ class Subscription extends Model
 
     public function isExpired(): bool
     {
-        return $this->end_date < now() && $this->status === 'active';
+        $expired = $this->ends_at
+            ? $this->ends_at->isPast()
+            : ($this->end_date && $this->end_date->lt(today()));
+
+        return $expired && $this->status === 'active';
     }
 
     public function isActive(): bool
     {
-        return $this->status === 'active' && $this->end_date >= now();
+        $notExpired = $this->ends_at
+            ? $this->ends_at->isFuture()
+            : ($this->end_date && $this->end_date->gte(today()));
+
+        return $this->status === 'active' && $notExpired;
     }
 
     public function renew(): void
     {
         $duration = max(1, (int) ($this->plan->duration_days ?? 30));
-        $baseEnd = ($this->end_date && $this->end_date->isFuture())
-            ? $this->end_date->copy()
+        $currentEnd = $this->ends_at ?? $this->end_date?->copy()->endOfDay();
+        $baseEnd = ($currentEnd && $currentEnd->isFuture())
+            ? $currentEnd->copy()
             : now();
         $newEnd = $baseEnd->copy()->addDays($duration);
         $keepStart = $this->status === 'active' && $this->start_date;
@@ -119,6 +130,7 @@ class Subscription extends Model
         $updates = [
             'start_date' => $keepStart ? $this->start_date : now(),
             'end_date' => $newEnd,
+            'ends_at' => $newEnd,
             'renewal_date' => $newEnd,
             'status' => 'active',
         ];
@@ -142,7 +154,9 @@ class Subscription extends Model
     public function expire(): void
     {
         $this->update(['status' => 'expired']);
-        $this->customer->update(['status' => 'expired']);
+        if ($this->customer && $this->customer->status !== 'suspended') {
+            $this->customer->update(['status' => 'expired']);
+        }
     }
 
     public function isDataExhausted(): bool

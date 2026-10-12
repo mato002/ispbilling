@@ -100,6 +100,7 @@ class ReactivatePaidUsers implements ShouldQueue
                             'status' => 'active',
                             'start_date' => now(),
                             'end_date' => now()->addDays($subscription->plan->duration_days),
+                            'ends_at' => now()->addDays($subscription->plan->duration_days),
                             'renewal_date' => now()->addDays($subscription->plan->duration_days),
                         ]);
                         Log::info("Activated subscription {$subscription->id} for customer {$customer->id} after payment");
@@ -114,6 +115,7 @@ class ReactivatePaidUsers implements ShouldQueue
                             $subscription->update([
                                 'start_date' => now(),
                                 'end_date' => now()->addDays($subscription->plan->duration_days),
+                                'ends_at' => now()->addDays($subscription->plan->duration_days),
                                 'renewal_date' => now()->addDays($subscription->plan->duration_days),
                             ]);
                         }

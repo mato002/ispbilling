@@ -193,6 +193,11 @@ class HotspotServerController extends Controller
 
         $hotspotServer->update($updateData);
 
+        if ($hotspotServer->router && ! (new MikroTikService($hotspotServer->router))->syncHotspotSessionTimeouts($hotspotServer->fresh())) {
+            return redirect()->route('isp.hotspot-servers.index')
+                ->with('warning', 'Settings saved, but the RouterOS user profile could not be updated. Check router connectivity and profile name.');
+        }
+
         return redirect()->route('isp.hotspot-servers.index')->with('success', 'Hotspot server updated successfully');
     }
 

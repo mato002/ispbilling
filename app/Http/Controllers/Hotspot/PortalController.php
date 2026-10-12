@@ -714,6 +714,7 @@ class PortalController extends Controller
             [
                 'start_date' => now(),
                 'end_date' => now()->addDays($plan->duration_days),
+                'ends_at' => now()->addDays($plan->duration_days),
                 'renewal_date' => now()->addDays($plan->duration_days),
                 'status' => 'suspended',
                 'auto_renew' => false,

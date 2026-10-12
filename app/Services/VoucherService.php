@@ -122,12 +122,7 @@ class VoucherService
 
             // Add data limit if specified
             if ($voucher->voucher_type === 'data' && $voucher->data_limit_mb) {
-                $params['limit-bytes-total'] = $voucher->data_limit_mb . 'M';
-            }
-
-            // Add expiry if specified
-            if ($voucher->expires_at) {
-                $params['limit-uptime'] = ($voucher->expires_at->diffInHours(now()) . 'h');
+                $params['limit-bytes-total'] = (string) ((int) $voucher->data_limit_mb * 1024 * 1024);
             }
 
             $connection = $mikrotik->getConnection();

@@ -66,6 +66,7 @@ class PaymentCompletionService
         $runAutomation = $forceServiceAutomation
             || $customer->connection_type === 'hotspot'
             || IspPaymentExperience::autoActivateOnPayment($payment->isp);
+        $subscriptionRenewed = false;
 
         try {
             if ($runAutomation) {
@@ -75,6 +76,7 @@ class PaymentCompletionService
                     if ($subscription && in_array($subscription->status, ['active', 'expired', 'suspended'], true)) {
                         $subscription->loadMissing('plan');
                         $subscription->renew();
+                        $subscriptionRenewed = true;
                         Log::info("Renewed subscription {$subscription->id} for customer {$customer->id} after payment {$payment->id}");
                     }
                 }
@@ -85,9 +87,13 @@ class PaymentCompletionService
 
                 if ($customer->router && ($customer->mikrotik_user_id || $customer->username)) {
                     $mikrotik = new MikroTikService($customer->router);
-                    $routerReady = $customer->connection_type === 'hotspot'
+                    $countersReady = ! ($customer->connection_type === 'hotspot'
+                        && $subscriptionRenewed
+                        && $customer->mikrotik_user_id)
+                        || $mikrotik->resetHotspotUserCounters($customer);
+                    $routerReady = $countersReady && ($customer->connection_type === 'hotspot'
                         ? $mikrotik->activateHotspotUser($customer)
-                        : $mikrotik->enableUser($customer);
+                        : $mikrotik->enableUser($customer));
 
                     if (! $routerReady) {
                         Log::warning("Payment successful but router provisioning failed for customer {$customer->id} (payment {$payment->id}). Scheduling retries.", [

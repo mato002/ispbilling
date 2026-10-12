@@ -18,7 +18,7 @@ class CheckExpiredSubscriptions implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(ISP $isp = null)
+    public function __construct(?ISP $isp = null)
     {
         $this->isp = $isp;
     }
@@ -42,7 +42,12 @@ class CheckExpiredSubscriptions implements ShouldQueue
             $query->where('isp_id', $isp->id);
         })
         ->where('status', 'active')
-        ->where('end_date', '<', now())
+        ->where(function ($query) {
+            $query->whereNotNull('ends_at')->where('ends_at', '<=', now())
+                ->orWhere(function ($legacy) {
+                    $legacy->whereNull('ends_at')->whereDate('end_date', '<', today());
+                });
+        })
         ->with(['customer.router', 'customer.invoices' => function ($query) {
             $query->where('status', 'pending')
                   ->orWhere('status', 'overdue');
@@ -58,14 +63,17 @@ class CheckExpiredSubscriptions implements ShouldQueue
                     ->whereIn('status', ['pending', 'overdue'])
                     ->exists();
 
-                if ($hasUnpaidInvoices) {
-                    // If there are unpaid invoices, suspend the customer
-                    if ($customer->status === 'active' && $customer->router) {
-                        $mikrotik = new MikroTikService($customer->router);
-                        $mikrotik->disconnectSession($customer);
-                        $mikrotik->disableUser($customer);
+                // Revoke access before changing database state. If RouterOS is
+                // unreachable, keep this subscription active so the next run retries.
+                if ($customer->router) {
+                    $mikrotik = new MikroTikService($customer->router);
+                    if (! $mikrotik->disconnectSession($customer) || ! $mikrotik->disableUser($customer)) {
+                        Log::warning("Router enforcement failed for expired subscription {$subscription->id}; will retry");
+                        continue;
                     }
-                    
+                }
+
+                if ($hasUnpaidInvoices) {
                     $customer->suspend();
                     $subscription->expire();
                     

@@ -71,7 +71,12 @@ class HandlePaymentWebhook
             $activeSubscription = $customer->subscriptions()
                 ->where('status', 'active')
                 ->where('start_date', '<=', now())
-                ->where('end_date', '>', now())
+                ->where(function ($query) {
+                    $query->where('ends_at', '>', now())
+                        ->orWhere(function ($legacy) {
+                            $legacy->whereNull('ends_at')->whereDate('end_date', '>=', today());
+                        });
+                })
                 ->first();
 
             if (!$activeSubscription) {

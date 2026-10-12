@@ -72,7 +72,12 @@ class Customer extends Model
     {
         return $this->subscriptions()
             ->where('status', 'active')
-            ->where('end_date', '>=', now())
+            ->where(function ($query) {
+                $query->where('ends_at', '>', now())
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('ends_at')->whereDate('end_date', '>=', today());
+                    });
+            })
             ->latest()
             ->first();
     }

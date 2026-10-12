@@ -169,6 +169,7 @@ class SubscriptionController extends Controller
             'plan_id' => $validated['plan_id'],
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
+            'ends_at' => \Illuminate\Support\Carbon::parse($validated['end_date'])->endOfDay(),
             'renewal_date' => $validated['end_date'],
             'status' => $validated['status'],
             'auto_renew' => $request->boolean('auto_renew'),

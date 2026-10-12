@@ -47,7 +47,12 @@ class ManageUserConnections implements ShouldQueue
     private function disconnectExpiredUsers(): void
     {
         $expiredSubscriptions = Subscription::where('status', 'active')
-            ->where('end_date', '<', now())
+            ->where(function ($query) {
+                $query->whereNotNull('ends_at')->where('ends_at', '<=', now())
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('ends_at')->whereDate('end_date', '<', today());
+                    });
+            })
             ->with(['customer.router', 'customer.hotspotServer'])
             ->get();
 
