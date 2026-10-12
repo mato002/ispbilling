@@ -115,16 +115,19 @@ class Voucher extends Model
     /**
      * Generate a unique alphanumeric voucher code (hotspot portal expects 12 chars).
      */
-    public static function generateCode(int $length = self::CODE_LENGTH): string
+    public static function generateCode(int $length = self::CODE_LENGTH, string $prefix = ''): string
     {
         $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $prefix = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $prefix) ?? '');
+        $length = max(1, $length);
+        $prefix = substr($prefix, 0, $length - 1);
 
         do {
-            $code = '';
-            for ($i = 0; $i < $length; $i++) {
+            $code = $prefix;
+            for ($i = strlen($prefix); $i < $length; $i++) {
                 $code .= $characters[random_int(0, strlen($characters) - 1)];
             }
-        } while (self::where('voucher_code', $code)->exists());
+        } while (self::withoutGlobalScopes()->where('voucher_code', $code)->exists());
 
         return $code;
     }

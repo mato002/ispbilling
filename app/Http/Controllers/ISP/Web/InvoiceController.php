@@ -32,6 +32,16 @@ class InvoiceController extends Controller
         $perPage = $this->resolvePerPage($request);
         $invoices = $query->latest()->paginate($perPage)->withQueryString();
 
+        if ($request->header('X-Listing-Refresh') === '1') {
+            return response()->json([
+                'rows' => view('isp.invoices.partials.rows', compact('invoices'))->render(),
+                'pagination' => view('isp.invoices.partials.pagination', compact('invoices'))->render(),
+                'from' => $invoices->firstItem() ?? 0,
+                'to' => $invoices->lastItem() ?? 0,
+                'total' => $invoices->total(),
+            ]);
+        }
+
         $filterChips = $this->listingFilterChips($request, route('isp.invoices.index'), [
             'search' => 'Search',
             'status' => [
@@ -47,7 +57,62 @@ class InvoiceController extends Controller
 
         $exportFormats = $this->listingExportFormats($request, route('isp.invoices.export.csv'));
 
-        return view('isp.invoices.index', compact('invoices', 'filterChips', 'exportFormats'));
+        $invoiceCustomers = \App\Models\Customer::query()
+            ->where('isp_id', $ispId)
+            ->whereHas('subscriptions', function ($subscriptionQuery) {
+                $subscriptionQuery->where('status', 'active')
+                    ->where('end_date', '>=', now());
+            })
+            ->with(['subscriptions' => function ($subscriptionQuery) {
+                $subscriptionQuery->where('status', 'active')
+                    ->where('end_date', '>=', now())
+                    ->with('plan')
+                    ->latest();
+            }])
+            ->orderBy('full_name')
+            ->get();
+
+        return view('isp.invoices.index', compact('invoices', 'filterChips', 'exportFormats', 'invoiceCustomers'));
+    }
+
+    /** Create an invoice from the invoice-list modal. */
+    public function storeFromIndex(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|integer|exists:customers,id',
+            'subscription_id' => 'required|integer|exists:subscriptions,id',
+            'amount' => 'required|numeric|min:0',
+            'due_date' => 'required|date',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $ispId = auth()->user()->isp_id;
+        $customer = \App\Models\Customer::query()
+            ->where('isp_id', $ispId)
+            ->findOrFail($validated['customer_id']);
+        $subscription = \App\Models\Subscription::query()
+            ->where('customer_id', $customer->id)
+            ->where('status', 'active')
+            ->where('end_date', '>=', now())
+            ->with('plan')
+            ->findOrFail($validated['subscription_id']);
+
+        $lines = InvoiceTax::computeForAmount((float) $validated['amount'], $customer->isp);
+
+        Invoice::create([
+            'isp_id' => $ispId,
+            'customer_id' => $customer->id,
+            'subscription_id' => $subscription->id,
+            'amount' => $lines['amount'],
+            'tax' => $lines['tax'],
+            'total_amount' => $lines['total_amount'],
+            'issue_date' => now(),
+            'due_date' => $validated['due_date'],
+            'status' => 'pending',
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return redirect()->route('isp.invoices.index')->with('success', 'Invoice created successfully.');
     }
 
     public function exportCsv(Request $request): StreamedResponse

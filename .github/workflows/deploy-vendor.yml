@@ -106,6 +106,6 @@ jobs:
           echo "=============================================="
           echo "Vendor chunks uploaded."
           echo "Open in your browser (replace domain and token):"
-          echo "  https://YOUR-DOMAIN/deploy-extract-vendor.php?token=YOUR_DEPLOY_EXTRACT_TOKEN"
+          echo "  POST https://YOUR-DOMAIN/deploy-extract-vendor.php with Authorization: Bearer YOUR_DEPLOY_EXTRACT_TOKEN"
           echo "Or merge parts in cPanel File Manager is NOT needed — use the URL above."
           echo "=============================================="

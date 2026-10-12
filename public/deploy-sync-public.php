@@ -5,13 +5,16 @@ declare(strict_types=1);
 /**
  * Copy Laravel public/ to cPanel document root (public_html/ispbilling).
  *
- *   /deploy-sync-public.php?token=YOUR_TOKEN
+ *   POST /deploy-sync-public.php with Authorization: Bearer YOUR_TOKEN
  */
 require __DIR__.'/deploy-sync-lib.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 
-$provided = (string) ($_GET['token'] ?? '');
+$provided = '';
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $provided = preg_replace('/^Bearer\s+/i', '', (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
+}
 $laravelRoot = deploy_resolve_laravel_root();
 
 if ($laravelRoot === null) {
@@ -21,7 +24,7 @@ if ($laravelRoot === null) {
 
 $expected = deploy_extract_expected_token($laravelRoot);
 
-if ($expected === '' || $provided === '' || ! hash_equals($expected, $provided)) {
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || $expected === '' || $provided === '' || ! hash_equals($expected, $provided)) {
     http_response_code(403);
     exit(deploy_extract_forbidden_message());
 }

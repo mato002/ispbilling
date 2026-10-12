@@ -19,6 +19,9 @@
      data-start="{{ $startDate }}"
      data-end="{{ $endDate }}"
      data-view="{{ $reportView }}">
+    <div class="flex justify-end">
+        <a href="{{ route('isp.reports.builder') }}" class="pb-btn pb-btn-primary">Build a custom report</a>
+    </div>
     @if (! ($saasAdvancedAnalytics ?? true))
         <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
             Advanced analytics widgets are not included in your current PrimeBilling plan. Upgrade in

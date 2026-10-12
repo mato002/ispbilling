@@ -4,6 +4,7 @@
     'module' => 'ISP Operations',
     'primaryLabel' => null,
     'primaryHref' => null,
+    'primaryEvent' => null,
     /** When null, opens create/edit URLs in the modal form shell (jana-prints pattern). */
     'primaryModal' => null,
 ])
@@ -18,7 +19,9 @@
         @isset($actions)
             {{ $actions }}
         @endisset
-        @if($primaryLabel && $primaryHref)
+        @if($primaryLabel && $primaryEvent)
+            <button type="button" class="pb-btn pb-btn-primary" @click="$dispatch(@js($primaryEvent))">{{ $primaryLabel }}</button>
+        @elseif($primaryLabel && $primaryHref)
             @php
                 $openInModal = $primaryModal ?? preg_match('/\/(create|edit)(\/|$)/', $primaryHref);
             @endphp

@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\Router;
 use Exception;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class MikroTikService
 {
@@ -186,6 +187,76 @@ class MikroTikService
         }
     }
 
+    /** Create or update the RouterOS hotspot profile represented by a billing plan. */
+    public function syncHotspotPlanProfile(Plan $plan): bool
+    {
+        $profileName = trim((string) $plan->speed_profile);
+        if ($profileName === '' || ! $this->routerOsLibraryAvailable() || ! $this->connect()) {
+            return false;
+        }
+
+        try {
+            $profiles = $this->apiPrint('/ip/hotspot/user/profile/print');
+            $existing = collect($profiles)->first(fn ($profile) => is_array($profile) && ($profile['name'] ?? null) === $profileName);
+            $params = ['name' => $profileName];
+
+            if ($plan->upload_speed_kbps || $plan->download_speed_kbps) {
+                $params['rate-limit'] = ($plan->upload_speed_kbps ? $plan->upload_speed_kbps.'k' : '0')
+                    .'/'.($plan->download_speed_kbps ? $plan->download_speed_kbps.'k' : '0');
+            }
+
+            if ($existing && ! isset($params['rate-limit'])) {
+                return true;
+            }
+
+            if ($existing) {
+                $params['.id'] = $existing['.id'] ?? null;
+                if (! $params['.id']) {
+                    return false;
+                }
+                $path = '/ip/hotspot/user/profile/set';
+            } else {
+                $path = '/ip/hotspot/user/profile/add';
+            }
+
+            return $this->apiCommand($path, $params);
+        } catch (\Throwable $e) {
+            Log::warning('MikroTik hotspot plan profile sync failed', [
+                'router_id' => $this->router->id,
+                'plan_id' => $plan->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /** @param array<string, string|null> $params */
+    protected function apiCommand(string $path, array $params): bool
+    {
+        if (! $this->connection) {
+            return false;
+        }
+
+        if (method_exists($this->connection, 'comm')) {
+            $response = $this->connection->comm($path, array_filter($params, fn ($value) => $value !== null));
+            return ! collect(is_array($response) ? $response : [])->contains(fn ($row) => isset($row['!trap']) || isset($row['!fatal']));
+        }
+
+        if (method_exists($this->connection, 'query')) {
+            $query = new \RouterOS\Query($path);
+            foreach ($params as $key => $value) {
+                if ($value !== null) {
+                    $query->equal($key, $value);
+                }
+            }
+            $response = $this->connection->query($query)->read();
+            return ! collect(is_array($response) ? $response : [])->contains(fn ($row) => isset($row['!trap']) || isset($row['!fatal']));
+        }
+
+        return false;
+    }
+
     protected function routerOsLibraryAvailable(): bool
     {
         if (class_exists('\RouterOS\Client')) {
@@ -306,7 +377,11 @@ class MikroTikService
      */
     public function createHotspotUser(Customer $customer, Plan $plan, ?string $plainPassword = null): bool
     {
-        $passwordForApi = $plainPassword ?? $customer->password;
+        $passwordForApi = $plainPassword ?? $customer->hotspot_password;
+        if (! $passwordForApi) {
+            $passwordForApi = \Illuminate\Support\Str::random(24);
+            $customer->forceFill(['hotspot_password' => $passwordForApi])->save();
+        }
 
         if (! $this->connect()) {
             // In local/testing environment, simulate success for testing
@@ -330,6 +405,18 @@ class MikroTikService
                 'password' => $passwordForApi,
                 'profile' => $plan->speed_profile ?? 'default',
             ];
+
+            if ($customer->hotspot_mac_address) {
+                $params['mac-address'] = $customer->hotspot_mac_address;
+            }
+
+            if ($plan->upload_speed_kbps || $plan->download_speed_kbps) {
+                $params['rate-limit'] = ($plan->upload_speed_kbps ?: 0).'k/'.($plan->download_speed_kbps ?: 0).'k';
+            }
+
+            if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
+                $params['limit-bytes-total'] = (string) ((int) $plan->data_limit_mb * 1024 * 1024);
+            }
 
             if ($plan->billing_type === 'time' && $plan->time_limit_hours) {
                 $params['limit-uptime'] = $plan->time_limit_hours.'h';
@@ -415,10 +502,10 @@ class MikroTikService
             }
 
             // Step 4: Ensure password is set (use customer password or generate random)
-            $password = $customer->password;
+            $password = $customer->hotspot_password;
             if (empty($password)) {
-                $password = \Illuminate\Support\Str::random(12);
-                $customer->update(['password' => \Illuminate\Support\Facades\Hash::make($password)]);
+                $password = \Illuminate\Support\Str::random(24);
+                $customer->forceFill(['hotspot_password' => $password])->save();
             }
 
             // Step 5: Create user on MikroTik if doesn't exist
@@ -431,7 +518,11 @@ class MikroTikService
                 }
             } else {
                 // Update existing user with current plan settings
-                $this->updateUserWithPlan($customer, $plan, $username, $password);
+                if (! $this->updateUserWithPlan($customer, $plan, $username, $password)) {
+                    $this->logAction('activate_hotspot_user', $customer, 'failed', 'Failed to apply plan settings to router user');
+
+                    return false;
+                }
             }
 
             // Step 6: Enable user
@@ -502,6 +593,9 @@ class MikroTikService
                 'password' => $password,
                 'profile' => $plan->speed_profile ?? 'default',
             ];
+            if ($customer->hotspot_mac_address) {
+                $params['mac-address'] = $customer->hotspot_mac_address;
+            }
 
             // Set session expiry based on plan duration
             if ($plan->duration_days) {
@@ -515,17 +609,13 @@ class MikroTikService
 
             // Set data limit if specified
             if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
-                $params['limit-bytes-total'] = $plan->data_limit_mb.'M';
+                $params['limit-bytes-total'] = (string) ((int) $plan->data_limit_mb * 1024 * 1024);
             }
 
+            if ($plan->upload_speed_kbps || $plan->download_speed_kbps) {
+                $params['rate-limit'] = ($plan->upload_speed_kbps ?: 0).'k/'.($plan->download_speed_kbps ?: 0).'k';
+            }
             // Set speed limits if specified
-            if ($plan->download_speed_kbps) {
-                $params['limit-bytes-out'] = ($plan->download_speed_kbps * 1024).'bps';
-            }
-            if ($plan->upload_speed_kbps) {
-                $params['limit-bytes-in'] = ($plan->upload_speed_kbps * 1024).'bps';
-            }
-
             $response = $this->connection->comm('/ip/hotspot/user/add', $params);
 
             if (isset($response[0]['.id'])) {
@@ -561,6 +651,9 @@ class MikroTikService
                 'password' => $password,
                 'profile' => $plan->speed_profile ?? 'default',
             ];
+            if ($customer->hotspot_mac_address) {
+                $params['mac-address'] = $customer->hotspot_mac_address;
+            }
 
             // Update session expiry
             if ($plan->duration_days) {
@@ -572,17 +665,12 @@ class MikroTikService
             }
 
             if ($plan->billing_type === 'data' && $plan->data_limit_mb) {
-                $params['limit-bytes-total'] = $plan->data_limit_mb.'M';
+                $params['limit-bytes-total'] = (string) ((int) $plan->data_limit_mb * 1024 * 1024);
             }
 
-            // Update speed limits
-            if ($plan->download_speed_kbps) {
-                $params['limit-bytes-out'] = ($plan->download_speed_kbps * 1024).'bps';
+            if ($plan->upload_speed_kbps || $plan->download_speed_kbps) {
+                $params['rate-limit'] = ($plan->upload_speed_kbps ?: 0).'k/'.($plan->download_speed_kbps ?: 0).'k';
             }
-            if ($plan->upload_speed_kbps) {
-                $params['limit-bytes-in'] = ($plan->upload_speed_kbps * 1024).'bps';
-            }
-
             $response = $this->connection->comm('/ip/hotspot/user/set', $params);
             $this->logAction('update_hotspot_user', $customer, 'success',
                 "Updated user: {$username}", $params, $response ?? []);
@@ -652,6 +740,7 @@ class MikroTikService
         }
 
         try {
+            return Cache::lock('router-pppoe-ip-allocation:'.$this->router->id, 60)->block(15, function () use ($customer, $plan, $passwordForApi) {
             $params = [
                 'name' => $customer->username,
                 'password' => $passwordForApi,
@@ -669,6 +758,7 @@ class MikroTikService
             }
 
             return false;
+            });
         } catch (Exception $e) {
             Log::error('Failed to create PPPoE user: '.$e->getMessage());
 
@@ -1046,9 +1136,45 @@ class MikroTikService
      */
     protected function getNextIpAddress(): string
     {
-        // This should be configured per router/IP pool
-        // For now, return a placeholder
-        return '192.168.1.100';
+        $pools = \App\Models\IpPool::forIsp($this->router->isp_id)
+            ->where('router_id', $this->router->id)->active()->get();
+        if ($pools->isEmpty()) {
+            throw new \RuntimeException('No active IP pool is configured for this router.');
+        }
+
+        $occupied = [];
+        foreach ($this->connection->comm('/ppp/secret/print') ?: [] as $secret) {
+            if (! empty($secret['remote-address'])) $occupied[$secret['remote-address']] = true;
+        }
+        foreach ($this->connection->comm('/ppp/active/print') ?: [] as $active) {
+            if (! empty($active['address'])) $occupied[$active['address']] = true;
+        }
+
+        foreach ($pools as $pool) {
+            foreach ($pool->ranges ?? [] as $range) {
+                $start = isset($range['start']) ? ip2long($range['start']) : false;
+                $end = isset($range['end']) ? ip2long($range['end']) : false;
+                if ($start !== false && $end !== false && $end >= $start) {
+                    $allocated = [];
+                    foreach ($occupied as $address => $_) {
+                        $numericAddress = ip2long($address);
+                        if ($numericAddress !== false && $numericAddress >= $start && $numericAddress <= $end) $allocated[] = $numericAddress;
+                    }
+                    sort($allocated, SORT_NUMERIC);
+                    $candidate = $start;
+                    foreach ($allocated as $usedAddress) {
+                        if ($usedAddress < $candidate) continue;
+                        if ($usedAddress > $candidate) break;
+                        $candidate++;
+                    }
+                    if ($candidate <= $end) return long2ip($candidate);
+                } elseif (! empty($range['address']) && ! isset($occupied[$range['address']])) {
+                    return $range['address'];
+                }
+            }
+        }
+
+        throw new \RuntimeException('The configured IP pool has no available addresses.');
     }
 
     /**

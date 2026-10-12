@@ -144,12 +144,13 @@
                         Put the application in maintenance mode for updates.
                     </p>
                     <div class="space-y-2">
-                        <button class="w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm" disabled>
-                            Enable Maintenance Mode
-                        </button>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                            (Feature coming soon)
-                        </p>
+                        <form method="POST" action="{{ route('admin.settings.maintenance') }}">
+                            @csrf
+                            <button type="submit" class="w-full px-4 py-2 {{ $maintenanceEnabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600' }} text-white rounded-md text-sm">
+                                {{ $maintenanceEnabled ? 'Disable Maintenance Mode' : 'Enable Maintenance Mode' }}
+                            </button>
+                        </form>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Current status: {{ $maintenanceEnabled ? 'Enabled' : 'Disabled' }}</p>
                     </div>
                 </div>
             </div>
@@ -161,12 +162,11 @@
                     <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                         Create a backup of your database.
                     </p>
-                    <button class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm" disabled>
-                        Create Backup
-                    </button>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        (Feature coming soon)
-                    </p>
+                    <form method="POST" action="{{ route('admin.settings.backup') }}">
+                        @csrf
+                        <button type="submit" class="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm">Download Database Backup</button>
+                    </form>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Downloads a JSON export of all database tables.</p>
                 </div>
             </div>
         </div>

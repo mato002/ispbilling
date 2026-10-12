@@ -33,9 +33,9 @@
 
         @if ($toolbar)
             <div class="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-                @unless ($autoSearch)
+        @unless ($autoSearch)
                     <button type="submit" class="pb-btn pb-btn-primary">Apply filters</button>
-                @endunless
+                @endif
                 @if ($resetUrl)
                     <a href="{{ $resetUrl }}" class="pb-btn" data-turbo-frame="pb-main">Reset</a>
                 @endif

@@ -28,7 +28,7 @@ class VoucherService
             'router_id' => $router->id,
             'plan_id' => $plan?->id,
             'created_by' => $createdBy ?? auth()->id(),
-            'voucher_code' => $data['voucher_code'] ?? Voucher::generateCode(),
+            'voucher_code' => $data['voucher_code'] ?? Voucher::generateCode(Voucher::CODE_LENGTH, (string) ($data['code_prefix'] ?? '')),
             'voucher_type' => $data['voucher_type'] ?? 'time',
             'time_limit_hours' => $data['time_limit_hours'] ?? null,
             'data_limit_mb' => $data['data_limit_mb'] ?? null,

@@ -15,6 +15,7 @@ class PlanController extends Controller
     {
         $plans = Plan::where('is_active', true)
             ->where('customer_visible', true)
+            ->whereNull('archived_at')
             ->orderBy('price')
             ->get();
 
@@ -27,7 +28,7 @@ class PlanController extends Controller
     public function show(Request $request, Plan $plan)
     {
         // Only show active and customer-visible plans
-        if (!$plan->is_active || !$plan->customer_visible) {
+        if (!$plan->is_active || !$plan->customer_visible || $plan->archived_at) {
             abort(404);
         }
 

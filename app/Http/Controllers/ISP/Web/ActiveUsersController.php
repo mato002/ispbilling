@@ -18,6 +18,10 @@ class ActiveUsersController extends Controller
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;
+        $planId = $request->integer('plan_id') ?: null;
+        if ($planId) {
+            abort_unless(\App\Models\Plan::where('isp_id', $ispId)->whereKey($planId)->exists(), 404);
+        }
         
         // Get active sessions from database
         $activeSessions = HotspotSession::whereHas('customer', function ($query) use ($ispId) {
@@ -38,7 +42,8 @@ class ActiveUsersController extends Controller
             'average_duration' => $activeSessions->avg('duration') ?? 0,
         ];
 
-        return view('isp.active-users.index', compact('activeSessions', 'routers', 'stats'));
+        $selectedPlan = $planId ? \App\Models\Plan::findOrFail($planId) : null;
+        return view('isp.active-users.index', compact('activeSessions', 'routers', 'stats', 'selectedPlan'));
     }
 
     /**
@@ -52,6 +57,14 @@ class ActiveUsersController extends Controller
 
         $ispId = auth()->user()->isp_id;
         $routerId = $request->router_id;
+        $planId = $request->integer('plan_id') ?: null;
+        $usernamesForPlan = null;
+        if ($planId) {
+            $plan = \App\Models\Plan::where('isp_id', $ispId)->findOrFail($planId);
+            $usernamesForPlan = Customer::where('isp_id', $ispId)
+                ->whereHas('subscriptions', fn ($query) => $query->where('plan_id', $plan->id)->where('status', 'active')->where('end_date', '>=', now()->toDateString()))
+                ->pluck('username')->filter()->map(fn ($username) => strtolower($username))->all();
+        }
 
         try {
             if ($routerId) {
@@ -67,6 +80,11 @@ class ActiveUsersController extends Controller
                     $routerUsers = $this->getActiveUsersFromRouter($router);
                     $users = array_merge($users, $routerUsers);
                 }
+            }
+
+            if ($usernamesForPlan !== null) {
+                $allowed = array_fill_keys($usernamesForPlan, true);
+                $users = array_values(array_filter($users, fn ($user) => isset($allowed[strtolower((string) ($user['username'] ?? ''))])));
             }
 
             return response()->json([
@@ -103,6 +121,12 @@ class ActiveUsersController extends Controller
             $users = [];
             
             foreach ($hotspotUsers as $user) {
+                $customer = Customer::where('isp_id', $router->isp_id)
+                    ->where('router_id', $router->id)
+                    ->where('username', $user['user'] ?? '')
+                    ->with(['subscriptions' => fn ($query) => $query->where('status', 'active')->where('end_date', '>=', now())->with('plan')])
+                    ->first();
+                $activePlan = $customer?->subscriptions->sortByDesc('end_date')->first()?->plan;
                 $users[] = [
                     'id' => $user['.id'] ?? $user['user'] ?? '',
                     'username' => $user['user'] ?? '',
@@ -114,6 +138,7 @@ class ActiveUsersController extends Controller
                     'router' => $router->name,
                     'router_id' => $router->id,
                     'connection_type' => 'Hotspot',
+                    'speed_limit' => $activePlan?->formatted_speed ?? 'Unknown',
                     'upload_speed' => $user['bytes-out'] ?? 0,
                     'download_speed' => $user['bytes-in'] ?? 0,
                     'session_id' => $user['session-id'] ?? '',
@@ -121,6 +146,12 @@ class ActiveUsersController extends Controller
             }
             
             foreach ($pppoeUsers as $user) {
+                $customer = Customer::where('isp_id', $router->isp_id)
+                    ->where('router_id', $router->id)
+                    ->where('username', $user['name'] ?? '')
+                    ->with(['subscriptions' => fn ($query) => $query->where('status', 'active')->where('end_date', '>=', now())->with('plan')])
+                    ->first();
+                $activePlan = $customer?->subscriptions->sortByDesc('end_date')->first()?->plan;
                 $users[] = [
                     'id' => $user['.id'] ?? $user['name'] ?? '',
                     'username' => $user['name'] ?? '',
@@ -132,6 +163,7 @@ class ActiveUsersController extends Controller
                     'router' => $router->name,
                     'router_id' => $router->id,
                     'connection_type' => 'PPPoE',
+                    'speed_limit' => $activePlan?->formatted_speed ?? 'Unknown',
                     'upload_speed' => $user['bytes-out'] ?? 0,
                     'download_speed' => $user['bytes-in'] ?? 0,
                     'session_id' => $user['.id'] ?? '',

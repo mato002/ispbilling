@@ -15,6 +15,7 @@
         :filter-chips="$filterChips ?? []"
         :export-formats="$exportFormats ?? []"
         :paginator="$isps"
+        :filter-auto-search="false"
         :empty="$isps->isEmpty()"
         empty-title="No ISPs found"
         empty-message="Create an ISP or adjust your search filters."
@@ -23,8 +24,9 @@
     >
         <x-slot:filters>
             <x-listing-filters.search
+                name="local_search"
                 placeholder="Name, company, email, phone…"
-                data-pb-auto-search
+                data-pb-live-filter
             />
             <x-listing-filters.select
                 name="is_active"
@@ -91,39 +93,60 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($isps as $isp)
-                        <x-listing-table.row :href="route('admin.isps.show', $isp->id)">
-                            <td class="font-medium text-gray-900 dark:text-gray-100">{{ $isp->name }}</td>
-                            <td class="text-gray-500 dark:text-gray-400">{{ $isp->company_name }}</td>
-                            <td class="text-gray-500 dark:text-gray-400">{{ $isp->email }}</td>
-                            <td class="text-gray-500 dark:text-gray-400">{{ number_format($isp->customers_count) }}</td>
-                            <td class="text-gray-500 dark:text-gray-400">{{ number_format($isp->routers_count) }}</td>
-                            <td class="text-gray-500 dark:text-gray-400">{{ number_format($isp->plans_count) }}</td>
-                            <td>
-                                @if ($isp->is_active)
-                                    <span class="inline-flex rounded-full bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800 dark:bg-green-800 dark:text-green-100">Active</span>
-                                @else
-                                    <span class="inline-flex rounded-full bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800 dark:bg-red-800 dark:text-red-100">Inactive</span>
-                                @endif
-                            </td>
-                            <td class="text-gray-500 dark:text-gray-400">{{ str_replace('_', ' ', ucfirst($isp->saas_subscription_status ?? 'none')) }}</td>
-                            <td class="text-gray-500 dark:text-gray-400">{{ $isp->created_at->format('M d, Y') }}</td>
-                            <td class="text-right">
-                                <x-table-actions>
-                                    <x-table-actions.link :href="route('admin.isps.show', $isp->id)" label="View" />
-                                    <x-table-actions.link :href="route('admin.isps.edit', $isp->id)" label="Edit" />
-                                    <x-table-actions.form
-                                        :action="route('admin.isps.destroy', $isp->id)"
-                                        method="DELETE"
-                                        label="Delete"
-                                        onsubmit="confirmFormSubmit(event, {title: 'Delete ISP', text: 'Are you sure you want to delete {{ $isp->name }}? This action cannot be undone.', icon: 'warning', confirmButtonText: 'Yes, delete', confirmButtonColor: '#ef4444'}); return false;"
-                                    />
-                                </x-table-actions>
-                            </td>
-                        </x-listing-table.row>
-                    @endforeach
+                    @include('admin.isps.partials.rows')
                 </tbody>
             </x-listing-table>
+            <script>
+            (() => {
+                if (window.__pbIspLocalSearchInstalled) return;
+                window.__pbIspLocalSearchInstalled = true;
+
+                const applySearch = (input) => {
+                    const listing = input.closest('[data-listing-root]');
+                    if (!listing) return;
+
+                    const tokens = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+                    const rows = [...listing.querySelectorAll('tbody tr[data-search]')];
+                    let visibleCount = 0;
+                    rows.forEach((row) => {
+                        const haystack = (row.dataset.search || '').toLowerCase();
+                        row.hidden = !tokens.every((token) => haystack.includes(token));
+                        if (!row.hidden) visibleCount += 1;
+                    });
+
+                    let emptyRow = listing.querySelector('[data-local-search-empty]');
+                    if (tokens.length > 0 && rows.length > 0 && visibleCount === 0) {
+                        if (!emptyRow) {
+                            emptyRow = document.createElement('tr');
+                            emptyRow.dataset.localSearchEmpty = '';
+                            emptyRow.innerHTML = '<td colspan="10" class="px-4 py-10 text-center text-sm text-slate-500">No loaded rows match your search.</td>';
+                            listing.querySelector('tbody')?.append(emptyRow);
+                        }
+                    } else {
+                        emptyRow?.remove();
+                    }
+                };
+
+                document.addEventListener('input', (event) => {
+                    const input = event.target.closest?.('[data-pb-live-filter]');
+                    if (input) applySearch(input);
+                });
+
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' && event.target.matches?.('[data-pb-live-filter]')) {
+                        event.preventDefault();
+                    }
+                });
+
+                const applyExistingSearch = (root = document) => {
+                    root.querySelectorAll?.('[data-pb-live-filter]').forEach(applySearch);
+                };
+
+                document.addEventListener('DOMContentLoaded', () => applyExistingSearch());
+                document.addEventListener('turbo:frame-render', (event) => applyExistingSearch(event.target));
+                applyExistingSearch();
+            })();
+            </script>
         </x-slot:table>
     </x-resource-index>
 </x-admin-layout>

@@ -378,6 +378,39 @@ class RouterController extends Controller
         ));
     }
 
+    /** Download a RouterOS external captive-portal redirect page for this router. */
+    public function downloadHotspotPortal(Router $router)
+    {
+        abort_unless($router->isp_id === auth()->user()->isp_id, 404);
+
+        $portalUrl = route('hotspot.splash');
+        $routerId = (int) $router->id;
+        $html = <<<HTML
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connecting…</title></head>
+<body><p>Opening the PrimeBilling hotspot portal…</p>
+<script>
+const target = new URL({$this->jsonForHtmlScript($portalUrl)});
+target.searchParams.set('router_id', {$routerId});
+target.searchParams.set('mac', '$(mac)');
+target.searchParams.set('ip', '$(ip)');
+target.searchParams.set('link-login-only', '$(link-login-only)');
+window.location.replace(target.toString());
+</script></body></html>
+HTML;
+
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="login.html"',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    private function jsonForHtmlScript(string $value): string
+    {
+        return json_encode($value, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
+    }
+
     public function edit(Router $router)
     {
         $this->authorizeRouter($router);
@@ -715,6 +748,7 @@ class RouterController extends Controller
         $rules = [
             'name' => ['string', 'max:255'],
             'ip_address' => ['ip'],
+            'hotspot_gateway_ip' => ['nullable', 'ip'],
             'port' => ['integer', 'min:1', 'max:65535'],
             'username' => ['string', 'max:255'],
             'password' => ['string', 'max:255'],

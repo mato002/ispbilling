@@ -12,6 +12,7 @@
     >
         <x-slot name="actions">
             <a href="{{ route('isp.routers.index') }}" class="pb-btn">Back to fleet</a>
+            <a href="{{ route('isp.routers.hotspot-portal', $router) }}" class="pb-btn">Download hotspot login page</a>
             <form method="POST" action="{{ route('isp.routers.poll', $router) }}" class="inline">
                 @csrf
                 <button type="submit" class="pb-btn pb-btn-primary">Sync now</button>
@@ -21,6 +22,9 @@
 @endsection
 
 @section('content')
+<div class="mb-5 rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-950 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-100">
+    <strong>Captive portal setup:</strong> set the Hotspot gateway IP on this router to the client-reachable gateway address, upload the downloaded <code>login.html</code> into the router's hotspot files, set the Hotspot server profile's HTML Directory to that folder, and allow your PrimeBilling domain in the Hotspot walled garden. RouterOS API credentials on this record are used for post-payment provisioning.
+</div>
 @php
     $tone = match ($snapshot['reachability'] ?? 'unknown') {
         'online' => 'ok',

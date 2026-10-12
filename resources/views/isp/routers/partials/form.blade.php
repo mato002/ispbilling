@@ -62,6 +62,13 @@
                        class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900"
                        placeholder="192.168.88.1" />
             </div>
+            <div>
+                <label class="isp-form-label mb-1">Hotspot gateway IP</label>
+                <input type="text" name="hotspot_gateway_ip" id="hotspot_gateway_ip" value="{{ $val('hotspot_gateway_ip') }}"
+                       class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900"
+                       placeholder="192.168.88.1" />
+                <p class="mt-1 text-xs text-slate-500">Client-side router address used by RouterOS captive-portal login. Defaults to the API IP when blank.</p>
+            </div>
             <div class="grid grid-cols-3 gap-3">
                 <div>
                     <label class="isp-form-label mb-1">Port *</label>

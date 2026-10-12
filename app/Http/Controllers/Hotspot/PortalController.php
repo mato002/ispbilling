@@ -27,10 +27,12 @@ class PortalController extends Controller
         $routerIp = $request->get('router_ip') ?? $request->ip();
         
         // Try to find router by IP
-        $router = Router::where('ip_address', $routerIp)->first();
+        $router = $request->filled('router_id')
+            ? Router::whereKey($request->integer('router_id'))->where('is_active', true)->first()
+            : Router::where('ip_address', $routerIp)->where('is_active', true)->first();
         
         // If no router found by IP, try to get any active router (for testing)
-        if (!$router) {
+        if (!$router && !$request->filled('router_id') && app()->environment(['local', 'testing'])) {
             $router = Router::where('is_active', true)->first();
         }
         
@@ -42,6 +44,8 @@ class PortalController extends Controller
         if ($isp) {
             $plans = \App\Models\Plan::where('isp_id', $isp->id)
                 ->where('is_active', true)
+                ->where('customer_visible', true)
+                ->whereNull('archived_at')
                 ->orderBy('price')
                 ->get();
         }
@@ -64,10 +68,12 @@ class PortalController extends Controller
         $routerIp = $request->get('router_ip') ?? $request->ip();
         
         // Try to find router by IP
-        $router = Router::where('ip_address', $routerIp)->first();
+        $router = $request->filled('router_id')
+            ? Router::whereKey($request->integer('router_id'))->where('is_active', true)->first()
+            : Router::where('ip_address', $routerIp)->where('is_active', true)->first();
         
         // If no router found by IP, try to get any active router (for testing)
-        if (!$router) {
+        if (!$router && !$request->filled('router_id') && app()->environment(['local', 'testing'])) {
             $router = Router::where('is_active', true)->first();
         }
         
@@ -79,6 +85,8 @@ class PortalController extends Controller
         if ($isp) {
             $plans = \App\Models\Plan::where('isp_id', $isp->id)
                 ->where('is_active', true)
+                ->where('customer_visible', true)
+                ->whereNull('archived_at')
                 ->orderBy('price')
                 ->get();
         }
@@ -488,11 +496,14 @@ class PortalController extends Controller
 
         $voucherCode = strtoupper($request->voucher_code);
         $routerIp = $request->router_ip ?? $request->ip();
-
-        $router = Router::where('ip_address', $routerIp)->first();
+        $router = in_array($routerIp, ['127.0.0.1', '::1', 'localhost'], true)
+            ? Router::where('is_active', true)->first()
+            : Router::where('ip_address', $routerIp)->first();
         
         if (!$router) {
-            return back()->withErrors(['error' => 'Router not found.']);
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => 'Router not found.'], 404)
+                : back()->withErrors(['error' => 'Router not found.']);
         }
 
         $voucher = Voucher::where('router_id', $router->id)
@@ -500,11 +511,15 @@ class PortalController extends Controller
             ->first();
 
         if (!$voucher) {
-            return back()->withErrors(['error' => 'Invalid voucher code.']);
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => 'Invalid voucher code.'], 422)
+                : back()->withErrors(['error' => 'Invalid voucher code.']);
         }
 
         if (!$voucher->isValid()) {
-            return back()->withErrors(['error' => 'Voucher has expired or is not valid.']);
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => 'Voucher has expired or is not valid.'], 422)
+                : back()->withErrors(['error' => 'Voucher has expired or is not valid.']);
         }
 
         // Check if voucher is assigned to a specific customer
@@ -529,7 +544,9 @@ class PortalController extends Controller
         // Activate voucher (creates payment record and enables on MikroTik)
         $voucherService = new \App\Services\VoucherService();
         if (!$voucherService->activate($voucher, $customerId)) {
-            return back()->withErrors(['error' => 'Failed to activate voucher.']);
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => 'Failed to activate voucher.'], 422)
+                : back()->withErrors(['error' => 'Failed to activate voucher.']);
         }
 
         // Create session record
@@ -544,10 +561,20 @@ class PortalController extends Controller
             'started_at' => now(),
         ]);
 
-        return redirect()->route('hotspot.status', [
+        $statusUrl = route('hotspot.status', [
             'username' => $voucher->voucher_code,
             'token' => $this->generateToken($customerId, $voucher->id),
-        ])->with('success', 'Voucher redeemed successfully! Internet access activated.');
+        ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Voucher redeemed successfully.',
+                'redirect_url' => $statusUrl,
+            ]);
+        }
+
+        return redirect()->to($statusUrl)->with('success', 'Voucher redeemed successfully! Internet access activated.');
     }
 
     /**
@@ -572,6 +599,10 @@ class PortalController extends Controller
         if (!$plan) {
             return back()->withErrors(['error' => 'Package not found.']);
         }
+
+        if (! $plan->is_active || ! $plan->customer_visible || $plan->archived_at) {
+            abort(404);
+        }
         
         if (!$isp || $plan->isp_id !== $isp->id) {
             return back()->withErrors(['error' => 'Invalid package.']);
@@ -587,48 +618,89 @@ class PortalController extends Controller
     {
         $request->validate([
             'phone_number' => 'required|string',
-            'email' => 'nullable|email',
-            'full_name' => 'required|string',
             'router_ip' => 'nullable|ip',
+            'router_id' => 'nullable|integer',
+            'mac' => ['nullable', 'regex:/^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
+            'link_login_only' => 'nullable|url|max:2048',
         ]);
         
         $routerIp = $request->router_ip ?? $request->ip();
         
         // If localhost/127.0.0.1, try to find any active router (for local testing)
-        if (in_array($routerIp, ['127.0.0.1', '::1', 'localhost'])) {
+        if ($request->filled('router_id')) {
+            $router = Router::whereKey($request->integer('router_id'))->where('is_active', true)->first();
+        } elseif (in_array($routerIp, ['127.0.0.1', '::1', 'localhost'])) {
             $router = Router::where('is_active', true)->first();
         } else {
-            $router = Router::where('ip_address', $routerIp)->first();
+            $router = Router::where('ip_address', $routerIp)->where('is_active', true)->first();
         }
         
         if (!$router) {
-            return back()->withErrors(['error' => 'Router not found.']);
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => 'Router not found.'], 404)
+                : back()->withErrors(['error' => 'Router not found.']);
         }
         
         // Find the plan by ID
         $plan = \App\Models\Plan::find($planId);
         
         if (!$plan) {
-            return back()->withErrors(['error' => 'Package not found.']);
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => 'Package not found.'], 404)
+                : back()->withErrors(['error' => 'Package not found.']);
+        }
+
+        if (! $plan->is_active || ! $plan->customer_visible || $plan->archived_at) {
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => 'Package is not available.'], 404)
+                : back()->withErrors(['error' => 'Package is not available.']);
         }
         
         if ($plan->isp_id !== $router->isp_id) {
-            return back()->withErrors(['error' => 'Invalid package.']);
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => 'Invalid package.'], 422)
+                : back()->withErrors(['error' => 'Invalid package.']);
         }
 
         $router->load('isp');
+
+        // RouterOS supplies this URL to the external captive portal. It must
+        // point to the router configured for this purchase, preventing a
+        // crafted request from making the buyer's browser post credentials to
+        // an unrelated internal host.
+        $routerLoginUrl = $request->input('link_login_only');
+        if ($routerLoginUrl) {
+            $parts = parse_url($routerLoginUrl) ?: [];
+            $host = $parts['host'] ?? null;
+            $allowedGateway = $router->hotspot_gateway_ip ?: $router->ip_address;
+            $validRouterLogin = is_string($host)
+                && hash_equals(strtolower((string) $allowedGateway), strtolower($host))
+                && in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
+                && ($parts['path'] ?? '') === '/login'
+                && ! isset($parts['user'])
+                && ! isset($parts['pass'])
+                && (! isset($parts['port']) || in_array((int) $parts['port'], [80, 443], true));
+            if (! $validRouterLogin) {
+                return response()->json(['success' => false, 'message' => 'Invalid captive portal login address.'], 422);
+            }
+        }
 
         // Create temporary customer record
         $customer = Customer::create([
             'isp_id' => $router->isp_id,
             'router_id' => $router->id,
-            'full_name' => $request->full_name,
-            'email' => $request->email,
+            // Hotspot checkout only requires a phone number; use a generic
+            // label for the customer record instead of collecting a name.
+            'full_name' => 'Hotspot Customer',
+            'email' => null,
             'phone_number' => $request->phone_number,
             'location' => 'Hotspot Portal Registration',
             'installation_date' => now()->toDateString(),
-            'username' => 'temp_' . uniqid(),
+            'username' => 'HB' . strtoupper(bin2hex(random_bytes(5))),
             'password' => Hash::make(uniqid()),
+            'hotspot_password' => \Illuminate\Support\Str::random(24),
+            'hotspot_mac_address' => $request->input('mac'),
+            'hotspot_login_url' => $routerLoginUrl,
             'connection_type' => 'hotspot',
             'status' => 'inactive',
         ]);
@@ -672,6 +744,14 @@ class PortalController extends Controller
                 'due_date' => now()->addDays(7),
                 'status' => 'pending',
                 'notes' => "Purchase of {$plan->name} package (plan_id: {$plan->id})",
+            ]);
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'invoice_id' => $invoice->id,
+                'message' => 'Purchase is ready for payment.',
             ]);
         }
 

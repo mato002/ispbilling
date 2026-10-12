@@ -45,7 +45,7 @@ function deploy_extract_expected_token(string $root): string
 function deploy_extract_forbidden_message(): string
 {
     return "Forbidden.\n\n"
-        ."Set a token using ONE of these (no terminal needed):\n"
+        ."Configure DEPLOY_EXTRACT_TOKEN, then send deployment helpers a POST request with an Authorization: Bearer header.\n"
         ."  1. cPanel File Manager → edit .env → add:\n"
         ."     DEPLOY_EXTRACT_TOKEN=choose-any-long-secret\n"
         ."  2. GitHub → Settings → Secrets → DEPLOY_EXTRACT_TOKEN → re-run Deploy workflow\n\n"

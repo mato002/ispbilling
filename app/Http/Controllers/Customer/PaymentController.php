@@ -212,6 +212,26 @@ class PaymentController extends Controller
             $payment = \App\Models\Payment::findByMpesaCheckoutRequestId($checkoutRequestId);
 
             if ($payment) {
+                if ($amount === null || (int) round((float) $amount) !== (int) round((float) $payment->amount)) {
+                    Log::warning('M-Pesa callback amount did not match the invoice; access was not activated.', [
+                        'payment_id' => $payment->id,
+                        'expected_amount' => $payment->amount,
+                        'callback_amount' => $amount,
+                        'checkout_request_id' => $checkoutRequestId,
+                    ]);
+                    $payment->update([
+                        'metadata' => array_merge($payment->metadata ?? [], [
+                            'mpesa_amount_mismatch' => [
+                                'expected' => (float) $payment->amount,
+                                'received' => $amount,
+                                'recorded_at' => now()->toIso8601String(),
+                            ],
+                        ]),
+                    ]);
+
+                    return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Received']);
+                }
+
                 $finalized = false;
 
                 try {

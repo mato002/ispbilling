@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\ISP;
 use App\Support\SaasOnboardingContext;
+use App\Support\SuperAdminWorkspaceContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,6 +21,12 @@ class LoadTenantIsp
     {
         $user = $request->user();
 
+        $timezone = data_get($user?->preferences, 'timezone');
+        if ($timezone && in_array($timezone, timezone_identifiers_list(), true)) {
+            config(['app.timezone' => $timezone]);
+            date_default_timezone_set($timezone);
+        }
+
         if (! $request->attributes->get(self::ATTRIBUTE) && $user) {
             if ($user->isp_id) {
                 $request->attributes->set(self::ATTRIBUTE, ISP::query()->find($user->isp_id));
@@ -31,6 +38,8 @@ class LoadTenantIsp
             }
         }
 
-        return $next($request);
+        $response = $next($request);
+        date_default_timezone_set(config('app.timezone', 'UTC'));
+        return $response;
     }
 }

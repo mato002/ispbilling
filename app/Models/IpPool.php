@@ -140,8 +140,39 @@ class IpPool extends Model
      */
     public function getAvailableIpsAttribute()
     {
-        // This would require integration with router to get actual usage
-        // For now, return total as placeholder
-        return $this->total_ips;
+        $ranges = $this->ranges ?? [];
+        $used = [];
+        if ($this->router_id) {
+            try {
+                $service = new \App\Services\MikroTikService($this->router);
+                if ($service->connect()) {
+                    foreach ($service->getConnection()->comm('/ppp/secret/print') ?: [] as $secret) {
+                        if (! empty($secret['remote-address'])) $used[$secret['remote-address']] = true;
+                    }
+                    foreach ($service->getConnection()->comm('/ppp/active/print') ?: [] as $active) {
+                        if (! empty($active['address'])) $used[$active['address']] = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Could not read IP pool utilization from router', ['pool_id' => $this->id, 'error' => $e->getMessage()]);
+                return 0;
+            }
+        }
+        $available = 0;
+        foreach ($ranges as $range) {
+            $start = isset($range['start']) ? ip2long($range['start']) : false;
+            $end = isset($range['end']) ? ip2long($range['end']) : false;
+            if ($start !== false && $end !== false && $end >= $start) {
+                $occupiedInRange = 0;
+                foreach ($used as $address => $_) {
+                    $numericAddress = ip2long($address);
+                    if ($numericAddress !== false && $numericAddress >= $start && $numericAddress <= $end) $occupiedInRange++;
+                }
+                $available += max(0, ($end - $start + 1) - $occupiedInRange);
+            } elseif (! empty($range['address']) && ! isset($used[$range['address']])) {
+                $available++;
+            }
+        }
+        return $available;
     }
 }

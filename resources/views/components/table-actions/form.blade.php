@@ -4,12 +4,13 @@
     'label',
     'danger' => true,
     'onsubmit' => null,
+    'turboFrame' => 'pb-main',
 ])
 
 <form
     method="POST"
     action="{{ $action }}"
-    data-turbo-frame="pb-main"
+    data-turbo-frame="{{ $turboFrame }}"
     @if($onsubmit) onsubmit="{{ $onsubmit }}" @endif
     {{ $attributes->merge(['class' => '']) }}
 >

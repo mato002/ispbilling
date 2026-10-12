@@ -5,6 +5,8 @@ namespace App\Http\Controllers\ISP\Web;
 use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
+use App\Models\Router;
+use App\Services\MikroTikService;
 use App\Support\Export\CsvExporter;
 use App\Support\FormSettingsService;
 use App\Support\PlanPackageTypes;
@@ -25,6 +27,7 @@ class PlanController extends Controller
         $query = $this->filteredPlansQuery($request, $ispId);
         $perPage = $this->resolvePerPage($request);
         $plans = $query->latest()->paginate($perPage)->withQueryString();
+        $routers = Router::where('isp_id', $ispId)->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
         $filterChips = $this->listingFilterChips($request, route('isp.plans.index'), [
             'package_type' => [
@@ -43,7 +46,7 @@ class PlanController extends Controller
 
         $exportFormats = $this->listingExportFormats($request, route('isp.plans.export.csv'));
 
-        return view('isp.plans.index', compact('plans', 'filterChips', 'exportFormats'));
+        return view('isp.plans.index', compact('plans', 'filterChips', 'exportFormats', 'routers'));
     }
 
     public function exportCsv(Request $request): StreamedResponse
@@ -159,7 +162,7 @@ class PlanController extends Controller
             PlanPackageTypes::validationRules($request),
             $plan->isp_id
         );
-        $validated['is_active'] = $request->has('is_active');
+        $validated['is_active'] = ! $plan->archived_at && $request->has('is_active');
         $validated = PlanPackageTypes::normalizePayload($validated);
 
         $plan->update($validated);
@@ -171,6 +174,10 @@ class PlanController extends Controller
     {
         if ($plan->isp_id !== auth()->user()->isp_id) {
             abort(403);
+        }
+
+        if ($plan->archived_at) {
+            return back()->with('error', 'Restore this archived plan before enabling it.');
         }
 
         $plan->update(['is_active' => ! $plan->is_active]);
@@ -188,6 +195,10 @@ class PlanController extends Controller
             abort(403);
         }
 
+        if ($plan->archived_at) {
+            return back()->with('error', 'Restore this archived plan before enabling it.');
+        }
+
         $plan->update(['is_active' => true]);
 
         return back()->with('success', 'Plan activated successfully.');
@@ -202,5 +213,96 @@ class PlanController extends Controller
         $plan->update(['is_active' => false]);
 
         return back()->with('success', 'Plan deactivated successfully.');
+    }
+
+    public function togglePublic(Plan $plan)
+    {
+        $this->ensurePlanBelongsToCurrentIsp($plan);
+
+        if ($plan->archived_at) {
+            return back()->with('error', 'Restore this plan before changing its public listing.');
+        }
+
+        if (! $plan->customer_visible && ! $plan->is_active) {
+            return back()->with('error', 'Enable this plan before publishing it to customers.');
+        }
+
+        $plan->update(['customer_visible' => ! $plan->customer_visible]);
+
+        return back()->with('success', $plan->customer_visible ? 'Plan is now visible to customers.' : 'Plan hidden from public listings.');
+    }
+
+    public function toggleArchive(Plan $plan)
+    {
+        $this->ensurePlanBelongsToCurrentIsp($plan);
+
+        if ($plan->archived_at) {
+            $plan->update(['archived_at' => null, 'customer_visible' => false, 'is_active' => false]);
+            return back()->with('success', 'Plan restored as inactive and hidden from customers.');
+        }
+
+        $plan->update(['archived_at' => now(), 'is_active' => false, 'customer_visible' => false]);
+
+        return back()->with('success', 'Plan archived. Existing subscriptions and reports are preserved.');
+    }
+
+    public function duplicate(Plan $plan)
+    {
+        $this->ensurePlanBelongsToCurrentIsp($plan);
+
+        $copy = $plan->replicate();
+        $copy->name = $plan->name.' (Copy)';
+        $copy->is_active = false;
+        $copy->customer_visible = false;
+        $copy->archived_at = null;
+        $copy->save();
+
+        return redirect()->route('isp.plans.index')->with('success', 'Plan copied as an inactive, unpublished draft. Review it before enabling or publishing.');
+    }
+
+    public function destroy(Plan $plan)
+    {
+        $this->ensurePlanBelongsToCurrentIsp($plan);
+
+        if ($plan->subscriptions()->exists()) {
+            return back()->with('error', 'Plans with subscriber history cannot be deleted. Archive the plan instead.');
+        }
+
+        $plan->delete();
+
+        return redirect()->route('isp.plans.index')->with('success', 'Plan deleted.');
+    }
+
+    public function syncProfile(Plan $plan)
+    {
+        $this->ensurePlanBelongsToCurrentIsp($plan);
+
+        if ($plan->access_type !== 'hotspot') {
+            return back()->with('error', 'Router profile sync is available for hotspot plans only.');
+        }
+        if (! trim((string) $plan->speed_profile)) {
+            return back()->with('error', 'Set a MikroTik profile name on this plan before syncing it.');
+        }
+
+        $routers = Router::where('isp_id', $plan->isp_id)->where('is_active', true)->get();
+        if ($routers->isEmpty()) {
+            return back()->with('error', 'No active routers are configured for this ISP.');
+        }
+
+        $synced = 0;
+        foreach ($routers as $router) {
+            if ((new MikroTikService($router))->syncHotspotPlanProfile($plan)) {
+                $synced++;
+            }
+        }
+
+        return $synced === $routers->count()
+            ? back()->with('success', 'NAS/MikroTik profile synchronized successfully on all active routers.')
+            : back()->with('error', "Profile sync succeeded on {$synced} of {$routers->count()} active routers. Check router connectivity and configuration.");
+    }
+
+    private function ensurePlanBelongsToCurrentIsp(Plan $plan): void
+    {
+        abort_unless((int) $plan->isp_id === (int) auth()->user()->isp_id, 403);
     }
 }

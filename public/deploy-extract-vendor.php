@@ -3,7 +3,7 @@
 /**
  * FTP-only deploy helper: merge vendor.part.* chunks and extract vendor/.
  *
- *   /deploy-extract-vendor.php?token=YOUR_TOKEN
+ *   POST /deploy-extract-vendor.php with Authorization: Bearer YOUR_TOKEN
  *
  * Token: DEPLOY_EXTRACT_TOKEN in .env OR GitHub secret + deploy.
  */
@@ -13,11 +13,14 @@ require __DIR__.'/deploy-token.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 
-$provided = (string) ($_GET['token'] ?? '');
+$provided = '';
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $provided = preg_replace('/^Bearer\s+/i', '', (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
+}
 $root = dirname(__DIR__);
 $expected = deploy_extract_expected_token($root);
 
-if ($expected === '' || $provided === '' || ! hash_equals($expected, $provided)) {
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || $expected === '' || $provided === '' || ! hash_equals($expected, $provided)) {
     http_response_code(403);
     exit(deploy_extract_forbidden_message());
 }

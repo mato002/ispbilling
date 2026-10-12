@@ -53,8 +53,6 @@ use App\Http\Controllers\ISP\Web\SubscriptionController;
 use App\Http\Controllers\ISP\Web\TicketController;
 use App\Http\Controllers\ISP\Web\UserConnectionController;
 use App\Http\Controllers\ISP\Web\VoucherController;
-use App\Http\Controllers\DeployMigrateController;
-use App\Http\Controllers\DeploySyncController;
 use App\Http\Controllers\FeatureDiscoveryController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PaymentController;
@@ -68,9 +66,6 @@ Route::get('/', [LandingController::class, 'show'])->name('welcome');
 
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
-
-Route::get('/deploy/sync-public', [DeploySyncController::class, 'syncPublic'])->name('deploy.sync-public');
-Route::get('/deploy/migrate', [DeployMigrateController::class, 'migrate'])->name('deploy.migrate');
 
 // Static Pages
 Route::get('/terms', [StaticPageController::class, 'terms'])->name('terms');
@@ -88,20 +83,32 @@ Route::get('/dashboard', function () {
         return redirect()->route('isp.technician.inventory.index');
     }
 
+    if ($user->isp_id) {
+        $landingRoute = [
+            'customers' => 'isp.customers.index',
+            'invoices' => 'isp.invoices.index',
+            'payments' => 'isp.payments.index',
+            'routers' => 'isp.routers.index',
+        ][data_get($user->preferences, 'landing', 'dashboard')] ?? null;
+        if ($landingRoute && Route::has($landingRoute)) return redirect()->route($landingRoute);
+    }
+
     // ISP admin/staff will use the enhanced dashboard
     if ($user->isp_id) {
         return redirect()->route('isp.dashboard');
     }
 
     return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'verified', 'load.tenant.isp'])->name('dashboard');
 
 Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
+    Route::post('/support/return-to-super-admin', [App\Http\Controllers\Admin\WorkspaceSwitchController::class, 'exit'])->name('admin.workspace.exit');
     Route::get('/feature-discovery/search', [FeatureDiscoveryController::class, 'search'])
         ->name('feature-discovery.search');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/preferences', [ProfileController::class, 'updatePreferences'])->name('profile.preferences.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // ISP SaaS onboarding (no ensure.saas.onboarding — completes plan + billing before console)
@@ -147,6 +154,11 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
         Route::post('/plans/{plan}/activate', [App\Http\Controllers\ISP\Web\PlanController::class, 'activate'])->name('plans.activate');
         Route::post('/plans/{plan}/deactivate', [App\Http\Controllers\ISP\Web\PlanController::class, 'deactivate'])->name('plans.deactivate');
         Route::post('/plans/{plan}/toggle-active', [App\Http\Controllers\ISP\Web\PlanController::class, 'toggleActive'])->name('plans.toggle-active');
+        Route::post('/plans/{plan}/toggle-public', [App\Http\Controllers\ISP\Web\PlanController::class, 'togglePublic'])->name('plans.toggle-public');
+        Route::post('/plans/{plan}/archive', [App\Http\Controllers\ISP\Web\PlanController::class, 'toggleArchive'])->name('plans.archive');
+        Route::post('/plans/{plan}/duplicate', [App\Http\Controllers\ISP\Web\PlanController::class, 'duplicate'])->name('plans.duplicate');
+        Route::post('/plans/{plan}/sync-profile', [App\Http\Controllers\ISP\Web\PlanController::class, 'syncProfile'])->name('plans.sync-profile');
+        Route::delete('/plans/{plan}', [App\Http\Controllers\ISP\Web\PlanController::class, 'destroy'])->name('plans.destroy');
 
         // IP Pools
         Route::prefix('ip-pools')->name('ip-pools.')->group(function () {
@@ -240,6 +252,7 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
         Route::post('/routers/test-connection', [RouterController::class, 'testConnection'])->name('routers.test-connection');
         Route::post('/routers', [RouterController::class, 'store'])->name('routers.store');
         Route::get('/routers/{router}', [RouterController::class, 'show'])->name('routers.show');
+        Route::get('/routers/{router}/hotspot-portal.html', [RouterController::class, 'downloadHotspotPortal'])->name('routers.hotspot-portal');
         Route::get('/routers/{router}/edit', [RouterController::class, 'edit'])->name('routers.edit');
         Route::put('/routers/{router}', [RouterController::class, 'update'])->name('routers.update');
         Route::post('/routers/{router}/activate', [RouterController::class, 'activate'])->name('routers.activate');
@@ -323,6 +336,7 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
 
         // Invoices
         Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::post('/invoices', [InvoiceController::class, 'storeFromIndex'])->name('invoices.store-from-index');
         Route::get('/invoices/export.csv', [InvoiceController::class, 'exportCsv'])->name('invoices.export.csv');
         Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
         Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
@@ -350,6 +364,8 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
 
         // Reports
         Route::get('/reports', [App\Http\Controllers\ISP\Web\ReportController::class, 'index'])->name('reports.index');
+        Route::get('/reports/builder', [App\Http\Controllers\ISP\Web\ReportController::class, 'builder'])->name('reports.builder');
+        Route::get('/reports/builder/export.csv', [App\Http\Controllers\ISP\Web\ReportController::class, 'exportBuilder'])->name('reports.builder.export');
         Route::get('/reports/customer-status', [App\Http\Controllers\ISP\Web\ReportController::class, 'customerStatusReport'])->name('reports.customer-status');
         Route::get('/reports/revenue-per-plan', [App\Http\Controllers\ISP\Web\ReportController::class, 'revenuePerPlanReport'])->name('reports.revenue-per-plan');
         Route::get('/reports/monthly-collections', [App\Http\Controllers\ISP\Web\ReportController::class, 'monthlyCollectionsReport'])->name('reports.monthly-collections');
@@ -371,6 +387,7 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
 
         // Vouchers
         Route::get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
+        Route::get('/vouchers/print', [VoucherController::class, 'printCodes'])->name('vouchers.print');
         Route::get('/vouchers/export.csv', [VoucherController::class, 'exportCsv'])->name('vouchers.export.csv');
         Route::get('/vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
         Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
@@ -513,6 +530,10 @@ Route::prefix('hotspot')->name('hotspot.')->group(function () {
     // Customer checkout access (after successful payment)
     Route::get('/checkout/access/{payment}', [CheckoutController::class, 'access'])
         ->name('checkout.access');
+    Route::get('/payment-status/{payment}', [CheckoutController::class, 'status'])
+        ->middleware('signed')->name('payment-status');
+    Route::get('/checkout/cancel/{payment}', [CheckoutController::class, 'cancel'])
+        ->middleware('signed')->name('checkout.cancel');
 });
 
 // Customer Self-Service Portal Routes
@@ -575,6 +596,7 @@ Route::middleware(['auth', 'ensure.superadmin'])->prefix('admin')->name('admin.'
     Route::get('/dashboard', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
 
     // ISP Management
+    Route::post('/isps/{isp}/workspace', [App\Http\Controllers\Admin\WorkspaceSwitchController::class, 'enter'])->name('isps.workspace.enter');
     Route::get('/isps', [ISPController::class, 'index'])->name('isps.index');
     Route::get('/isps/export/csv', [ISPController::class, 'exportCsv'])->name('isps.export.csv');
     Route::get('/isps/create', [ISPController::class, 'create'])->name('isps.create');
@@ -650,6 +672,8 @@ Route::middleware(['auth', 'ensure.superadmin'])->prefix('admin')->name('admin.'
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('/settings/clear-cache', [SettingController::class, 'clearCache'])->name('settings.clear-cache');
     Route::post('/settings/optimize', [SettingController::class, 'optimize'])->name('settings.optimize');
+    Route::post('/settings/maintenance', [SettingController::class, 'toggleMaintenance'])->name('settings.maintenance');
+    Route::post('/settings/backup', [SettingController::class, 'backup'])->name('settings.backup');
 
     // ISP → platform helpdesk queue
     Route::prefix('helpdesk')->name('helpdesk.')->group(function () {

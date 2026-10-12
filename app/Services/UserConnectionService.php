@@ -8,6 +8,7 @@ use App\Models\Router;
 use App\Models\Subscription;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class UserConnectionService
 {
@@ -82,6 +83,8 @@ class UserConnectionService
     public function createPPPoEUser(Customer $customer, Subscription $subscription): bool
     {
         try {
+            if (! $customer->router) return false;
+            return Cache::lock('router-pppoe-ip-allocation:'.$customer->router_id, 60)->block(15, function () use ($customer, $subscription) {
             if (! $customer->router) {
                 Log::error("Customer {$customer->id} missing router");
 
@@ -124,6 +127,7 @@ class UserConnectionService
 
             return false;
 
+            });
         } catch (\Exception $e) {
             Log::error("Error creating PPPoE user {$customer->username}: ".$e->getMessage());
 
@@ -308,16 +312,31 @@ class UserConnectionService
      */
     private function getNextAvailableIp(IpPool $ipPool): ?string
     {
-        // This is a simplified implementation
-        // In production, you'd need to check actual IP usage on the router
-        if (! empty($ipPool->ranges)) {
-            $firstRange = $ipPool->ranges[0];
-            if (isset($firstRange['start'])) {
-                return $firstRange['start'];
+        $used = [];
+        $router = $ipPool->router;
+        if ($router) {
+            $service = new MikroTikService($router);
+            if (! $service->connect()) throw new \RuntimeException('Could not verify addresses on the router.');
+            foreach ($service->getConnection()->comm('/ppp/secret/print') ?: [] as $secret) {
+                if (! empty($secret['remote-address'])) $used[$secret['remote-address']] = true;
+            }
+            foreach ($service->getConnection()->comm('/ppp/active/print') ?: [] as $active) {
+                if (! empty($active['address'])) $used[$active['address']] = true;
             }
         }
-
-        return null;
+        foreach ($ipPool->ranges ?? [] as $range) {
+            $start = isset($range['start']) ? ip2long($range['start']) : false;
+            $end = isset($range['end']) ? ip2long($range['end']) : false;
+            if ($start !== false && $end !== false && $end >= $start) {
+                for ($candidate = $start; $candidate <= $end; $candidate++) {
+                    $address = long2ip($candidate);
+                    if (! isset($used[$address])) return $address;
+                }
+            } elseif (! empty($range['address']) && ! isset($used[$range['address']])) {
+                return $range['address'];
+            }
+        }
+        throw new \RuntimeException('The configured IP pool has no available addresses.');
     }
 
     /**

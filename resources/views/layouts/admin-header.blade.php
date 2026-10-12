@@ -2,9 +2,11 @@
     use App\Support\SaasOnboardingContext;
 
     $user = Auth::user();
+    $supportWorkspace = \App\Support\SuperAdminWorkspaceContext::active();
+    $supportIsp = $supportWorkspace ? \App\Support\SuperAdminWorkspaceContext::isp() : null;
     $onboardingIsp = SaasOnboardingContext::resolveIsp($user);
     $ispName = $onboardingIsp?->name ?? $user->isp?->name ?? ($user->isSuperAdmin() ? 'PrimeBilling Admin' : 'Your ISP');
-    $homeRoute = $user->isSuperAdmin() ? route('admin.dashboard') : route('isp.dashboard');
+    $homeRoute = $supportWorkspace ? route('isp.dashboard') : ($user->isSuperAdmin() ? route('admin.dashboard') : route('isp.dashboard'));
     $pbSaasOnboardingOverlay = (bool) ($pbSaasOnboardingOverlay ?? false);
     $onboardingHomeRoute = $homeRoute;
 @endphp
@@ -93,6 +95,12 @@
 
         {{-- ============= RIGHT CLUSTER ============= --}}
         <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
+
+            @if($supportWorkspace && $supportIsp)
+                <span class="hidden lg:inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200" title="You are authenticated as an ISP admin for troubleshooting">
+                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>ISP admin session · {{ $supportIsp->name }}
+                </span>
+            @endif
 
             {{-- Context-aware Create (jana-prints quick-create pattern) --}}
             <div id="pb-quick-create" class="hidden sm:contents"></div>
@@ -238,6 +246,15 @@
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 7.04 4.29l.06.06A1.65 1.65 0 0 0 8.92 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.36.18.66.46.86.84a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
                             ISP settings
                         </a>
+                    @endif
+                    @if($supportWorkspace)
+                        <div class="my-1 border-t border-slate-100 dark:border-slate-800"></div>
+                        <form method="POST" action="{{ route('admin.workspace.exit') }}">
+                            @csrf
+                            <button type="submit" class="pb-row !p-2 w-full text-left text-sm font-semibold text-indigo-600 dark:text-indigo-300">Return to Super Admin account</button>
+                        </form>
+                    @elseif($user->isSuperAdmin())
+                        <a href="{{ route('admin.isps.index') }}" class="pb-row !p-2 text-sm font-semibold text-indigo-600 dark:text-indigo-300">Open ISP workspace</a>
                     @endif
                     <div class="my-1 border-t border-slate-100 dark:border-slate-800"></div>
                     <form method="POST" action="{{ route('logout') }}">

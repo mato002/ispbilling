@@ -16,8 +16,15 @@ class EnsureIspWorkspaceOperator
     {
         $user = $request->user();
 
-        if (! $user || $user->isSuperAdmin()) {
+        if (! $user) {
             return $next($request);
+        }
+
+        // Super admins use the platform console. Letting them continue into a
+        // tenant route leaves the ISP context empty and can trigger invalid
+        // tenant-specific queries (for example, the connection statistics API).
+        if ($user->isSuperAdmin()) {
+            return redirect()->route('admin.dashboard');
         }
 
         if ($user->isTechnician()) {

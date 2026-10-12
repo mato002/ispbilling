@@ -139,10 +139,14 @@ class NotificationController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $snapshot = $this->notificationService->getDropdownSnapshot(
-            $ispId,
-            NotificationService::DROPDOWN_LIMIT
-        );
+        $preference = data_get(auth()->user()->preferences, 'notifs', 'all');
+        $snapshot = $preference === 'none'
+            ? ['notifications' => collect(), 'unread_count' => 0]
+            : $this->notificationService->getDropdownSnapshot(
+                $ispId,
+                NotificationService::DROPDOWN_LIMIT,
+                $preference === 'critical'
+            );
 
         return response()->json([
             'notifications' => $snapshot['notifications']->map(

@@ -24,7 +24,10 @@ class ShareNotifications
         // Only share notifications for authenticated ISP users
         if (auth()->check() && auth()->user()->isp_id) {
             $ispId = (int) auth()->user()->isp_id;
-            $snapshot = $this->notificationService->getDropdownSnapshot($ispId);
+            $preference = data_get(auth()->user()->preferences, 'notifs', 'all');
+            $snapshot = $preference === 'none'
+                ? ['notifications' => collect(), 'unread_count' => 0]
+                : $this->notificationService->getDropdownSnapshot($ispId, 5, $preference === 'critical');
 
             View::share('recentNotifications', $snapshot['notifications']);
             View::share('unreadCount', $snapshot['unread_count']);

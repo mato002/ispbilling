@@ -193,14 +193,14 @@
     </section>
 
     {{-- ============================================================
-         5) PREFERENCES (placeholders)
+         5) PREFERENCES
     ============================================================ --}}
     <section class="pb-card pb-fade-up delay-3 p-5 sm:p-6">
         <header class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h2 class="text-sm font-bold text-slate-900 dark:text-white sm:text-base">Preferences</h2>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Personalise how PrimeBilling looks and behaves for you. Some preferences are stored locally for now.
+                    Personalise how PrimeBilling looks and behaves for your account. Preferences sync across your devices.
                 </p>
             </div>
             <span class="pb-pill">Beta</span>
@@ -208,11 +208,16 @@
 
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
              x-data="{
-                 theme: localStorage.getItem('pb.theme') || 'system',
-                 notifs: localStorage.getItem('pb.notifs') || 'all',
-                 timezone: localStorage.getItem('pb.timezone') || @json($user->isp?->timezone ?? config('app.timezone', 'Africa/Nairobi')),
-                 landing: localStorage.getItem('pb.landing') || 'dashboard',
-                 save(key, value) { localStorage.setItem('pb.' + key, value); }
+                 theme: @json(data_get($user->preferences, 'theme', 'system')),
+                 notifs: @json(data_get($user->preferences, 'notifs', 'all')),
+                 timezone: @json(data_get($user->preferences, 'timezone', $user->isp?->timezone ?? config('app.timezone', 'Africa/Nairobi'))),
+                 landing: @json(data_get($user->preferences, 'landing', 'dashboard')),
+                 async save(key, value) {
+                    localStorage.setItem('pb.' + key, value);
+                    const payload = { theme: this.theme, notifs: this.notifs, timezone: this.timezone, landing: this.landing };
+                    const response = await fetch(@js(route('profile.preferences.update')), { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: JSON.stringify(payload) });
+                    if (!response.ok) alert('Could not save preferences. Please try again.');
+                 }
              }">
             <div>
                 <label class="isp-form-label">Theme</label>
@@ -221,7 +226,7 @@
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
                 </select>
-                <p class="mt-1 text-[11px] text-slate-400">Affects this browser only.</p>
+                <p class="mt-1 text-[11px] text-slate-400">Saved to your account and applied on each device.</p>
             </div>
 
             <div>
@@ -243,7 +248,7 @@
                     <option value="Africa/Dar_es_Salaam">Africa/Dar_es_Salaam (EAT)</option>
                     <option value="UTC">UTC</option>
                 </select>
-                <p class="mt-1 text-[11px] text-slate-400">Used to display dates in this browser.</p>
+                <p class="mt-1 text-[11px] text-slate-400">Used for dates and times in your account.</p>
             </div>
 
             <div>
@@ -255,7 +260,7 @@
                     <option value="payments">Payments</option>
                     <option value="routers">Routers</option>
                 </select>
-                <p class="mt-1 text-[11px] text-slate-400">Where to land after sign-in.</p>
+                <p class="mt-1 text-[11px] text-slate-400">Where to land after sign-in to your ISP workspace.</p>
             </div>
         </div>
     </section>

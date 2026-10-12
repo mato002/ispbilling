@@ -8,7 +8,19 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
     <x-vite-assets />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
+        .mpesa-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #bbf7d0;
+            border-top-color: #087a48;
+            border-radius: 50%;
+            animation: mpesa-spin .8s linear infinite;
+        }
+        @keyframes mpesa-spin { to { transform: rotate(360deg); } }
+        .hotspot-payment-modal { border-radius: 18px !important; }
         body {
             @if(isset($portalSettings))
                 @if($portalSettings->background_type === 'gradient')
@@ -48,18 +60,18 @@
     </style>
 </head>
 <body class="font-sans antialiased">
-    <div class="min-h-screen flex flex-col items-center justify-center p-4">
-        <div class="portal-container w-full max-w-md p-6 sm:p-8">
+    <div class="min-h-screen flex flex-col items-center justify-start p-2 sm:justify-center sm:p-5">
+        <div class="portal-container w-full {{ request()->routeIs('hotspot.splash', 'hotspot.packages') ? 'max-w-7xl' : 'max-w-md' }} p-3 sm:p-8">
             @if(isset($portalSettings) && $portalSettings->logo_url)
-                <div class="text-center mb-6">
-                    <img src="{{ $portalSettings->logo_url }}" alt="Portal Logo" class="h-16 mx-auto mb-4">
+                <div class="text-center mb-3 sm:mb-6">
+                    <img src="{{ $portalSettings->logo_url }}" alt="Portal Logo" class="h-10 sm:h-16 mx-auto mb-2 sm:mb-4">
                 </div>
             @elseif(isset($isp) && $isp)
-                <div class="text-center mb-6">
+                <div class="text-center mb-3 sm:mb-6">
                     @if($isp->logo)
-                        <img src="{{ $isp->logo }}" alt="{{ $isp->company_name }}" class="h-16 mx-auto mb-4">
+                        <img src="{{ $isp->logo }}" alt="{{ $isp->company_name }}" class="h-10 sm:h-16 mx-auto mb-2 sm:mb-4">
                     @endif
-                    <h1 class="text-2xl font-bold text-gray-900">{{ $isp->company_name ?? $isp->name }}</h1>
+                    <h1 class="text-base sm:text-2xl font-bold text-gray-900 leading-tight">{{ $isp->company_name ?? $isp->name }}</h1>
                     @if($isp->tagline)
                         <p class="text-sm text-gray-600 mt-1">{{ $isp->tagline }}</p>
                     @endif
@@ -67,8 +79,8 @@
             @endif
 
             @if(isset($portalSettings))
-                <div class="text-center mb-6">
-                    <h2 class="text-2xl font-bold text-gray-900">{{ $portalSettings->welcome_message }}</h2>
+                <div class="text-center mb-3 sm:mb-6">
+                    <h2 class="text-lg sm:text-2xl font-bold text-gray-900">{{ $portalSettings->welcome_message }}</h2>
                 </div>
             @endif
 

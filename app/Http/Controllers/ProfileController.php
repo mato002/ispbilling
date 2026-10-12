@@ -37,6 +37,18 @@ class ProfileController extends Controller
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
+    public function updatePreferences(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'theme' => ['required', 'in:system,light,dark'],
+            'notifs' => ['required', 'in:all,critical,none'],
+            'timezone' => ['required', 'timezone'],
+            'landing' => ['required', 'in:dashboard,customers,invoices,payments,routers'],
+        ]);
+        $request->user()->forceFill(['preferences' => $validated])->save();
+        return response()->json(['saved' => true]);
+    }
+
     /**
      * Delete the user's account.
      */

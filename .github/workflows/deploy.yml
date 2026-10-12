@@ -174,11 +174,11 @@ jobs:
           BASE="${DEPLOY_SITE_URL:-https://ispbilling.zhengkyc.com}"
           BASE="${BASE%/}"
           migrate_ok=0
-          for path in /deploy/migrate /deploy-migrate.php; do
-            URL="${BASE}${path}?token=${DEPLOY_EXTRACT_TOKEN}"
-            echo "Trying ${URL} ..."
+          for path in /api/deploy/migrate /deploy-migrate.php; do
+            URL="${BASE}${path}"
+            echo "Trying protected POST ${URL} ..."
             for attempt in 1 2 3; do
-              HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -o /tmp/deploy-migrate.out -w "%{http_code}" "$URL" || echo "000")
+              HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" -o /tmp/deploy-migrate.out -w "%{http_code}" "$URL" || echo "000")
               echo "HTTP ${HTTP}"
               cat /tmp/deploy-migrate.out || true
               echo ""
@@ -243,11 +243,11 @@ jobs:
           BASE="${DEPLOY_SITE_URL:-https://ispbilling.zhengkyc.com}"
           BASE="${BASE%/}"
           sync_ok=0
-          for path in /deploy/sync-public /deploy-sync-public.php; do
-            URL="${BASE}${path}?token=${DEPLOY_EXTRACT_TOKEN}"
-            echo "Trying ${URL} ..."
+          for path in /api/deploy/sync-public /deploy-sync-public.php; do
+            URL="${BASE}${path}"
+            echo "Trying protected POST ${URL} ..."
             for attempt in 1 2 3; do
-              HTTP=$(curl -sS --connect-timeout 30 --max-time 120 -o /tmp/deploy-sync.out -w "%{http_code}" "$URL" || echo "000")
+              HTTP=$(curl -sS --connect-timeout 30 --max-time 120 -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" -o /tmp/deploy-sync.out -w "%{http_code}" "$URL" || echo "000")
               echo "HTTP ${HTTP}"
               cat /tmp/deploy-sync.out || true
               echo ""

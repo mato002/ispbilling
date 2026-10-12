@@ -3,6 +3,7 @@
 namespace App\Support\Navigation;
 
 use Illuminate\Support\Arr;
+use App\Support\SuperAdminWorkspaceContext;
 
 class ModuleWorkspaceNav
 {
@@ -15,7 +16,7 @@ class ModuleWorkspaceNav
         }
 
         if ($user->isSuperAdmin()) {
-            return 'admin';
+            return SuperAdminWorkspaceContext::active() ? 'isp' : 'admin';
         }
 
         if ($user->isTechnician()) {

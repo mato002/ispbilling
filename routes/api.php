@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\DeployMigrateController;
+use App\Http\Controllers\DeploySyncController;
 use App\Http\Controllers\ISP\CustomerController;
 use App\Http\Controllers\ISP\PlanController;
 use App\Http\Controllers\ISP\RouterController;
@@ -18,6 +20,8 @@ use App\Http\Controllers\Admin\DashboardController;
 */
 
 // Public API status
+Route::post('/deploy/sync-public', [DeploySyncController::class, 'syncPublic'])->middleware('throttle:5,1');
+Route::post('/deploy/migrate', [DeployMigrateController::class, 'migrate'])->middleware('throttle:5,1');
 Route::get('/status', function () {
     return response()->json([
         'status' => 'online',
@@ -48,6 +52,8 @@ Route::post('/payments/mpesa/c2b/confirmation/{webhook_token}', [\App\Http\Contr
 
 Route::post('/payments/selcom/callback', [PaymentController::class, 'selcomCallback'])
     ->name('payments.selcom.callback');
+Route::post('/payments/stripe/webhook', [PaymentController::class, 'stripeWebhook'])
+    ->name('payments.stripe.webhook');
 
 // Public Hotspot API (for MikroTik router integration)
 Route::prefix('hotspot')->name('hotspot.')->group(function () {

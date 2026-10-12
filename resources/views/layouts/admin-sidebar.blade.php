@@ -1,8 +1,9 @@
 @php
     $user = Auth::user();
-    $isSuper = $user->isSuperAdmin();
+    $supportWorkspace = $user->isSuperAdmin() && \App\Support\SuperAdminWorkspaceContext::active();
+    $isSuper = $user->isSuperAdmin() && ! $supportWorkspace;
     $isTechnician = $user->isTechnician();
-    $isIsp = $user->isIspAdmin() || $user->isIspStaff();
+    $isIsp = $user->isIspAdmin() || $user->isIspStaff() || $supportWorkspace;
     $tenantIsp = request()->attributes->get(\App\Http\Middleware\LoadTenantIsp::ATTRIBUTE);
     $ispName = $tenantIsp?->name ?? optional($user->isp)->name ?? ($isSuper ? 'PrimeBilling Admin' : 'Your ISP');
     $homeRoute = $isSuper

@@ -21,10 +21,11 @@ class NotificationService
      *
      * @return array{notifications: \Illuminate\Support\Collection<int, Notification>, unread_count: int}
      */
-    public function getDropdownSnapshot(int $ispId, int $limit = self::DROPDOWN_LIMIT): array
+    public function getDropdownSnapshot(int $ispId, int $limit = self::DROPDOWN_LIMIT, bool $criticalOnly = false): array
     {
         $query = Notification::withoutGlobalScope('isp_tenant')
             ->where('isp_id', $ispId);
+        if ($criticalOnly) $query->whereIn('type', ['error', 'critical', 'warning']);
 
         $notifications = (clone $query)
             ->select(['id', 'isp_id', 'title', 'message', 'type', 'is_read', 'created_at'])

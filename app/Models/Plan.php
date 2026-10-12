@@ -34,6 +34,8 @@ class Plan extends Model
         'is_recurring',
         'service_type',
         'requires_pppoe_plan',
+        'customer_visible',
+        'archived_at',
     ];
 
     protected $casts = [
@@ -48,6 +50,8 @@ class Plan extends Model
         'is_one_time' => 'boolean',
         'is_recurring' => 'boolean',
         'requires_pppoe_plan' => 'boolean',
+        'customer_visible' => 'boolean',
+        'archived_at' => 'datetime',
     ];
 
     public function isp(): BelongsTo

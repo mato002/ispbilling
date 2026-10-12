@@ -48,6 +48,31 @@ function discoveryCategoryLabel(category) {
 }
 
 document.addEventListener('alpine:init', () => {
+    Alpine.data('pbSearchableSelect', (config = {}) => ({
+        options: Array.isArray(config.options) ? config.options : [],
+        selected: String(config.selected ?? ''),
+        query: '', open: false, highlighted: 0,
+        get filteredOptions() {
+            const search = this.query.trim().toLowerCase();
+            return this.options.filter(option => !search || option.label.toLowerCase().includes(search));
+        },
+        init() { this.query = this.options.find(option => option.value === this.selected)?.label ?? ''; },
+        search() {
+            this.open = true;
+            const selectedLabel = this.options.find(option => option.value === this.selected)?.label ?? '';
+            if (this.query !== selectedLabel) this.selected = '';
+            this.highlighted = 0;
+        },
+        select(value, label) {
+            this.selected = String(value); this.query = label; this.open = false;
+            this.$el.querySelector('input[type="hidden"]').dispatchEvent(new Event('pb-filter-change', { bubbles: true }));
+            this.$el.querySelector('input[type="hidden"]').dispatchEvent(new Event('change', { bubbles: true }));
+        },
+        highlightNext() { this.open = true; this.highlighted = Math.min(this.highlighted + 1, this.filteredOptions.length - 1); },
+        highlightPrevious() { this.highlighted = Math.max(this.highlighted - 1, 0); },
+        chooseHighlighted() { const option = this.filteredOptions[this.highlighted]; if (option) this.select(option.value, option.label); },
+    }));
+
     Alpine.data('pbTopbar', () => ({
         searchOpen: false,
         quickActionsOpen: false,
@@ -62,6 +87,8 @@ document.addEventListener('alpine:init', () => {
         discoveryFavorites: discoveryNormalizeStored(JSON.parse(localStorage.getItem(DISCOVERY_FAVORITES_KEY) || '[]')),
 
         init() {
+            this.$el.addEventListener('pb-filter-change', () => this.submitForm());
+
             this.$watch('discoveryRecent', (value) => {
                 localStorage.setItem(DISCOVERY_RECENT_KEY, JSON.stringify(value.slice(0, window.__pbDiscovery?.recentLimit ?? 12)));
             });
@@ -247,13 +274,19 @@ document.addEventListener('alpine:init', () => {
         autoSearch: Boolean(options.autoSearch ?? true),
         debounceMs: Number(options.debounceMs ?? 350),
         timer: null,
+        controller: null,
 
         init() {
             if (! this.autoSearch) {
                 return;
             }
 
-            this.$el.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"])').forEach((field) => {
+            this.$el.addEventListener('submit', (event) => {
+                event.preventDefault();
+                this.submitForm();
+            });
+
+            this.$el.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([data-filter-search-only])').forEach((field) => {
                 if (field.type === 'text' || field.type === 'search' || field.type === 'email' || field.type === 'tel') {
                     field.addEventListener('input', () => this.scheduleSubmit());
 
@@ -274,13 +307,79 @@ document.addEventListener('alpine:init', () => {
         },
 
         submitForm() {
-            this.$el.querySelector('[name="page"]')?.remove();
+            this.updateListing();
+        },
 
-            if (typeof this.$el.requestSubmit === 'function') {
-                this.$el.requestSubmit();
-            } else {
-                this.$el.submit();
+        async updateListing() {
+            const form = this.$el;
+            const listing = form.closest('[data-listing-root]') ?? document.querySelector('#pb-main');
+            const currentBody = listing?.querySelector('table tbody');
+
+            if (!currentBody || form.method.toUpperCase() !== 'GET') {
+                form.submit();
+                return;
             }
+
+            this.controller?.abort();
+            this.controller = new AbortController();
+            const params = new URLSearchParams(new FormData(form));
+            params.delete('page');
+            const url = new URL(form.action, window.location.origin);
+            url.search = params.toString();
+
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        Accept: 'text/html',
+                        'X-Listing-Refresh': '1',
+                    },
+                    credentials: 'same-origin',
+                    signal: this.controller.signal,
+                });
+                if (!response.ok) throw new Error(`Listing search failed (${response.status})`);
+
+                const contentType = response.headers.get('content-type') ?? '';
+                if (contentType.includes('application/json')) {
+                    const data = await response.json();
+                    currentBody.innerHTML = data.rows;
+                    listing.querySelector('[data-listing-pagination]')?.replaceChildren(document.createRange().createContextualFragment(data.pagination));
+                    this.updateListingCount(listing, data);
+                } else {
+                    const sourceDocument = new DOMParser().parseFromString(await response.text(), 'text/html');
+                    const sourceListing = sourceDocument.querySelector('[data-listing-root]') ?? sourceDocument.querySelector('#pb-main');
+                    const sourceBody = sourceListing?.querySelector('table tbody');
+                    if (!sourceBody) {
+                        const columns = currentBody.closest('table')?.querySelectorAll('thead th').length ?? 1;
+                        currentBody.innerHTML = `<tr><td colspan="${columns}" class="px-4 py-10 text-center text-sm text-slate-500">No records match these filters.</td></tr>`;
+                        listing.querySelector('[data-listing-pagination]')?.replaceChildren();
+                        this.updateListingCount(listing, { from: 0, to: 0, total: 0 });
+                        window.history.replaceState({}, '', url);
+                        return;
+                    }
+
+                    currentBody.innerHTML = sourceBody.innerHTML;
+                    const currentPagination = listing.querySelector('[data-listing-pagination]');
+                    const sourcePagination = sourceListing.querySelector('[data-listing-pagination]');
+                    if (currentPagination && sourcePagination) currentPagination.innerHTML = sourcePagination.innerHTML;
+                    ['from', 'to', 'total'].forEach((key) => {
+                        const current = listing.querySelector(`[data-listing-${key}]`);
+                        const source = sourceListing.querySelector(`[data-listing-${key}]`);
+                        if (current && source) current.textContent = source.textContent;
+                    });
+                }
+
+                window.history.replaceState({}, '', url);
+            } catch (error) {
+                if (error.name !== 'AbortError') console.error(error);
+            }
+        },
+
+        updateListingCount(listing, data) {
+            const values = { from: data.from, to: data.to, total: Number(data.total).toLocaleString() };
+            Object.entries(values).forEach(([key, value]) => {
+                const target = listing.querySelector(`[data-listing-${key}]`);
+                if (target) target.textContent = value;
+            });
         },
     }));
 

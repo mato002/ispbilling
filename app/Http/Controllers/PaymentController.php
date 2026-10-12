@@ -15,12 +15,64 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 
 class PaymentController extends Controller
 {
     public function __construct(
         protected PaymentCompletionService $paymentCompletionService
     ) {
+    }
+
+    /** Verify Stripe's signature and apply checkout completion independent of the browser return. */
+    public function stripeWebhook(Request $request)
+    {
+        $signatureHeader = $request->header('Stripe-Signature', '');
+        $parts = [];
+        foreach (explode(',', $signatureHeader) as $part) {
+            [$key, $value] = array_pad(explode('=', trim($part), 2), 2, null);
+            if ($key && $value !== null) $parts[$key][] = $value;
+        }
+        $timestamp = $parts['t'][0] ?? null;
+        $payload = $request->getContent();
+        if (! $timestamp || abs(now()->timestamp - (int) $timestamp) > 300) {
+            return response()->json(['error' => 'Invalid Stripe signature timestamp'], 400);
+        }
+        try {
+            $event = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return response()->json(['error' => 'Invalid Stripe event'], 400);
+        }
+
+        $session = $event['data']['object'] ?? [];
+        $paymentId = (int) ($session['metadata']['payment_id'] ?? 0);
+        $payment = Payment::query()->whereKey($paymentId)->where('payment_method', 'stripe')->first();
+        $method = $payment
+            ? IspPaymentMethod::forIsp($payment->isp_id)->where('provider', 'stripe')->first()
+            : null;
+        $secret = $method?->getCredential('webhook_secret');
+        if (! $secret) return response()->json(['error' => 'Stripe webhook is not configured'], 400);
+        $expected = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
+        $valid = false;
+        foreach ($parts['v1'] ?? [] as $candidate) $valid = $valid || hash_equals($expected, $candidate);
+        if (! $valid) return response()->json(['error' => 'Invalid Stripe signature'], 400);
+
+        if (! $payment || ($session['id'] ?? null) !== ($payment->metadata['stripe_session_id'] ?? null)) {
+            return response()->json(['error' => 'Payment does not match Stripe session'], 404);
+        }
+        if ((int) ($session['amount_total'] ?? 0) !== (int) round((float) $payment->amount * 100)) {
+            return response()->json(['error' => 'Stripe session amount does not match payment'], 400);
+        }
+
+        $eventType = $event['type'] ?? '';
+        if (in_array($eventType, ['checkout.session.completed', 'checkout.session.async_payment_succeeded'], true)
+            && ($session['payment_status'] ?? null) === 'paid') {
+            $this->paymentCompletionService->markAsCompleted($payment);
+        } elseif ($eventType === 'checkout.session.expired' && $payment->status === 'pending') {
+            $payment->markAsFailed();
+        }
+
+        return response()->json(['received' => true]);
     }
 
     /**
@@ -93,11 +145,17 @@ class PaymentController extends Controller
             if ($result['success']) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'MPesa STK Push initiated. Please check your phone.',
+                    'message' => 'M-Pesa payment prompt sent. Check your phone.',
+                    'payment_id' => $payment->id,
+                    'status_url' => URL::temporarySignedRoute(
+                        'hotspot.payment-status', now()->addMinutes(10), ['payment' => $payment->id]
+                    ),
                     'payment' => $payment,
                     'checkout_request_id' => $result['checkout_request_id'] ?? null,
                 ]);
             }
+
+            $payment->markAsFailed();
 
             return response()->json([
                 'success' => false,
@@ -511,7 +569,7 @@ class PaymentController extends Controller
             
             $selcomService = new SelcomService($payment->isp);
 
-            if (!$selcomService->handleWebhook($data)) {
+            if (!$selcomService->handleWebhook($data, $request)) {
                 return response()->json(['error' => 'Invalid signature'], 400);
             }
 

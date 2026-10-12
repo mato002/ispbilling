@@ -16,6 +16,9 @@
         type="search"
         name="{{ $name }}"
         value="{{ $value }}"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
         class="isp-form-input"
         placeholder="{{ $placeholder }}"
         {{ $attributes->except(['name', 'label', 'placeholder', 'value', 'class']) }}

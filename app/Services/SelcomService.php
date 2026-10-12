@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\Payment;
 use App\Models\ISP;
+use App\Models\IspPaymentMethod;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
 use Exception;
 
 class SelcomService
@@ -25,6 +27,15 @@ class SelcomService
         $this->apiSecret = $settings['selcom_api_secret'] ?? config('services.selcom.api_secret');
         $this->vendorId = $settings['selcom_vendor_id'] ?? config('services.selcom.vendor_id');
         $this->environment = $settings['selcom_environment'] ?? config('services.selcom.environment', 'sandbox');
+
+        $method = IspPaymentMethod::forIsp($isp->id)->where('provider', 'selcom')->first();
+        if ($method) {
+            $credentials = $method->credentials;
+            $this->apiKey = $credentials['api_key'] ?? $this->apiKey;
+            $this->apiSecret = $credentials['api_secret'] ?? $this->apiSecret;
+            $this->vendorId = $credentials['vendor'] ?? $this->vendorId;
+            $this->environment = $credentials['environment'] ?? $this->environment;
+        }
     }
 
     /**
@@ -43,51 +54,67 @@ class SelcomService
         return hash_hmac('sha256', $string, $this->apiSecret);
     }
 
+    protected function baseUrl(): string
+    {
+        return $this->environment === 'production'
+            ? 'https://apigw.selcommobile.com'
+            : 'https://apigwtest.selcommobile.com';
+    }
+
+    protected function authHeaders(array $data, array $fields): array
+    {
+        $timestamp = now()->toIso8601String();
+        $signing = 'timestamp='.$timestamp;
+        foreach ($fields as $field) $signing .= '&'.$field.'='.($data[$field] ?? '');
+        return [
+            'Authorization' => 'SELCOM '.base64_encode($this->apiKey),
+            'Digest-Method' => 'HS256',
+            'Digest' => base64_encode(hash_hmac('sha256', $signing, $this->apiSecret, true)),
+            'Timestamp' => $timestamp,
+            'Signed-Fields' => implode(',', $fields),
+            'Accept' => 'application/json',
+        ];
+    }
+
     /**
      * Initiate payment
      */
     public function initiatePayment(Payment $payment): array
     {
         try {
-            $baseUrl = $this->environment === 'production'
-                ? 'https://api.selcommobile.com/v1'
-                : 'https://api.selcommobile.com/v1';
-
             $callbackUrl = route('payments.selcom.callback');
-
             $payload = [
                 'vendor' => $this->vendorId,
                 'order_id' => $payment->payment_reference,
-                'buyer_email' => $payment->customer->email ?? $payment->phone_number . '@selcom.com',
-                'buyer_name' => $payment->customer->full_name,
-                'buyer_phone' => $payment->phone_number ?? $payment->customer->phone_number,
+                'buyer_email' => $payment->customer?->email ?: (($payment->phone_number ?: 'customer').'@selcom.com'),
+                'buyer_name' => $payment->customer?->full_name ?: 'Internet customer',
+                'buyer_phone' => $payment->phone_number ?: ($payment->customer?->phone_number ?? ''),
                 'amount' => (string) $payment->amount,
                 'currency' => $this->isp->currency ?? 'TZS',
-                'redirect_url' => $callbackUrl,
-                'cancel_url' => $callbackUrl,
-                'webhook' => $callbackUrl,
+                'redirect_url' => base64_encode(\Illuminate\Support\Facades\URL::temporarySignedRoute('hotspot.checkout.access', now()->addHours(24), ['payment' => $payment->id])),
+                'cancel_url' => base64_encode($callbackUrl),
+                'webhook' => base64_encode($callbackUrl),
+                'no_of_items' => 1,
             ];
-
-            $payload['signature'] = $this->generateSignature($payload);
-
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . base64_encode($this->apiKey . ':' . $this->apiSecret),
-            ])->post($baseUrl . '/checkout/create-order', $payload);
+            $fields = array_keys($payload);
+            $response = Http::withHeaders($this->authHeaders($payload, $fields))
+                ->post($this->baseUrl().'/v1/checkout/create-order-minimal', $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
                 
-                if (isset($data['data']['order_id'])) {
+                $gatewayUrl = data_get($data, 'data.0.payment_gateway_url');
+                if (($data['resultcode'] ?? null) === '000' && $gatewayUrl) {
                     $payment->update([
-                        'transaction_id' => $data['data']['order_id'] ?? null,
-                        'metadata' => $data,
+                        'transaction_id' => $payment->payment_reference,
+                        'metadata' => array_merge($payment->metadata ?? [], ['selcom_response' => $data]),
                     ]);
 
                     return [
                         'success' => true,
                         'message' => 'Payment initiated successfully',
-                        'payment_url' => $data['data']['payment_gateway_url'] ?? null,
-                        'order_id' => $data['data']['order_id'] ?? null,
+                        'payment_url' => base64_decode($gatewayUrl, true) ?: $gatewayUrl,
+                        'order_id' => $payment->payment_reference,
                     ];
                 }
 
@@ -116,20 +143,9 @@ class SelcomService
     public function verifyPayment(string $orderId): array
     {
         try {
-            $baseUrl = $this->environment === 'production'
-                ? 'https://api.selcommobile.com/v1'
-                : 'https://api.selcommobile.com/v1';
-
-            $payload = [
-                'vendor' => $this->vendorId,
-                'order_id' => $orderId,
-            ];
-
-            $payload['signature'] = $this->generateSignature($payload);
-
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . base64_encode($this->apiKey . ':' . $this->apiSecret),
-            ])->post($baseUrl . '/checkout/order-status', $payload);
+            $payload = ['order_id' => $orderId];
+            $response = Http::withHeaders($this->authHeaders($payload, ['order_id']))
+                ->get($this->baseUrl().'/v1/checkout/order-status', $payload);
 
             if ($response->successful()) {
                 return $response->json();
@@ -145,15 +161,22 @@ class SelcomService
     /**
      * Handle webhook callback
      */
-    public function handleWebhook(array $data): bool
+    public function handleWebhook(array $data, ?Request $request = null): bool
     {
         try {
-            $signature = $data['signature'] ?? null;
-            unset($data['signature']);
-            
-            $expectedSignature = $this->generateSignature($data);
-            
-            if ($signature !== $expectedSignature) {
+            $signedFields = $request?->header('Signed-Fields');
+            $digest = $request?->header('Digest');
+            $timestamp = $request?->header('Timestamp');
+            if (! $signedFields || ! $digest || ! $timestamp || ! $this->apiSecret) return false;
+            if (abs(now()->diffInSeconds(\Illuminate\Support\Carbon::parse($timestamp))) > 300) return false;
+            $fields = array_filter(explode(',', $signedFields));
+            $signing = 'timestamp='.$timestamp;
+            foreach ($fields as $field) {
+                if (! array_key_exists($field, $data)) return false;
+                $signing .= '&'.$field.'='.$data[$field];
+            }
+            $expected = base64_encode(hash_hmac('sha256', $signing, $this->apiSecret, true));
+            if (! hash_equals($expected, $digest)) {
                 Log::error('Selcom webhook signature mismatch');
                 return false;
             }

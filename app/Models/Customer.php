@@ -30,6 +30,9 @@ class Customer extends Model
         'account_credit',
         'installation_date',
         'mikrotik_user_id',
+        'hotspot_password',
+        'hotspot_mac_address',
+        'hotspot_login_url',
         'notes',
         'custom_attributes',
     ];
@@ -38,6 +41,7 @@ class Customer extends Model
         'installation_date' => 'date',
         'custom_attributes' => 'array',
         'account_credit' => 'decimal:2',
+        'hotspot_password' => 'encrypted',
     ];
 
     protected $hidden = [

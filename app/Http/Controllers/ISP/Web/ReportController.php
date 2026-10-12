@@ -9,14 +9,127 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Support\Export\CsvExporter;
+use App\Services\IspReportBuilder;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
+    public function builder(Request $request, IspReportBuilder $builder)
+    {
+        $definitions = $builder->definitions();
+        $request->merge([
+            'dataset' => $request->input('dataset', 'payments'),
+            'metric' => $request->input('metric', 'count'),
+            'mode' => $request->input('mode', 'rows'),
+        ]);
+        $validated = $request->validate([
+            'dataset' => ['required', Rule::in(array_keys($definitions))],
+            'columns' => ['nullable', 'array', 'max:12'],
+            'columns.*' => ['string'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'status' => ['nullable', 'string'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'group_by' => ['nullable', 'string'],
+            'metric' => ['required', Rule::in(['count', 'sum', 'average'])],
+            'measure' => ['nullable', 'string'],
+            'mode' => ['required', Rule::in(['rows', 'aggregate'])],
+        ]);
+        $dataset = $definitions[$validated['dataset']];
+        $columnKeys = array_keys($dataset['columns']);
+        $validated['columns'] = array_values(array_intersect($validated['columns'] ?? array_slice($columnKeys, 0, 6), $columnKeys));
+        if ($validated['columns'] === [] && empty($validated['group_by'])) $validated['columns'] = array_slice($columnKeys, 0, 1);
+        if (! empty($validated['status']) && ! in_array($validated['status'], $dataset['status'], true)) {
+            return back()->withErrors(['status' => 'Choose a valid status for this report.'])->withInput();
+        }
+        $groupable = array_keys(array_filter($dataset['columns'], fn ($field) => ! empty($field['group'])));
+        if (! empty($validated['group_by']) && ! in_array($validated['group_by'], $groupable, true)) {
+            return back()->withErrors(['group_by' => 'Choose a valid grouping field.'])->withInput();
+        }
+        if (in_array($validated['metric'], ['sum', 'average'], true) && ! isset($dataset['measures'][$validated['measure'] ?? ''])) {
+            return back()->withErrors(['measure' => 'Choose a valid numeric field for this calculation.'])->withInput();
+        }
+
+        $results = null;
+        $records = null;
+        $selectedColumns = [];
+        if ($request->has('run')) {
+            if ($validated['mode'] === 'aggregate') {
+                $metricLabel = $validated['metric'] === 'count'
+                    ? 'Record count'
+                    : ucfirst($validated['metric']).' '.$dataset['columns'][$validated['measure']]['label'];
+                $validated['metric_label'] = $metricLabel;
+                $results = $builder->query((int) auth()->user()->isp_id, $validated);
+            } else {
+                [$query, $selectedColumns] = $builder->rows((int) auth()->user()->isp_id, $validated);
+                $records = $query->paginate(50)->withQueryString();
+            }
+        }
+
+        return view('isp.reports.builder', compact('definitions', 'dataset', 'validated', 'results', 'records', 'selectedColumns'));
+    }
+
+    public function exportBuilder(Request $request, IspReportBuilder $builder): StreamedResponse
+    {
+        $definitions = $builder->definitions();
+        $validated = $request->validate([
+            'dataset' => ['required', Rule::in(array_keys($definitions))],
+            'columns' => ['nullable', 'array', 'max:12'],
+            'columns.*' => ['string'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'status' => ['nullable', 'string'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'group_by' => ['nullable', 'string'],
+            'metric' => ['required', Rule::in(['count', 'sum', 'average'])],
+            'measure' => ['nullable', 'string'],
+            'mode' => ['required', Rule::in(['rows', 'aggregate'])],
+        ]);
+        $dataset = $definitions[$validated['dataset']];
+        $keys = array_keys($dataset['columns']);
+        $validated['columns'] = array_values(array_intersect($validated['columns'] ?? array_slice($keys, 0, 6), $keys));
+        if ($validated['columns'] === []) $validated['columns'] = array_slice($keys, 0, 1);
+        if (! empty($validated['status']) && ! in_array($validated['status'], $dataset['status'], true)) abort(422);
+        $groupable = array_keys(array_filter($dataset['columns'], fn ($field) => ! empty($field['group'])));
+        if (! empty($validated['group_by']) && ! in_array($validated['group_by'], $groupable, true)) abort(422);
+        if (in_array($validated['metric'], ['sum', 'average'], true) && ! isset($dataset['measures'][$validated['measure'] ?? ''])) abort(422);
+        if ($validated['mode'] === 'aggregate') {
+            $metricLabel = $validated['metric'] === 'count' ? 'Record count' : ucfirst($validated['metric']).' '.$dataset['columns'][$validated['measure']]['label'];
+            $validated['metric_label'] = $metricLabel;
+            $results = $builder->query((int) auth()->user()->isp_id, $validated);
+            return CsvExporter::download('custom-'.$validated['dataset'].'-summary-'.now()->format('Ymd-His').'.csv',
+                [$validated['group_by'] ? $dataset['columns'][$validated['group_by']]['label'] : 'Total', $metricLabel],
+                function ($out) use ($results) {
+                    foreach ($results as [$label, $value]) {
+                        if (is_string($label) && preg_match('/^\s*[=+\-@]/u', $label)) $label = "'".$label;
+                        fputcsv($out, [$label, $value]);
+                    }
+                });
+        }
+        [$query, $selected] = $builder->rows((int) auth()->user()->isp_id, $validated);
+
+        return CsvExporter::download('custom-'.$validated['dataset'].'-'.now()->format('Ymd-His').'.csv',
+            array_map(fn ($field) => $field['label'], array_values($selected)),
+            function ($out) use ($query, $selected) {
+                $query->chunk(500, function ($rows) use ($out, $selected) {
+                    foreach ($rows as $row) {
+                        $values = [];
+                        foreach (array_keys($selected) as $key) {
+                            $value = $row->{$key};
+                            if (is_string($value) && preg_match('/^\s*[=+\-@]/u', $value)) $value = "'".$value;
+                            $values[] = $value;
+                        }
+                        fputcsv($out, $values);
+                    }
+                });
+            });
+    }
+
     public function index(Request $request)
     {
         $ispId = auth()->user()->isp_id;

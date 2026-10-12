@@ -267,7 +267,7 @@ class MpesaService
                 'Password' => $password,
                 'Timestamp' => $timestamp,
                 'TransactionType' => $this->transactionType,
-                'Amount' => (int) $payment->amount,
+                'Amount' => (int) round((float) $payment->amount),
                 'PartyA' => $payment->phone_number,
                 'PartyB' => $this->shortcode,
                 'PhoneNumber' => $payment->phone_number,

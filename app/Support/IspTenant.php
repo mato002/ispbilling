@@ -30,7 +30,7 @@ class IspTenant
         }
 
         if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
-            return false;
+            return SuperAdminWorkspaceContext::ispId() !== null;
         }
 
         return (bool) ($user->isp_id ?? null);
@@ -46,6 +46,10 @@ class IspTenant
         }
 
         $user = self::resolveAuthenticatedUser();
+
+        if ($user && $user->isSuperAdmin()) {
+            return SuperAdminWorkspaceContext::ispId();
+        }
 
         return $user && $user->isp_id ? (int) $user->isp_id : null;
     }
@@ -66,7 +70,7 @@ class IspTenant
         }
 
         if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
-            return null;
+            return SuperAdminWorkspaceContext::ispId();
         }
 
         return $user->isp_id ? (int) $user->isp_id : null;

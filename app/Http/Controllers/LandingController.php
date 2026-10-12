@@ -23,6 +23,8 @@ class LandingController extends Controller
             $landingPlans = Plan::query()
                 ->where('isp_id', $landingIsp->id)
                 ->where('is_active', true)
+                ->where('customer_visible', true)
+                ->whereNull('archived_at')
                 ->orderBy('price')
                 ->get();
         } else {

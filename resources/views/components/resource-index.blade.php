@@ -21,7 +21,7 @@
     $exportFormats = $exportFormats ?? [];
 @endphp
 
-<div {{ $attributes->merge(['class' => 'space-y-6']) }}>
+<div data-listing-root {{ $attributes->merge(['class' => 'space-y-6']) }}>
     @if ($showFlash && session('success'))
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
             {{ session('success') }}
@@ -72,14 +72,16 @@
             <div class="pb-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-sm text-slate-500 dark:text-slate-400">
                     Showing
-                    <span class="font-medium text-slate-700 dark:text-slate-200">{{ $paginator->firstItem() ?? 0 }}</span>
+                    <span data-listing-from class="font-medium text-slate-700 dark:text-slate-200">{{ $paginator->firstItem() ?? 0 }}</span>
                     –
-                    <span class="font-medium text-slate-700 dark:text-slate-200">{{ $paginator->lastItem() ?? 0 }}</span>
+                    <span data-listing-to class="font-medium text-slate-700 dark:text-slate-200">{{ $paginator->lastItem() ?? 0 }}</span>
                     of
-                    <span class="font-medium text-slate-700 dark:text-slate-200">{{ number_format($paginator->total()) }}</span>
+                    <span data-listing-total class="font-medium text-slate-700 dark:text-slate-200">{{ number_format($paginator->total()) }}</span>
                 </p>
                 @if ($paginator->hasPages())
-                    <div class="pb-pagination">{{ $paginator->withQueryString()->links() }}</div>
+                    <div class="pb-pagination" data-listing-pagination>{{ $paginator->withQueryString()->links() }}</div>
+                @else
+                    <div class="pb-pagination" data-listing-pagination></div>
                 @endif
             </div>
         @endif

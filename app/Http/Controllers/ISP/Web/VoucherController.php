@@ -32,6 +32,7 @@ class VoucherController extends BaseController
         $ispId = $this->getIspId();
 
         $routers = Router::where('isp_id', $ispId)->get();
+        $plans = Plan::where('isp_id', $ispId)->orderBy('name')->get(['id', 'name']);
         $routerLabels = $routers->pluck('name', 'id')->mapWithKeys(
             fn (string $name, int $id): array => [(string) $id => $name]
         )->all();
@@ -54,6 +55,10 @@ class VoucherController extends BaseController
                 'label' => 'Router',
                 'values' => $routerLabels,
             ],
+            'plan_id' => [
+                'label' => 'Plan',
+                'values' => $plans->mapWithKeys(fn ($plan) => [(string) $plan->id => $plan->name])->all(),
+            ],
             'voucher_type' => [
                 'label' => 'Type',
                 'values' => ['time' => 'Time', 'data' => 'Data'],
@@ -64,7 +69,7 @@ class VoucherController extends BaseController
 
         $exportFormats = $this->listingExportFormats($request, route('isp.vouchers.export.csv'));
 
-        return view('isp.vouchers.index', compact('vouchers', 'routers', 'filterChips', 'exportFormats'));
+        return view('isp.vouchers.index', compact('vouchers', 'routers', 'plans', 'filterChips', 'exportFormats'));
     }
 
     public function exportCsv(Request $request): StreamedResponse
@@ -98,6 +103,16 @@ class VoucherController extends BaseController
         });
     }
 
+    public function printCodes(Request $request)
+    {
+        $request->validate(['plan_id' => ['required', 'integer']]);
+        $ispId = $this->getIspId();
+        $plan = Plan::where('isp_id', $ispId)->findOrFail($request->integer('plan_id'));
+        $vouchers = $this->filteredVouchersQuery($request, $ispId)->limit(1000)->get();
+
+        return view('isp.vouchers.print-codes', compact('plan', 'vouchers'));
+    }
+
     /**
      * @deprecated Use exportCsv via isp.vouchers.export.csv
      */
@@ -122,6 +137,10 @@ class VoucherController extends BaseController
 
         if ($request->filled('voucher_type')) {
             $query->where('voucher_type', $request->voucher_type);
+        }
+
+        if ($request->filled('plan_id')) {
+            $query->where('plan_id', $request->integer('plan_id'));
         }
 
         if ($pattern = SearchHelper::likePattern($request->search)) {
@@ -258,7 +277,9 @@ class VoucherController extends BaseController
     {
         $request->validate([
             'router_id' => 'required|exists:routers,id',
+            'plan_id' => 'nullable|exists:plans,id',
             'quantity' => 'required|integer|min:1|max:1000',
+            'code_prefix' => ['nullable', 'string', 'max:6', 'regex:/^[A-Za-z0-9]*$/'],
             'voucher_type' => 'required|in:time,data',
             'time_limit_hours' => 'required_if:voucher_type,time|integer|min:1',
             'data_limit_mb' => 'required_if:voucher_type,data|integer|min:1',
@@ -293,13 +314,14 @@ class VoucherController extends BaseController
                     'price',
                     'expires_at',
                     'notes',
+                    'code_prefix',
                 ]),
                 $plan,
                 auth()->id()
             );
 
             if ($result['success_count'] > 0) {
-                return redirect()->route('isp.vouchers.index')
+                return redirect()->route('isp.vouchers.index', $plan ? ['plan_id' => $plan->id] : [])
                     ->with('success', "Successfully created {$result['success_count']} vouchers".
                         ($result['error_count'] > 0 ? ". {$result['error_count']} failed." : ''));
             } else {

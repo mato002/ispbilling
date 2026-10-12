@@ -8,6 +8,7 @@ use App\Models\Subscription;
 use App\Notifications\PaymentReceived;
 use App\Support\IspPaymentExperience;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -23,16 +24,25 @@ class PaymentCompletionService
      */
     public function markAsCompleted(Payment $payment, bool $forceServiceAutomation = false): void
     {
-        if ($payment->status !== 'completed') {
-            $payment->markAsCompleted();
-            $payment->refresh();
-        }
+        DB::transaction(function () use ($payment) {
+            $locked = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
+            if ($locked->status !== 'completed') $locked->markAsCompleted();
+        });
 
-        $this->processTenantPaymentSuccess($payment, $forceServiceAutomation);
+        $this->processTenantPaymentSuccess($payment->fresh(), $forceServiceAutomation);
     }
 
     public function processTenantPaymentSuccess(Payment $payment, bool $forceServiceAutomation = false): void
     {
+        $lock = Cache::lock('payment-completion:'.$payment->getKey(), 300);
+        $lock->block(15, function () use ($payment, $forceServiceAutomation) {
+            $this->processTenantPaymentSuccessOnce($payment, $forceServiceAutomation);
+        });
+    }
+
+    private function processTenantPaymentSuccessOnce(Payment $payment, bool $forceServiceAutomation = false): void
+    {
+        if ($payment->fresh()?->status !== 'completed') return;
         if ($payment->isPlatformSaasPayment()) {
             return;
         }
@@ -50,32 +60,15 @@ class PaymentCompletionService
             return;
         }
 
-        $runAutomation = $forceServiceAutomation || IspPaymentExperience::autoActivateOnPayment($payment->isp);
+        // A prepaid captive-portal purchase must activate the purchased service
+        // to complete checkout, regardless of the ISP's postpaid auto-activation
+        // preference for ordinary invoices.
+        $runAutomation = $forceServiceAutomation
+            || $customer->connection_type === 'hotspot'
+            || IspPaymentExperience::autoActivateOnPayment($payment->isp);
 
         try {
             if ($runAutomation) {
-                if ($customer->router && ($customer->mikrotik_user_id || $customer->username)) {
-                    $mikrotik = new MikroTikService($customer->router);
-
-                    if ($mikrotik->enableUser($customer)) {
-                        Log::info("Successfully enabled MikroTik user for customer {$customer->id} after payment {$payment->id}");
-                    } else {
-                        Log::warning("Payment successful but MikroTik enable failed for customer {$customer->id} (payment {$payment->id}). Router may be unreachable; scheduling retries.", [
-                            'router_id' => $customer->router_id,
-                        ]);
-
-                        $chainKey = 'router-provision-retry-chain:'.$customer->id.':'.$payment->id;
-                        if (Cache::add($chainKey, 1, now()->addMinutes(70))) {
-                            RetryRouterProvisioning::dispatch($customer->id, $payment->id, 1)
-                                ->delay(now()->addMinutes(5));
-                        }
-                    }
-                }
-
-                if ($customer->status !== 'active') {
-                    $customer->activate();
-                }
-
                 if ($invoice && $invoice->subscription_id) {
                     $subscription = Subscription::query()->find($invoice->subscription_id);
 
@@ -83,6 +76,30 @@ class PaymentCompletionService
                         $subscription->loadMissing('plan');
                         $subscription->renew();
                         Log::info("Renewed subscription {$subscription->id} for customer {$customer->id} after payment {$payment->id}");
+                    }
+                }
+
+                if ($customer->status !== 'active') {
+                    $customer->activate();
+                }
+
+                if ($customer->router && ($customer->mikrotik_user_id || $customer->username)) {
+                    $mikrotik = new MikroTikService($customer->router);
+                    $routerReady = $customer->connection_type === 'hotspot'
+                        ? $mikrotik->activateHotspotUser($customer)
+                        : $mikrotik->enableUser($customer);
+
+                    if (! $routerReady) {
+                        Log::warning("Payment successful but router provisioning failed for customer {$customer->id} (payment {$payment->id}). Scheduling retries.", [
+                            'router_id' => $customer->router_id,
+                            'connection_type' => $customer->connection_type,
+                        ]);
+
+                        $chainKey = 'router-provision-retry-chain:'.$customer->id.':'.$payment->id;
+                        if (Cache::add($chainKey, 1, now()->addMinutes(70))) {
+                            RetryRouterProvisioning::dispatch($customer->id, $payment->id, 1)
+                                ->delay(now()->addMinutes(1));
+                        }
                     }
                 }
             }

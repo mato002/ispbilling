@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToIspTenant;
 use App\Support\IspTenant;
+use App\Support\SuperAdminWorkspaceContext;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -14,6 +15,20 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use BelongsToIspTenant;
     use HasFactory, Notifiable;
+
+    public function getAttribute($key)
+    {
+        if (
+            $key === 'isp_id'
+            && $this->getAttributeFromArray('role') === 'super_admin'
+            && $this->exists
+            && (string) auth()->id() === (string) $this->getKey()
+        ) {
+            return SuperAdminWorkspaceContext::ispId();
+        }
+
+        return parent::getAttribute($key);
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -43,7 +58,7 @@ class User extends Authenticatable
         $query = static::query();
 
         $auth = IspTenant::resolveAuthenticatedUser();
-        if ($auth !== null && $auth->isSuperAdmin()) {
+        if ($auth !== null && $auth->isSuperAdmin() && ! SuperAdminWorkspaceContext::active()) {
             $query->withoutGlobalScope('isp_tenant');
         }
 
@@ -71,6 +86,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'preferences' => 'array',
         ];
     }
 
@@ -86,7 +102,8 @@ class User extends Authenticatable
 
     public function isIspAdmin(): bool
     {
-        return $this->role === 'isp_admin';
+        return $this->role === 'isp_admin'
+            || ($this->isSuperAdmin() && (string) auth()->id() === (string) $this->getKey() && SuperAdminWorkspaceContext::active());
     }
 
     public function isIspStaff(): bool

@@ -63,7 +63,11 @@ class RetryRouterProvisioning implements ShouldQueue
 
         $mikrotik = new MikroTikService($customer->router);
 
-        if ($mikrotik->enableUser($customer)) {
+        $provisioned = $customer->connection_type === 'hotspot'
+            ? $mikrotik->activateHotspotUser($customer)
+            : $mikrotik->enableUser($customer);
+
+        if ($provisioned) {
             Log::info('RetryRouterProvisioning: enableUser succeeded after prior failure', [
                 'customer_id' => $customer->id,
                 'attempt' => $this->attempt,

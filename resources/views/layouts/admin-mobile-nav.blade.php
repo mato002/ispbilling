@@ -27,7 +27,7 @@
         
         <!-- Mobile Navigation -->
         <nav class="p-4 space-y-2">
-            @if(Auth::user()->isSuperAdmin())
+            @if(Auth::user()->isSuperAdmin() && ! \\App\\Support\\SuperAdminWorkspaceContext::active())
                 <!-- Dashboard -->
                 <a href="{{ route('admin.dashboard') }}" 
                    @click="closeMenu()"

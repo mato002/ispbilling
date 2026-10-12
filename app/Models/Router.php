@@ -15,6 +15,7 @@ class Router extends Model
         'isp_id',
         'name',
         'ip_address',
+        'hotspot_gateway_ip',
         'username',
         'password',
         'port',

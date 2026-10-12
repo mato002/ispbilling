@@ -22,9 +22,11 @@
     <script>
         (function () {
             try {
-                var stored = localStorage.getItem('pb.theme');
+                var accountTheme = @json(data_get(auth()->user()?->preferences, 'theme'));
+                var stored = accountTheme || localStorage.getItem('pb.theme');
+                if (accountTheme) localStorage.setItem('pb.theme', accountTheme);
                 var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (stored === 'dark' || (!stored && prefersDark)) {
+                if (stored === 'dark' || ((!stored || stored === 'system') && prefersDark)) {
                     document.documentElement.classList.add('dark');
                 }
             } catch (e) {}

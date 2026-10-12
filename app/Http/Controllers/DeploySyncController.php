@@ -20,7 +20,8 @@ class DeploySyncController extends Controller
             );
         }
 
-        $provided = (string) $request->query('token', '');
+        abort_unless($request->isMethod('post'), 405);
+        $provided = (string) $request->bearerToken();
 
         if ($provided === '' || ! hash_equals($expected, $provided)) {
             return $this->plainResponse("Forbidden.\n", 403);

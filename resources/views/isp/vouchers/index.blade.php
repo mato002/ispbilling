@@ -12,6 +12,10 @@
     >
         <x-slot name="actions">
             <a href="{{ route('isp.vouchers.create-bulk') }}" class="pb-btn">Bulk create</a>
+            @if(request()->filled('plan_id'))
+                <a href="{{ route('isp.vouchers.print', request()->only('plan_id')) }}" target="_blank" rel="noopener" class="pb-btn">Print codes</a>
+                <a href="{{ route('isp.vouchers.export.csv', request()->only('plan_id')) }}" class="pb-btn">Export codes CSV</a>
+            @endif
         </x-slot>
     </x-isp-page-header>
 @endsection
@@ -48,6 +52,13 @@
                 placeholder="All routers"
                 class="min-w-[160px] flex-1"
                 :options="$routers->pluck('name', 'id')->mapWithKeys(fn ($name, $id) => [(string) $id => $name])->all()"
+            />
+            <x-listing-filters.select
+                name="plan_id"
+                label="Plan"
+                placeholder="All plans"
+                class="min-w-[160px] flex-1"
+                :options="$plans->mapWithKeys(fn ($plan) => [(string) $plan->id => $plan->name])->all()"
             />
             <x-listing-filters.select
                 name="voucher_type"

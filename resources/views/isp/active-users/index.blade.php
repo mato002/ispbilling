@@ -17,6 +17,12 @@
 
 @section('content')
 <div class="space-y-6">
+    @if($selectedPlan ?? null)
+        <div class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+            Showing live sessions for plan <strong>{{ $selectedPlan->name }}</strong>.
+            <a href="{{ route('isp.active-users.index') }}" class="ml-2 font-semibold underline">Clear plan filter</a>
+        </div>
+    @endif
     <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <x-dashboard.kpi-card title="Active users" :value="number_format($stats['total_active_users'] ?? 0)" valueId="total-users" subtext="Live sessions" iconBg="from-indigo-500 to-cyan-500">
             <x-slot:icon><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></x-slot:icon>
@@ -32,16 +38,8 @@
         </x-dashboard.kpi-card>
     </section>
 
-    <x-filter-bar :action="route('isp.active-users.index')">
-        <div class="min-w-[220px] flex-1">
-            <label class="isp-form-label">Router</label>
-            <select name="router_id" class="isp-form-select">
-                <option value="">All routers</option>
-                @foreach($routers as $router)
-                    <option value="{{ $router->id }}" @selected(request('router_id') == $router->id)>{{ $router->name }} ({{ $router->ip_address }})</option>
-                @endforeach
-            </select>
-        </div>
+    <x-filter-bar :action="route('isp.active-users.index')" :auto-search="false" :toolbar="false">
+        <x-searchable-select name="router_id" label="Router" :options="$routers->mapWithKeys(fn ($router) => [$router->id => $router->name.' ('.$router->ip_address.')'])->all()" placeholder="All routers" :value="request('router_id')" class="min-w-[220px] flex-1" @pb-filter-change="const url = new URL(window.location.href); $event.target.value ? url.searchParams.set('router_id', $event.target.value) : url.searchParams.delete('router_id'); window.history.replaceState({}, '', url); loadUsers($event.target.value)" />
     </x-filter-bar>
 
     <div>
@@ -54,6 +52,7 @@
                 <tr>
                     <th>User</th>
                     <th>IP</th>
+                    <th>Plan speed</th>
                     <th>Device</th>
                     <th>Duration</th>
                     <th>Type</th>
@@ -63,7 +62,7 @@
             </thead>
             <tbody id="users-table-body">
                 <tr id="loading-row">
-                    <td colspan="7" class="py-10 text-center text-slate-500">
+                    <td colspan="8" class="py-10 text-center text-slate-500">
                         <span class="inline-flex items-center gap-2">
                             <svg class="h-5 w-5 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
                             Loading…
@@ -100,9 +99,11 @@
         startAutoRefresh();
     });
 
-    function loadUsers() {
-        const routerId = new URLSearchParams(window.location.search).get('router_id');
-        fetch('{{ route("isp.active-users.realtime") }}' + (routerId ? '?router_id=' + routerId : ''))
+    function loadUsers(selectedRouterId = null) {
+        const routerId = selectedRouterId ?? document.querySelector('[name="router_id"]')?.value ?? new URLSearchParams(window.location.search).get('router_id');
+        const params = new URLSearchParams(window.location.search);
+        if (routerId) params.set('router_id', routerId); else params.delete('router_id');
+        fetch('{{ route("isp.active-users.realtime") }}' + (params.toString() ? '?' + params.toString() : ''))
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -128,13 +129,14 @@
     function updateUsersTable(users) {
         const tbody = document.getElementById('users-table-body');
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-slate-500">No active users for this filter.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="py-10 text-center text-slate-500">No active users for this filter.</td></tr>';
             return;
         }
         tbody.innerHTML = users.map(user => {
             const un = escapeHtml(user.username);
             const mac = escapeHtml(user.mac_address || 'N/A');
             const ip = escapeHtml(user.ip_address || 'N/A');
+            const speed = escapeHtml(user.speed_limit || 'Unknown');
             const dev = escapeHtml(user.device || 'Unknown');
             const dur = escapeHtml(user.duration || '0 min');
             const ctype = escapeHtml(user.connection_type || '');
@@ -149,6 +151,7 @@
             return `<tr>
                 <td><div class="font-semibold text-slate-900 dark:text-white">${un}</div><div class="font-mono text-xs text-slate-500">${mac}</div></td>
                 <td class="font-mono text-sm">${ip}</td>
+                <td>${speed}</td>
                 <td><span class="pb-pill pb-pill-info text-xs">${dev}</span></td>
                 <td>${dur}</td>
                 <td><span class="${typePill} text-xs">${ctype}</span></td>

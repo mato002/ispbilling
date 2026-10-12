@@ -11,14 +11,16 @@
     $value ??= request($name);
 @endphp
 
-<div @class([$class])>
-    <label class="isp-form-label">{{ $label }}</label>
-    <select name="{{ $name }}" class="isp-form-select" {{ $attributes->except(['name', 'label', 'options', 'placeholder', 'value', 'class']) }}>
-        @if ($placeholder !== null)
-            <option value="">{{ $placeholder }}</option>
-        @endif
-        @foreach ($options as $optionValue => $optionLabel)
-            <option value="{{ $optionValue }}" @selected((string) $value === (string) $optionValue)>{{ $optionLabel }}</option>
-        @endforeach
-    </select>
-</div>
+@if (count($options) > 8)
+    <x-searchable-select :name="$name" :label="$label" :options="$options" :placeholder="$placeholder ?? 'All'" :value="$value" :class="$class" {{ $attributes }} />
+@else
+    <div @class([$class]) {{ $attributes }}>
+        <label class="isp-form-label">{{ $label }}</label>
+        <select name="{{ $name }}" class="isp-form-select">
+            @if ($placeholder !== null)<option value="">{{ $placeholder }}</option>@endif
+            @foreach ($options as $optionValue => $optionLabel)
+                <option value="{{ $optionValue }}" @selected((string) $value === (string) $optionValue)>{{ $optionLabel }}</option>
+            @endforeach
+        </select>
+    </div>
+@endif

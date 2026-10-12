@@ -9,6 +9,8 @@ use App\View\Composers\IspSettingsComposer;
 use App\View\Composers\IspSystemAnnouncementsComposer;
 use App\View\Composers\SaasOnboardingOverlayComposer;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Schema;
+use App\Models\PlatformSetting;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -26,6 +28,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        try {
+            if (Schema::hasTable('platform_settings')) {
+                foreach ([
+                    'app_name' => 'app.name',
+                    'app_url' => 'app.url',
+                    'app_timezone' => 'app.timezone',
+                    'app_locale' => 'app.locale',
+                ] as $key => $configKey) {
+                    $value = PlatformSetting::get($key);
+                    if ($value !== null && $value !== '') config([$configKey => $value]);
+                }
+                date_default_timezone_set(config('app.timezone', 'UTC'));
+            }
+        } catch (\Throwable) {
+            // Settings are optional during initial installation and migrations.
+        }
+
         if (! $this->app->runningInConsole()) {
             $raw = (string) ini_get('memory_limit');
             if ($raw !== '' && $raw !== '-1') {
