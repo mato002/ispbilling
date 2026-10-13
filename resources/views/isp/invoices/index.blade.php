@@ -25,7 +25,7 @@
             ])->values(),
         ])->values();
     @endphp
-    <div x-data="invoiceCreateModal({{ Js::from($invoiceCustomerOptions) }})" @keydown.escape.window="open = false" @open-invoice-modal.window="open = true">
+    <div x-data="invoiceCreateModal({{ Js::from($invoiceCustomerOptions) }})" @keydown.escape.window="open = false; paymentOpen = false; adjustmentOpen = false" @open-invoice-modal.window="open = true" @open-invoice-payment.window="paymentUrl = $event.detail.url; paymentAmount = $event.detail.amount; paymentReference = $event.detail.reference; paymentOpen = true" @open-invoice-adjustment.window="adjustmentUrl = $event.detail.url; adjustmentBalance = $event.detail.balance; adjustmentCredit = $event.detail.credit; adjustmentOpen = true">
     <div x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm" @click.self="open = false">
         <section x-transition class="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900" role="dialog" aria-modal="true" aria-labelledby="invoice-modal-title">
             <div class="flex items-start justify-between border-b border-slate-200 px-6 py-5 dark:border-slate-800">
@@ -67,10 +67,36 @@
             </form>
         </section>
     </div>
+    <div x-cloak x-show="paymentOpen" class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" @click.self="paymentOpen = false">
+        <section class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900" role="dialog" aria-modal="true" aria-labelledby="record-payment-title">
+            <div class="mb-5 flex items-start justify-between"><div><p class="text-xs font-semibold uppercase tracking-widest text-indigo-600">Invoice payment</p><h2 id="record-payment-title" class="mt-1 text-xl font-bold text-slate-900 dark:text-white">Record payment</h2><p class="mt-1 text-sm text-slate-500" x-text="paymentReference"></p></div><button type="button" @click="paymentOpen = false" class="pb-btn">Close</button></div>
+            <form method="POST" :action="paymentUrl" class="space-y-4">
+                @csrf
+                <div class="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900 dark:bg-indigo-500/10 dark:text-indigo-100">Amount to record: <strong>KES <span x-text="paymentAmount"></span></strong></div>
+                <div><label class="isp-form-label" for="record-payment-method">Payment received by</label><select id="record-payment-method" name="payment_method" class="isp-form-select"><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="offline_mpesa">Offline M-Pesa</option></select></div>
+                <div><label class="isp-form-label" for="record-payment-reference">Transaction / receipt reference</label><input id="record-payment-reference" name="transaction_id" maxlength="120" class="isp-form-input" placeholder="Optional receipt or transaction ID"></div>
+                <div><label class="isp-form-label" for="record-payment-notes">Notes</label><textarea id="record-payment-notes" name="notes" maxlength="500" rows="2" class="isp-form-input" placeholder="Optional payment note"></textarea></div>
+                <div class="flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700"><button type="button" @click="paymentOpen = false" class="pb-btn">Back</button><button type="submit" class="pb-btn pb-btn-primary">Confirm payment received</button></div>
+            </form>
+        </section>
+    </div>
+    <div x-cloak x-show="adjustmentOpen" class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" @click.self="adjustmentOpen = false">
+        <section class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900" role="dialog" aria-modal="true" aria-labelledby="invoice-adjustment-title">
+            <div class="mb-5 flex items-start justify-between"><div><p class="text-xs font-semibold uppercase tracking-widest text-indigo-600">Balance adjustment</p><h2 id="invoice-adjustment-title" class="mt-1 text-xl font-bold text-slate-900 dark:text-white">Apply credit or discount</h2></div><button type="button" @click="adjustmentOpen = false" class="pb-btn">Close</button></div>
+            <form method="POST" :action="adjustmentUrl" class="space-y-4">
+                @csrf
+                <p class="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900 dark:bg-indigo-500/10 dark:text-indigo-100">Balance due: <strong>KES <span x-text="adjustmentBalance"></span></strong><br>Available account credit: <strong>KES <span x-text="adjustmentCredit"></span></strong></p>
+                <div><label class="isp-form-label" for="invoice-adjustment-type">Adjustment type</label><select id="invoice-adjustment-type" name="type" x-model="adjustmentType" required class="isp-form-select"><option value="credit">Apply account credit</option><option value="discount">Discount / promo code</option></select></div>
+                <div><label class="isp-form-label" for="invoice-adjustment-amount">Amount (KES)</label><input id="invoice-adjustment-amount" name="amount" type="number" min="0.01" step="0.01" :max="adjustmentType === 'credit' ? Math.min(Number(adjustmentBalance), Number(adjustmentCredit)) : adjustmentBalance" required class="isp-form-input"></div>
+                <div><label class="isp-form-label" for="invoice-adjustment-reason">Reason / promo code</label><input id="invoice-adjustment-reason" name="reason" maxlength="500" required class="isp-form-input" placeholder="Reason or promo code"></div>
+                <div class="flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700"><button type="button" @click="adjustmentOpen = false" class="pb-btn">Back</button><button type="submit" class="pb-btn pb-btn-primary">Apply adjustment</button></div>
+            </form>
+        </section>
+    </div>
     <script>
         function invoiceCreateModal(customers) {
             return {
-                open: @json($errors->any()), customers, customerId: @json(old('customer_id', '')), subscriptionId: @json(old('subscription_id', '')), amount: @json(old('amount', '')),
+                open: @json($errors->has('customer_id') || $errors->has('subscription_id') || $errors->has('due_date')), paymentOpen: false, adjustmentOpen: false, paymentUrl: '', paymentAmount: '', paymentReference: '', adjustmentUrl: '', adjustmentBalance: '', adjustmentCredit: '0.00', adjustmentType: 'credit', customers, customerId: @json(old('customer_id', '')), subscriptionId: @json(old('subscription_id', '')), amount: @json(old('amount', '')),
                 get selectedCustomer() { return this.customers.find(customer => String(customer.id) === String(this.customerId)); },
                 syncAmount() {
                     const subscription = this.selectedCustomer?.subscriptions.find(item => String(item.id) === String(this.subscriptionId));
@@ -78,6 +104,31 @@
                 }
             };
         }
+
+        document.addEventListener('click', async event => {
+            const button = event.target.closest('[data-invoice-stk]');
+            if (!button) return;
+            const phone = button.dataset.phone;
+            if (!phone) {
+                window.Swal ? await Swal.fire({icon: 'error', title: 'No phone number', text: 'Add a phone number to the customer before sending an STK prompt.'}) : alert('Customer phone number is missing.');
+                return;
+            }
+            button.disabled = true;
+            try {
+                const response = await fetch(button.dataset.url, {
+                    method: 'POST',
+                    headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? ''},
+                    body: new URLSearchParams({_token: document.querySelector('meta[name="csrf-token"]')?.content ?? '', invoice_id: button.dataset.invoiceId, payment_method: 'mpesa', phone_number: phone})
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message || 'Could not send the STK prompt.');
+                window.Swal ? await Swal.fire({icon: 'success', title: 'STK push sent', text: `STK push sent to ${phone}`, timer: 3000, showConfirmButton: false}) : alert(`STK push sent to ${phone}`);
+            } catch (error) {
+                window.Swal ? await Swal.fire({icon: 'error', title: 'STK push failed', text: error.message}) : alert(error.message);
+            } finally {
+                button.disabled = false;
+            }
+        });
 
     </script>
     </div>

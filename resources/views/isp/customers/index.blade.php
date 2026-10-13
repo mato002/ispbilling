@@ -55,8 +55,10 @@
     @keydown.escape.window="closeDrawer(); quickOpen = false"
 >
     {{-- ========== OPERATIONAL TOOLBAR ========== --}}
-    <div class="pb-card relative overflow-hidden p-4 sm:p-5">
-        <div class="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-gradient-to-br from-indigo-500/15 to-cyan-400/10 blur-2xl"></div>
+    <div class="pb-card relative overflow-visible p-4 sm:p-5">
+        <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+            <div class="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-gradient-to-br from-indigo-500/15 to-cyan-400/10 blur-2xl"></div>
+        </div>
         <form
             method="GET"
             action="{{ route('isp.customers.index') }}"
@@ -129,22 +131,22 @@
     </div>
 
     {{-- ========== VISIBLE FILTERS ========== --}}
-    <section class="pb-card p-4 sm:p-5">
-        <div class="mb-4 flex items-center justify-between gap-3">
-            <div><h2 class="text-sm font-bold text-slate-900 dark:text-white">Filter subscribers</h2><p class="mt-1 text-xs text-slate-500">All filters are available here and update the subscriber list as you change them.</p></div>
+    <section class="pb-card p-3 sm:p-4">
+        <div class="mb-2 flex items-center justify-between gap-3">
+            <h2 class="text-sm font-bold text-slate-900 dark:text-white">Filter subscribers</h2>
             <a href="{{ route('isp.customers.index') }}" data-turbo-frame="pb-main" class="shrink-0 text-xs font-semibold text-indigo-600 hover:text-indigo-700">Reset all</a>
         </div>
             <form
                 method="GET"
                 action="{{ route('isp.customers.index') }}"
-                class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+                class="flex max-w-full items-end gap-2 overflow-x-auto pb-1"
                 data-turbo-frame="pb-main"
                 x-data="pbFilterForm({ autoSearch: true })"
             >
                 @if(request('search'))
                     <input type="hidden" name="search" value="{{ request('search') }}">
                 @endif
-                <div>
+                <div class="w-28 shrink-0">
                     <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</label>
                     <select name="status" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                         <option value="">All</option>
@@ -153,7 +155,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
+                <div class="w-32 shrink-0">
                     <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Connection</label>
                     <select name="connection_type" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                         <option value="">All</option>
@@ -161,17 +163,17 @@
                         <option value="pppoe" {{ request('connection_type') === 'pppoe' ? 'selected' : '' }}>PPPoE</option>
                     </select>
                 </div>
-                <div>
+                <div class="w-36 shrink-0">
                     <x-searchable-select name="router_id" label="Router" :options="$routers->pluck('name', 'id')->all()" placeholder="Any router" :value="request('router_id')" />
                 </div>
-                <div>
+                <div class="w-36 shrink-0">
                     <x-searchable-select name="plan_id" label="Package" :options="$plans->pluck('name', 'id')->all()" placeholder="Any active plan" :value="request('plan_id')" />
                 </div>
-                <div>
+                <div class="w-36 shrink-0">
                     <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Location contains</label>
                     <input type="text" name="location" value="{{ request('location') }}" placeholder="Town, estate, site…" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                 </div>
-                <div>
+                <div class="w-36 shrink-0">
                     <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Billing</label>
                     <select name="payment_status" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                         <option value="">Any</option>
@@ -180,17 +182,17 @@
                         <option value="clear" {{ request('payment_status') === 'clear' ? 'selected' : '' }}>No pending/overdue</option>
                     </select>
                 </div>
-                <div class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-800/40">
-                    <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <div class="flex shrink-0 flex-col justify-center gap-1 rounded-xl border border-slate-100 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-800/40">
+                    <label class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-700 dark:text-slate-200">
                         <input type="checkbox" name="online_only" value="1" {{ request('online_only') ? 'checked' : '' }} class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800">
                         Online now (active session)
                     </label>
-                    <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <label class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-700 dark:text-slate-200">
                         <input type="checkbox" name="expiring_only" value="1" {{ request('expiring_only') ? 'checked' : '' }} class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800">
                         Subscription expiring ≤ 7 days
                     </label>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid w-[264px] shrink-0 grid-cols-2 gap-2">
                     <div>
                         <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Created from</label>
                         <input type="date" name="created_from" value="{{ request('created_from') }}" class="w-full rounded-xl border border-slate-200 bg-white py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
@@ -200,7 +202,7 @@
                         <input type="date" name="created_to" value="{{ request('created_to') }}" class="w-full rounded-xl border border-slate-200 bg-white py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                     </div>
                 </div>
-                <div>
+                <div class="w-24 shrink-0">
                     <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Per page</label>
                     <select name="per_page" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                         @foreach ([10, 15, 25, 50] as $size)
@@ -208,8 +210,8 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="flex gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
-                    <a href="{{ route('isp.customers.index') }}" data-turbo-frame="pb-main" class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-center text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Reset filters</a>
+                <div class="shrink-0">
+                    <a href="{{ route('isp.customers.index') }}" data-turbo-frame="pb-main" class="inline-flex h-10 items-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Reset filters</a>
                 </div>
             </form>
     </section>

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\CustomerUsageStat;
+use App\Models\DataUsage;
 use App\Models\Subscription;
 use App\Services\MikroTikService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,7 +38,10 @@ class EnforceBandwidthCaps implements ShouldQueue
             }
 
             // Sum usage for this subscription
-            $totalBytes = CustomerUsageStat::where('subscription_id', $subscription->id)->sum('total_bytes');
+            $hasUsageSnapshots = DataUsage::query()->where('subscription_id', $subscription->id)->exists();
+            $totalBytes = $hasUsageSnapshots
+                ? DataUsage::query()->where('subscription_id', $subscription->id)->sum('total_bytes')
+                : CustomerUsageStat::where('subscription_id', $subscription->id)->sum('total_bytes');
 
             if ($totalBytes <= 0) {
                 continue;

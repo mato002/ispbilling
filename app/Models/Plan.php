@@ -28,6 +28,9 @@ class Plan extends Model
         'billing_type',
         'data_limit_mb',
         'time_limit_hours',
+        'time_limit_minutes',
+        'is_popular',
+        'is_best_value',
         'device_limit',
         'is_active',
         'is_one_time',
@@ -45,6 +48,9 @@ class Plan extends Model
         'download_speed_kbps' => 'integer',
         'data_limit_mb' => 'integer',
         'time_limit_hours' => 'integer',
+        'time_limit_minutes' => 'integer',
+        'is_popular' => 'boolean',
+        'is_best_value' => 'boolean',
         'device_limit' => 'integer',
         'is_active' => 'boolean',
         'is_one_time' => 'boolean',
@@ -94,7 +100,8 @@ class Plan extends Model
 
     public function isHotspot(): bool
     {
-        return ($this->package_type ?? $this->access_type) === PlanPackageTypes::HOTSPOT;
+        return $this->package_type === PlanPackageTypes::HOTSPOT
+            || $this->access_type === PlanPackageTypes::HOTSPOT;
     }
 
     public function isPppoe(): bool
@@ -138,6 +145,38 @@ class Plan extends Model
         return $this->isDataBundle()
             || $this->billing_type === 'data'
             || ($this->data_limit_mb !== null && $this->data_limit_mb > 0);
+    }
+
+    /** Return the MikroTik uptime limit for this package, if it has one. */
+    public function hotspotUptimeLimit(): ?string
+    {
+        if ($this->time_limit_minutes) {
+            $hours = intdiv($this->time_limit_minutes, 60);
+            $minutes = $this->time_limit_minutes % 60;
+
+            return ($hours ? $hours.'h' : '').($minutes ? $minutes.'m' : '');
+        }
+
+        if ($this->time_limit_hours) {
+            return $this->time_limit_hours.'h';
+        }
+
+        return $this->duration_days ? ($this->duration_days * 24).'h' : null;
+    }
+
+    public function hotspotExpiresAt(?\Illuminate\Support\Carbon $startsAt = null): ?\Illuminate\Support\Carbon
+    {
+        $expiresAt = ($startsAt ?? now())->copy();
+
+        if ($this->time_limit_minutes) {
+            return $expiresAt->addMinutes($this->time_limit_minutes);
+        }
+
+        if ($this->time_limit_hours) {
+            return $expiresAt->addHours($this->time_limit_hours);
+        }
+
+        return $this->duration_days ? $expiresAt->addDays($this->duration_days) : null;
     }
 
     public function getFormattedSpeedAttribute(): string

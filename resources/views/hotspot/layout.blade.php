@@ -104,10 +104,24 @@
             @yield('content')
         </div>
 
-        <div class="mt-4 text-center text-[11px] text-white/80">
-            <p>
-                Powered by {{ $isp->company_name ?? $isp->name ?? config('app.name') }}
-            </p>
+        <div class="mt-3 w-full max-w-3xl text-center text-[11px] text-white/90 sm:mt-4 sm:text-xs">
+            @if(isset($portalSettings) && ($portalSettings->mpesa_till_number || $portalSettings->support_phone || $portalSettings->support_whatsapp))
+                <div class="mb-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded-xl bg-slate-950/20 px-3 py-2">
+                    @if($portalSettings->mpesa_till_number)
+                        <span><strong>M-Pesa Till:</strong> {{ $portalSettings->mpesa_till_number }}</span>
+                    @endif
+                    @if($portalSettings->support_phone)
+                        <a class="underline underline-offset-2" href="tel:{{ preg_replace('/[^0-9+]/', '', $portalSettings->support_phone) }}">Call {{ $portalSettings->support_phone }}</a>
+                    @endif
+                    @if($portalSettings->support_whatsapp)
+                        <a class="underline underline-offset-2" target="_blank" rel="noopener" href="https://wa.me/{{ preg_replace('/^0/', '254', preg_replace('/\D/', '', $portalSettings->support_whatsapp)) }}">WhatsApp support</a>
+                    @endif
+                </div>
+                @if($portalSettings->mpesa_till_number)
+                    <p class="mb-2 text-[10px] text-white/80 sm:text-[11px]">If the STK prompt fails, pay to the Till above and contact support with your M-Pesa receipt.</p>
+                @endif
+            @endif
+            <p>Powered by {{ $isp->company_name ?? $isp->name ?? config('app.name') }}</p>
         </div>
     </div>
 </body>

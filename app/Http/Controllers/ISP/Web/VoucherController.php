@@ -11,6 +11,9 @@ use App\Services\VoucherService;
 use App\Support\Export\CsvExporter;
 use App\Support\FormSettingsService;
 use App\Support\Search\SearchHelper;
+use Endroid\QrCode\Builder\Builder as QrBuilder;
+use Endroid\QrCode\ErrorCorrectionLevel;
+use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -33,6 +36,8 @@ class VoucherController extends BaseController
 
         $routers = Router::where('isp_id', $ispId)->get();
         $plans = Plan::where('isp_id', $ispId)->orderBy('name')->get(['id', 'name']);
+        $batchReferences = Voucher::where('isp_id', $ispId)->whereNotNull('batch_reference')
+            ->distinct()->orderByDesc('batch_reference')->limit(100)->pluck('batch_reference', 'batch_reference')->all();
         $routerLabels = $routers->pluck('name', 'id')->mapWithKeys(
             fn (string $name, int $id): array => [(string) $id => $name]
         )->all();
@@ -59,6 +64,7 @@ class VoucherController extends BaseController
                 'label' => 'Plan',
                 'values' => $plans->mapWithKeys(fn ($plan) => [(string) $plan->id => $plan->name])->all(),
             ],
+            'batch_reference' => ['label' => 'Batch', 'values' => $batchReferences],
             'voucher_type' => [
                 'label' => 'Type',
                 'values' => ['time' => 'Time', 'data' => 'Data'],
@@ -69,7 +75,7 @@ class VoucherController extends BaseController
 
         $exportFormats = $this->listingExportFormats($request, route('isp.vouchers.export.csv'));
 
-        return view('isp.vouchers.index', compact('vouchers', 'routers', 'plans', 'filterChips', 'exportFormats'));
+        return view('isp.vouchers.index', compact('vouchers', 'routers', 'plans', 'batchReferences', 'filterChips', 'exportFormats'));
     }
 
     public function exportCsv(Request $request): StreamedResponse
@@ -79,19 +85,20 @@ class VoucherController extends BaseController
         $filename = 'vouchers-'.now()->format('Ymd-His').'.csv';
 
         return CsvExporter::download($filename, [
-            'Voucher Code', 'Type', 'Time Limit (Hours)', 'Data Limit (MB)', 'Speed Profile',
+            'Batch', 'Voucher Code', 'Type', 'Time Limit (Hours)', 'Data Limit (MB)', 'Speed Profile',
             'Price', 'Status', 'Expires At', 'Router', 'Plan', 'Created At', 'Used At',
         ], function ($out) use ($query) {
             $query->chunk(200, function ($vouchers) use ($out) {
                 foreach ($vouchers as $voucher) {
                     fputcsv($out, [
+                        $voucher->batch_reference ?? '',
                         $voucher->voucher_code,
                         $voucher->voucher_type,
                         $voucher->time_limit_hours ?? '',
                         $voucher->data_limit_mb ?? '',
                         $voucher->speed_profile ?? '',
                         $voucher->price ?? '',
-                        $voucher->status,
+                        $voucher->reportStatusLabel(),
                         $voucher->expires_at?->format('Y-m-d H:i:s') ?? '',
                         $voucher->router->name ?? '',
                         $voucher->plan->name ?? '',
@@ -109,6 +116,15 @@ class VoucherController extends BaseController
         $ispId = $this->getIspId();
         $plan = Plan::where('isp_id', $ispId)->findOrFail($request->integer('plan_id'));
         $vouchers = $this->filteredVouchersQuery($request, $ispId)->limit(1000)->get();
+        foreach ($vouchers as $voucher) {
+            $voucher->print_qr_data_uri = (new QrBuilder(
+                writer: new SvgWriter(),
+                data: $voucher->voucher_code,
+                errorCorrectionLevel: ErrorCorrectionLevel::Medium,
+                size: 90,
+                margin: 3,
+            ))->build()->getDataUri();
+        }
 
         return view('isp.vouchers.print-codes', compact('plan', 'vouchers'));
     }
@@ -139,6 +155,10 @@ class VoucherController extends BaseController
             $query->where('voucher_type', $request->voucher_type);
         }
 
+        if ($request->filled('batch_reference')) {
+            $query->where('batch_reference', $request->batch_reference);
+        }
+
         if ($request->filled('plan_id')) {
             $query->where('plan_id', $request->integer('plan_id'));
         }
@@ -146,6 +166,7 @@ class VoucherController extends BaseController
         if ($pattern = SearchHelper::likePattern($request->search)) {
             $query->where(function ($q) use ($pattern) {
                 $q->where('voucher_code', 'like', $pattern)
+                    ->orWhere('batch_reference', 'like', $pattern)
                     ->orWhere('notes', 'like', $pattern);
             });
         }

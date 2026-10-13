@@ -16,6 +16,8 @@
         <td>
             @if ($invoice->status === 'paid')
                 <x-status-badge status="paid" />
+            @elseif ($invoice->status === 'cancelled')
+                <x-status-badge status="cancelled" />
             @elseif ($invoice->status === 'overdue')
                 <x-status-badge status="overdue" />
             @else
@@ -26,6 +28,17 @@
             <x-table-actions>
                 <x-table-actions.link :href="route('isp.invoices.show', $invoice)" label="View" />
                 <x-table-actions.link :href="route('isp.invoices.show', $invoice).'?pdf=1'" label="Download PDF" target="_blank" />
+                @if(in_array($invoice->status, ['pending', 'overdue'], true))
+                    <button type="button" @click="$dispatch('open-invoice-payment', {url: '{{ route('isp.invoices.mark-paid', $invoice) }}', amount: '{{ number_format((float) $invoice->total_amount, 2, '.', '') }}', reference: '{{ addslashes($invoice->invoice_number) }}'})" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">Record payment</button>
+                    <button type="button" data-invoice-stk data-url="{{ route('isp.payments.initiate.store') }}" data-invoice-id="{{ $invoice->id }}" data-phone="{{ $invoice->customer->phone_number }}" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">Send M-Pesa STK push</button>
+                    <x-table-actions.form :action="route('isp.invoices.remind', $invoice)" label="Send reminder" :danger="false" />
+                    <button type="button" @click="$dispatch('open-invoice-adjustment', {url: '{{ route('isp.invoices.adjust', $invoice) }}', balance: '{{ number_format((float) $invoice->total_amount, 2, '.', '') }}', credit: '{{ number_format((float) $invoice->customer->account_credit, 2, '.', '') }}'})" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">Apply credit / discount</button>
+                    <div class="my-1 border-t border-slate-200 dark:border-slate-700"></div>
+                    <x-table-actions.form :action="route('isp.invoices.cancel', $invoice)" label="Cancel invoice" :danger="true" onsubmit="confirmFormSubmit(event, {title: 'Cancel invoice', text: 'Cancel this invoice? Pending payment attempts will be marked failed.', icon: 'warning', confirmButtonText: 'Cancel invoice', confirmButtonColor: '#ef4444'}); return false;" />
+                    <x-table-actions.form :action="route('isp.invoices.destroy', $invoice)" method="DELETE" label="Delete unpaid invoice" :danger="true" onsubmit="confirmFormSubmit(event, {title: 'Delete invoice', text: 'Permanently delete this unpaid invoice? Its audit history will be retained.', icon: 'warning', confirmButtonText: 'Delete invoice', confirmButtonColor: '#ef4444'}); return false;" />
+                @elseif($invoice->status === 'cancelled' && !$invoice->payments()->where('status', 'completed')->exists())
+                    <x-table-actions.form :action="route('isp.invoices.destroy', $invoice)" method="DELETE" label="Delete unpaid invoice" :danger="true" onsubmit="confirmFormSubmit(event, {title: 'Delete invoice', text: 'Permanently delete this unpaid invoice? Its audit history will be retained.', icon: 'warning', confirmButtonText: 'Delete invoice', confirmButtonColor: '#ef4444'}); return false;" />
+                @endif
             </x-table-actions>
         </td>
     </x-listing-table.row>

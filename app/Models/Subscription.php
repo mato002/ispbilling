@@ -124,7 +124,8 @@ class Subscription extends Model
         $baseEnd = ($currentEnd && $currentEnd->isFuture())
             ? $currentEnd->copy()
             : now();
-        $newEnd = $baseEnd->copy()->addDays($duration);
+        $newEnd = $this->plan?->hotspotExpiresAt($baseEnd)
+            ?? $baseEnd->copy()->addDays($duration);
         $keepStart = $this->status === 'active' && $this->start_date;
 
         $updates = [

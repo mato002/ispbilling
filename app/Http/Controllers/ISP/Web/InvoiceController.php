@@ -171,7 +171,7 @@ class InvoiceController extends Controller
         if ($invoice->isp_id !== auth()->user()->isp_id) {
             abort(403);
         }
-        $invoice->load(['customer', 'subscription', 'payments', 'isp']);
+        $invoice->load(['customer', 'subscription', 'payments', 'isp', 'adjustments.actor', 'auditLogs.user']);
 
         // Check if PDF is requested
         if ($request->has('pdf') && $request->pdf == '1') {
@@ -308,6 +308,12 @@ class InvoiceController extends Controller
             ->each(fn (Payment $payment) => $payment->markAsFailed());
 
         $invoice->cancel('Cancelled by '.auth()->user()->name);
+        \App\Models\PaymentAuditLog::log([
+            'isp_id' => $invoice->isp_id, 'customer_id' => $invoice->customer_id,
+            'invoice_id' => $invoice->id, 'user_id' => auth()->id(),
+            'action' => 'invoice_cancelled', 'status' => 'success',
+            'description' => 'Invoice cancelled by '.auth()->user()->name,
+        ]);
 
         return redirect()
             ->route('isp.invoices.show', $invoice)
@@ -329,11 +335,17 @@ class InvoiceController extends Controller
 
         $request->validate([
             'notes' => ['nullable', 'string', 'max:500'],
+            'payment_method' => ['nullable', 'in:cash,bank_transfer,offline_mpesa'],
+            'transaction_id' => ['nullable', 'string', 'max:120'],
         ]);
 
         $payment = DB::transaction(function () use ($invoice, $request) {
+            $lockedInvoice = Invoice::query()->lockForUpdate()->findOrFail($invoice->id);
+            if (! in_array($lockedInvoice->status, ['pending', 'overdue'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['invoice' => 'Only pending or overdue invoices can be marked paid.']);
+            }
             $pending = Payment::query()
-                ->where('invoice_id', $invoice->id)
+                ->where('invoice_id', $lockedInvoice->id)
                 ->where('status', 'pending')
                 ->where('payment_method', 'manual')
                 ->lockForUpdate()
@@ -341,22 +353,41 @@ class InvoiceController extends Controller
                 ->first();
 
             if ($pending) {
+                $pending->update([
+                    'amount' => $lockedInvoice->total_amount,
+                    'payment_method' => match ($request->input('payment_method', 'cash')) {
+                        'bank_transfer' => 'bank_transfer', 'offline_mpesa' => 'mpesa', default => 'manual',
+                    },
+                    'transaction_id' => $request->input('transaction_id') ?: $pending->transaction_id,
+                    'metadata' => array_merge($pending->metadata ?? [], [
+                        'recorded_method' => $request->input('payment_method', 'cash'),
+                        'external_reference' => $request->input('transaction_id'),
+                        'notes' => $request->input('notes'),
+                        'recorded_by' => auth()->id(),
+                        'cash_mark_paid' => true,
+                    ]),
+                ]);
                 $pending->markAsCompleted();
 
                 return $pending->fresh();
             }
 
             $payment = Payment::create([
-                'isp_id' => $invoice->isp_id,
-                'customer_id' => $invoice->customer_id,
-                'invoice_id' => $invoice->id,
-                'payment_method' => 'manual',
-                'amount' => $invoice->total_amount,
-                'phone_number' => $invoice->customer?->phone_number,
+                'isp_id' => $lockedInvoice->isp_id,
+                'customer_id' => $lockedInvoice->customer_id,
+                'invoice_id' => $lockedInvoice->id,
+                'payment_method' => match ($request->input('payment_method', 'cash')) {
+                    'bank_transfer' => 'bank_transfer', 'offline_mpesa' => 'mpesa', default => 'manual',
+                },
+                'amount' => $lockedInvoice->total_amount,
+                'transaction_id' => $request->input('transaction_id'),
+                'phone_number' => $lockedInvoice->customer?->phone_number,
                 'status' => 'pending',
                 'metadata' => [
                     'recorded_by' => auth()->id(),
                     'cash_mark_paid' => true,
+                    'recorded_method' => $request->input('payment_method', 'cash'),
+                    'external_reference' => $request->input('transaction_id'),
                     'notes' => $request->input('notes'),
                 ],
             ]);
@@ -368,8 +399,137 @@ class InvoiceController extends Controller
 
         $this->paymentCompletionService->processTenantPaymentSuccess($payment, true);
 
+        \App\Models\PaymentAuditLog::log([
+            'isp_id' => $invoice->isp_id,
+            'payment_id' => $payment->id,
+            'customer_id' => $invoice->customer_id,
+            'invoice_id' => $invoice->id,
+            'user_id' => auth()->id(),
+            'action' => 'manual_payment_recorded',
+            'payment_method' => in_array($request->input('payment_method'), ['bank_transfer', 'offline_mpesa'], true)
+                ? ($request->input('payment_method') === 'bank_transfer' ? 'bank_transfer' : 'mpesa')
+                : 'manual',
+            'amount' => $payment->amount,
+            'transaction_id' => $request->input('transaction_id'),
+            'status' => 'success',
+            'description' => 'Manual invoice payment recorded by '.auth()->user()->name,
+        ]);
+
         return redirect()
             ->route('isp.invoices.show', $invoice)
             ->with('success', 'Invoice marked paid. Subscription/service updated if linked.');
+    }
+
+    public function sendReminder(Invoice $invoice): RedirectResponse
+    {
+        $this->assertInvoiceTenant($invoice);
+        if (! in_array($invoice->status, ['pending', 'overdue'], true)) {
+            return back()->with('error', 'Only unpaid invoices can receive a reminder.');
+        }
+        $customer = $invoice->customer;
+        if (! $customer || (! $customer->phone_number && ! $customer->email)) {
+            return back()->with('error', 'This customer has no phone number or email address.');
+        }
+
+        try {
+            $notification = new \App\Notifications\PaymentReminder($invoice->load(['isp', 'customer']));
+            \Illuminate\Support\Facades\Notification::sendNow($customer, $notification);
+            $channels = collect($notification->via($customer))->map(function ($channel) {
+                if ($channel === 'mail') return 'Email';
+                if (is_string($channel) && str_contains($channel, 'DynamicSmsChannel')) return 'SMS';
+                return is_string($channel) ? class_basename($channel) : 'notification';
+            })->implode(' and ');
+            \App\Models\PaymentAuditLog::log([
+                'isp_id' => $invoice->isp_id,
+                'customer_id' => $invoice->customer_id,
+                'invoice_id' => $invoice->id,
+                'user_id' => auth()->id(),
+                'action' => 'reminder_sent',
+                'status' => 'success',
+                'description' => 'Reminder sent via '.$channels,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Invoice reminder delivery failed', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+            return back()->with('error', 'Reminder could not be delivered. Check notification settings and try again.');
+        }
+
+        return back()->with('success', 'Payment reminder sent to '.$customer->phone_number.' / '.$customer->email.'.');
+    }
+
+    public function adjust(Request $request, Invoice $invoice): RedirectResponse
+    {
+        $this->assertInvoiceTenant($invoice);
+        if (! in_array($invoice->status, ['pending', 'overdue'], true)) {
+            return back()->with('error', 'Only unpaid invoices can be adjusted.');
+        }
+        $data = $request->validate([
+            'type' => ['required', 'in:credit,discount'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        DB::transaction(function () use ($invoice, $data) {
+            $locked = Invoice::query()->lockForUpdate()->findOrFail($invoice->id);
+            if (! in_array($locked->status, ['pending', 'overdue'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['invoice' => 'Invoice is no longer unpaid.']);
+            }
+            $before = round((float) $locked->total_amount, 2);
+            $amount = round((float) $data['amount'], 2);
+            if ($amount <= 0 || $amount > $before) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['amount' => 'Adjustment must be greater than zero and no more than the balance due.']);
+            }
+            if ($data['type'] === 'credit') {
+                $customer = \App\Models\Customer::query()->lockForUpdate()->findOrFail($locked->customer_id);
+                if ((float) $customer->account_credit < $amount) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'amount' => 'Customer account credit is only KES '.number_format((float) $customer->account_credit, 2).'.',
+                    ]);
+                }
+                $customer->decrement('account_credit', $amount);
+            }
+            $after = round($before - $amount, 2);
+            $locked->update([
+                'total_amount' => $after,
+                ...($after === 0.0 ? ['status' => 'paid', 'paid_date' => now()] : []),
+            ]);
+            $locked->adjustments()->create([
+                'user_id' => auth()->id(), 'type' => $data['type'], 'amount' => $amount,
+                'before_total' => $before, 'after_total' => $after, 'reason' => $data['reason'],
+            ]);
+            \App\Models\PaymentAuditLog::log([
+                'isp_id' => $locked->isp_id, 'customer_id' => $locked->customer_id,
+                'invoice_id' => $locked->id, 'user_id' => auth()->id(),
+                'action' => 'invoice_'.$data['type'], 'status' => 'success', 'amount' => $amount,
+                'description' => ucfirst($data['type']).' applied'.($data['type'] === 'credit' ? ' from customer account credit' : '').'. Balance changed from '.$before.' to '.$after.'. '.$data['reason'],
+            ]);
+        });
+
+        return back()->with('success', 'Invoice balance adjusted.');
+    }
+
+    public function destroy(Invoice $invoice): RedirectResponse
+    {
+        $this->assertInvoiceTenant($invoice);
+        if ($invoice->status === 'paid' || $invoice->payments()->where('status', 'completed')->exists()) {
+            return back()->with('error', 'Invoices with completed payments cannot be deleted.');
+        }
+        DB::transaction(function () use ($invoice) {
+            $locked = Invoice::query()->lockForUpdate()->findOrFail($invoice->id);
+            $locked->payments()->where('status', 'pending')->get()->each(fn (Payment $payment) => $payment->markAsFailed());
+            \App\Models\PaymentAuditLog::log([
+                'isp_id' => $locked->isp_id, 'customer_id' => $locked->customer_id,
+                'invoice_id' => $locked->id, 'user_id' => auth()->id(), 'action' => 'invoice_deleted',
+                'status' => 'success', 'amount' => $locked->total_amount,
+                'description' => 'Unpaid invoice deleted by '.auth()->user()->name.'; invoice number '.$locked->invoice_number,
+            ]);
+            $locked->delete();
+        });
+
+        return redirect()->route('isp.invoices.index')->with('success', 'Unpaid invoice deleted. Its audit record was retained.');
+    }
+
+    private function assertInvoiceTenant(Invoice $invoice): void
+    {
+        abort_unless($invoice->isp_id === auth()->user()->isp_id, 403);
     }
 }

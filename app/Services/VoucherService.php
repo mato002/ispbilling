@@ -29,6 +29,7 @@ class VoucherService
             'plan_id' => $plan?->id,
             'created_by' => $createdBy ?? auth()->id(),
             'voucher_code' => $data['voucher_code'] ?? Voucher::generateCode(Voucher::CODE_LENGTH, (string) ($data['code_prefix'] ?? '')),
+            'batch_reference' => $data['batch_reference'] ?? null,
             'voucher_type' => $data['voucher_type'] ?? 'time',
             'time_limit_hours' => $data['time_limit_hours'] ?? null,
             'data_limit_mb' => $data['data_limit_mb'] ?? null,
@@ -66,6 +67,7 @@ class VoucherService
     ): array {
         $vouchers = [];
         $errors = [];
+        $data['batch_reference'] ??= 'VB-'.now()->format('Ymd').'-'.strtoupper(\Illuminate\Support\Str::random(5));
 
         DB::beginTransaction();
         try {

@@ -58,6 +58,9 @@
             <div class="flex items-end">
                 <button type="submit" class="pb-btn pb-btn-primary">Apply range</button>
             </div>
+            <div class="flex items-end">
+                <a href="{{ route('isp.reports.export.revenue.pdf', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="pb-btn">Export revenue PDF</a>
+            </div>
         </x-filter-bar>
 
         <section class="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -145,6 +148,7 @@
                     <input type="date" id="revenue-end-date" value="{{ $endDate }}" class="isp-form-input text-sm">
                 </div>
                 <a id="revenue-export-link" href="{{ route('isp.reports.export.revenue', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="pb-btn text-sm">Export CSV</a>
+                <a id="revenue-pdf-link" href="{{ route('isp.reports.export.revenue.pdf', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="pb-btn text-sm">Statement PDF</a>
                 <button type="button" data-load="revenue" class="pb-btn pb-btn-primary text-sm">Refresh</button>
             </div>
         </div>
@@ -254,6 +258,7 @@
         revenue: @json(route('isp.reports.revenue-per-plan')),
         collections: @json(route('isp.reports.monthly-collections')),
         exportRevenue: @json(route('isp.reports.export.revenue')),
+        exportRevenuePdf: @json(route('isp.reports.export.revenue.pdf')),
         exportCollections: @json(route('isp.reports.export.collections')),
     };
 
@@ -312,6 +317,8 @@
         if (exportLink) {
             exportLink.href = `${routes.exportRevenue}?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
         }
+        const pdfLink = document.getElementById('revenue-pdf-link');
+        if (pdfLink) pdfLink.href = `${routes.exportRevenuePdf}?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
         const data = await fetchJson(`${routes.revenue}?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`);
         document.getElementById('revenue-total').textContent = money(data.summary.total_revenue);
         document.getElementById('revenue-payments').textContent = data.summary.total_payments ?? 0;

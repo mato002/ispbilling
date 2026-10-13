@@ -32,20 +32,14 @@
                     :title="$store.sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
                     :aria-label="$store.sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
                     :aria-expanded="(!$store.sidebar.collapsed).toString()">
-                <svg x-show="$store.sidebar.collapsed" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-                </svg>
-                <svg x-show="!$store.sidebar.collapsed" x-cloak class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="10" y1="18" x2="20" y2="18"/>
-                </svg>
+                <x-font-awesome-icon name="bars" x-show="$store.sidebar.collapsed" class="h-5 w-5" />
+                <x-font-awesome-icon name="bars-staggered" x-show="!$store.sidebar.collapsed" x-cloak class="h-5 w-5" />
             </button>
 
             {{-- Mobile menu toggle --}}
             <button @click="$store.sidebar.openMobile()"
                     class="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
-                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-                </svg>
+                <x-font-awesome-icon name="bars" class="h-5 w-5" />
             </button>
 
             {{-- Logo + brand --}}
@@ -82,9 +76,7 @@
                 @click="searchOpen = true"
                 class="group flex w-full max-w-xl items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-left text-xs text-slate-500 transition hover:border-indigo-200 hover:bg-white hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400 dark:hover:border-indigo-500/30 dark:hover:bg-slate-900"
             >
-                <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
-                </svg>
+                <x-font-awesome-icon name="magnifying-glass" class="h-4 w-4 text-slate-400" />
                 <span class="text-[13px]">Search pages, settings, reports, network…</span>
                 <span class="ml-auto inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">
                     ⌘K
@@ -110,9 +102,7 @@
             <button @click="searchOpen = true"
                     class="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
                     title="Search">
-                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
-                </svg>
+                <x-font-awesome-icon name="magnifying-glass" class="h-5 w-5" />
             </button>
 
             {{-- Network status indicator --}}
@@ -126,13 +116,9 @@
                 <div class="relative" data-pb-quick-actions @click.outside="quickActionsOpen = false">
                     <button @click="quickActionsOpen = !quickActionsOpen"
                             class="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 px-3 py-2 text-xs font-semibold text-white shadow-[0_8px_18px_-10px_rgba(99,102,241,0.6)] hover:from-indigo-600 hover:to-cyan-600">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 5v14"/><path d="M5 12h14"/>
-                        </svg>
+                        <x-font-awesome-icon name="add" class="h-4 w-4" />
                         <span>Quick action</span>
-                        <svg class="h-3 w-3 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m6 9 6 6 6-6"/>
-                        </svg>
+                        <x-font-awesome-icon name="chevron-down" class="h-3 w-3 opacity-80" />
                     </button>
 
                     <div x-show="quickActionsOpen" x-cloak
@@ -143,7 +129,7 @@
                         <div class="px-2 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Operations</div>
                         <a href="{{ route('isp.customers.create') }}" data-pb-modal-open class="pb-row !p-2 text-sm">
                             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-300">
-                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                                <x-font-awesome-icon name="circle-plus" class="h-4 w-4" />
                             </span>
                             <span class="leading-tight">
                                 <span class="block font-medium text-slate-800 dark:text-slate-100">Add new customer</span>
@@ -152,7 +138,7 @@
                         </a>
                         <a href="{{ route('isp.payments.initiate') }}" class="pb-row !p-2 text-sm">
                             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
-                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                <x-font-awesome-icon name="credit-card" class="h-4 w-4" />
                             </span>
                             <span class="leading-tight">
                                 <span class="block font-medium text-slate-800 dark:text-slate-100">Record payment</span>
@@ -161,7 +147,7 @@
                         </a>
                         <a href="{{ route('isp.subscriptions.create') }}" data-pb-modal-open class="pb-row !p-2 text-sm">
                             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-300">
-                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                                <x-font-awesome-icon name="circle-check" class="h-4 w-4" />
                             </span>
                             <span class="leading-tight">
                                 <span class="block font-medium text-slate-800 dark:text-slate-100">New subscription</span>
@@ -170,7 +156,7 @@
                         </a>
                         <a href="{{ route('isp.routers.create') }}" data-pb-modal-open class="pb-row !p-2 text-sm">
                             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-300">
-                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="9" rx="2"/><path d="M7 7v4M17 7v4M5 7h14"/></svg>
+                                <x-font-awesome-icon name="house-signal" class="h-4 w-4" />
                             </span>
                             <span class="leading-tight">
                                 <span class="block font-medium text-slate-800 dark:text-slate-100">Add MikroTik router</span>
@@ -179,7 +165,7 @@
                         </a>
                         <a href="{{ route('isp.reports.index') }}" class="pb-row !p-2 text-sm">
                             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-300">
-                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 5-5"/></svg>
+                                <x-font-awesome-icon name="chart-line" class="h-4 w-4" />
                             </span>
                             <span class="leading-tight">
                                 <span class="block font-medium text-slate-800 dark:text-slate-100">Generate report</span>
@@ -195,13 +181,8 @@
             <button @click="toggleTheme()"
                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                     :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
-                <svg x-show="theme !== 'dark'" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>
-                </svg>
-                <svg x-show="theme === 'dark'" x-cloak class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="4"/>
-                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
-                </svg>
+                <x-font-awesome-icon name="cloud-moon" x-show="theme !== 'dark'" class="h-5 w-5" />
+                <x-font-awesome-icon name="cloud-sun" x-show="theme === 'dark'" x-cloak class="h-5 w-5" />
             </button>
 
             {{-- Notifications --}}
@@ -223,9 +204,7 @@
                             {{ $user->isSuperAdmin() ? 'Super Admin' : ($user->isIspAdmin() ? 'ISP Admin' : 'ISP Staff') }}
                         </div>
                     </div>
-                    <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m6 9 6 6 6-6"/>
-                    </svg>
+                    <x-font-awesome-icon name="chevron-down" class="h-3.5 w-3.5 text-slate-400" />
                 </button>
 
                 <div x-show="profileOpen" x-cloak
@@ -238,12 +217,12 @@
                         <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ $user->email }}</p>
                     </div>
                     <a href="{{ route('profile.edit') }}" class="pb-row !p-2 text-sm text-slate-600 dark:text-slate-300">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                        <x-font-awesome-icon name="circle-user" class="h-4 w-4" />
                         Profile settings
                     </a>
                     @if($user->isIspAdmin() || $user->isIspStaff())
                         <a href="{{ route('isp.settings.index') }}" class="pb-row !p-2 text-sm text-slate-600 dark:text-slate-300">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 7.04 4.29l.06.06A1.65 1.65 0 0 0 8.92 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.36.18.66.46.86.84a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+                            <x-font-awesome-icon name="gear" class="h-4 w-4" />
                             ISP settings
                         </a>
                     @endif
@@ -260,7 +239,7 @@
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="pb-row !p-2 w-full text-left text-sm text-rose-600 dark:text-rose-400">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            <x-font-awesome-icon name="arrow-right-from-bracket" class="h-4 w-4" />
                             Sign out
                         </button>
                     </form>

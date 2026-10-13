@@ -1,0 +1,9 @@
+Font Awesome Free 7.3.1
+Copyright Fonticons, Inc.
+
+The SVG icon artwork in fontawesome.svg is from Font Awesome Free and is
+licensed under the Creative Commons Attribution 4.0 International license.
+Attribution and license: https://fontawesome.com/license/free
+
+The SVG symbols are bundled locally so the hotspot portal can render icons
+without downloading an icon font at runtime.

@@ -42,6 +42,9 @@ class PortalSettingController extends Controller
             'show_packages' => 'boolean',
             'show_payment_button' => 'boolean',
             'payment_button_text' => 'required|string|max:50',
+            'mpesa_till_number' => 'nullable|string|max:20',
+            'support_phone' => 'nullable|string|max:30',
+            'support_whatsapp' => 'nullable|string|max:30',
             'theme_color' => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);

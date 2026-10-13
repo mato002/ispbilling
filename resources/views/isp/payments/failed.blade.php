@@ -8,7 +8,11 @@
         module="Billing"
         primaryLabel="Webhook logs"
         :primaryHref="route('isp.payments.transaction-logs')"
-    />
+    >
+        <x-slot:actions>
+            <x-export-dropdown :formats="$exportFormats ?? []" />
+        </x-slot:actions>
+    </x-isp-page-header>
 @endsection
 
 @section('content')
@@ -27,6 +31,14 @@
                 placeholder="All"
                 :options="['pending' => 'Pending', 'failed' => 'Failed']"
             />
+            <x-listing-filters.select
+                name="connection_type"
+                label="Service"
+                placeholder="All"
+                :options="['hotspot' => 'Hotspot', 'pppoe' => 'PPPoE']"
+            />
+            <x-listing-filters.date name="date_from" label="Attempt from" />
+            <x-listing-filters.date name="date_to" label="Attempt to" />
         </x-slot:filters>
 
         <x-slot:table>
@@ -35,6 +47,7 @@
                     <tr>
                         <th>Reference</th>
                         <th>Customer</th>
+                        <th>Service</th>
                         <th>Amount</th>
                         <th>Method</th>
                         <th>Status</th>
@@ -47,6 +60,7 @@
                         <x-listing-table.row :href="route('isp.payments.show', $payment)">
                             <td class="font-mono text-sm">{{ $payment->payment_reference }}</td>
                             <td>{{ $payment->customer?->full_name ?? '—' }}</td>
+                            <td><span class="pb-pill {{ $payment->serviceTypeLabel() === 'Hotspot' ? 'pb-pill-cyan' : 'pb-pill-info' }}">{{ $payment->serviceTypeLabel() }}</span></td>
                             <td class="font-mono font-semibold">KES {{ number_format($payment->amount, 2) }}</td>
                             <td><span class="pb-pill pb-pill-info">{{ strtoupper($payment->payment_method) }}</span></td>
                             <td>

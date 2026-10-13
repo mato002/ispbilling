@@ -2,17 +2,20 @@
 
 @section('content')
 <div class="text-center">
+    <a href="{{ route('hotspot.login', ['router_ip' => request()->get('router_ip') ?? request()->ip()]) }}"
+       class="mb-3 flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800 hover:bg-blue-100 sm:mb-5 sm:text-sm">
+        <x-font-awesome-icon name="arrow-rotate-right" class="h-4 w-4" />Already bought a package? Reconnect / Check status
+    </a>
+
     <button id="open-voucher-modal" type="button"
             class="mb-4 w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 sm:mb-6 sm:w-auto sm:min-w-72">
-        🎫 Have a voucher? Redeem instantly
+        <x-font-awesome-icon name="barcode" class="mr-2 h-4 w-4" />Have a voucher? Redeem instantly
     </button>
 
     @if(!isset($portalSettings) || $portalSettings->show_packages)
     <div class="mb-3 sm:mb-8">
         <div class="inline-block p-2 sm:p-4 bg-blue-100 rounded-full mb-2 sm:mb-4">
-            <svg class="w-9 h-9 sm:w-16 sm:h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
-            </svg>
+            <x-font-awesome-icon name="broadcast-tower" class="h-9 w-9 text-blue-600 sm:h-16 sm:w-16" />
         </div>
         <h3 class="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">Available Packages</h3>
     </div>
@@ -22,9 +25,14 @@
     <div class="mb-4 sm:mb-8">
         <div class="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3">
             @foreach($plans as $plan)
-            <div class="bg-white rounded-lg shadow-sm p-2 sm:p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+            <div class="relative bg-white rounded-lg shadow-sm p-2 sm:p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+                @if($plan->is_popular || $plan->is_best_value)
+                    <span class="absolute right-1 top-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold leading-tight text-white sm:right-3 sm:top-3 sm:px-2 sm:text-[10px] {{ $plan->is_popular ? 'bg-indigo-600' : 'bg-emerald-600' }}">
+                        {{ $plan->is_popular ? 'MOST POPULAR' : 'BEST VALUE' }}
+                    </span>
+                @endif
                 <div class="text-center">
-                    <h4 class="text-xs leading-tight sm:text-lg font-bold text-gray-900 mb-1 sm:mb-2">{{ $plan->name }}</h4>
+                    <h4 class="{{ $plan->is_popular || $plan->is_best_value ? 'mt-3 sm:mt-4' : '' }} text-xs leading-tight sm:text-lg font-bold text-gray-900 mb-1 sm:mb-2">{{ $plan->name }}</h4>
                     <div class="text-base sm:text-3xl font-bold text-blue-600 mb-1 sm:mb-2">
                         Ksh {{ number_format($plan->price, 0) }}
                     </div>
@@ -35,9 +43,18 @@
                         @if($plan->download_speed_kbps)
                             • {{ round($plan->download_speed_kbps/1024) }} Mbps
                         @endif
-                        @if($plan->duration_days)
-                            • {{ $plan->duration_days }} days
+                        @if($plan->time_limit_minutes)
+                            • {{ $plan->time_limit_minutes < 60 ? $plan->time_limit_minutes.' min' : rtrim(rtrim(number_format($plan->time_limit_minutes / 60, 1), '0'), '.').' hr' }}
+                        @elseif($plan->time_limit_hours)
+                            • {{ $plan->time_limit_hours }} hr
+                        @elseif($plan->duration_days)
+                            • {{ $plan->duration_days === 1 ? '24 hours' : $plan->duration_days.' days' }}
                         @endif
+                    </div>
+                    <div class="mb-2 flex justify-center">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-800 sm:text-[11px]">
+                            <x-font-awesome-icon name="mobile-screen-button" class="h-3 w-3" /> M-PESA STK
+                        </span>
                     </div>
                     @if(!isset($portalSettings) || $portalSettings->show_payment_button)
                     <button type="button"
@@ -48,7 +65,9 @@
                        data-router-ip="{{ request()->get('router_ip') ?? request()->ip() }}"
                        data-router-id="{{ $router?->id }}"
                        data-mac="{{ request()->query('mac') }}"
+                       data-ip="{{ request()->query('ip') }}"
                        data-link-login-only="{{ request()->query('link-login-only') }}"
+                       data-link-orig="{{ request()->query('link-orig') }}"
                        class="buy-hotspot-package block w-full py-2 px-1 sm:py-3 sm:px-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-md sm:rounded-lg hover:from-blue-700 hover:to-indigo-700 transition duration-150 text-xs sm:text-base">
                         {{ isset($portalSettings) ? $portalSettings->payment_button_text : 'Buy Now' }}
                     </button>
@@ -59,13 +78,6 @@
         </div>
     </div>
     @endif
-
-    <div class="grid grid-cols-2 gap-2 sm:gap-4">
-        <a href="{{ route('hotspot.login', ['router_ip' => request()->ip()]) }}" 
-           class="col-span-2 block w-full py-2 px-2 sm:py-4 sm:px-6 text-white font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition duration-150 text-xs sm:text-base">
-            👤 Already have an account? Login
-        </a>
-    </div>
 
     <div class="mt-3 pt-3 sm:mt-8 sm:pt-6 border-t border-gray-200">
         <p class="text-[11px] sm:text-xs text-gray-500">
@@ -99,7 +111,9 @@
                         router_ip: buyButton.dataset.routerIp,
                         router_id: buyButton.dataset.routerId,
                         mac: buyButton.dataset.mac,
+                        ip_address: buyButton.dataset.ip,
                         link_login_only: buyButton.dataset.linkLoginOnly,
+                        link_orig: buyButton.dataset.linkOrig,
                         phone_number: phone
                     })
                 });

@@ -253,6 +253,12 @@
                         <td class="text-right">KES {{ number_format($invoice->penalty, 2) }}</td>
                     </tr>
                 @endif
+                @foreach($invoice->adjustments ?? [] as $adjustment)
+                    <tr>
+                        <td>{{ ucfirst($adjustment->type) }}: {{ $adjustment->reason }}</td>
+                        <td class="text-right">− KES {{ number_format($adjustment->amount, 2) }}</td>
+                    </tr>
+                @endforeach
             </tbody>
         </table>
 
@@ -274,6 +280,12 @@
                     <span>KES {{ number_format($invoice->penalty, 2) }}</span>
                 </div>
             @endif
+            @foreach($invoice->adjustments ?? [] as $adjustment)
+                <div class="total-row">
+                    <span>{{ ucfirst($adjustment->type) }}:</span>
+                    <span>− KES {{ number_format($adjustment->amount, 2) }}</span>
+                </div>
+            @endforeach
             <div class="total-row">
                 <span>TOTAL:</span>
                 <span>KES {{ number_format($invoice->total_amount, 2) }}</span>

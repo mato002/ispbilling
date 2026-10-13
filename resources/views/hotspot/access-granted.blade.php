@@ -4,10 +4,7 @@
 <div class="text-center">
     <div class="mb-8">
         <div class="inline-block p-4 bg-green-100 rounded-full mb-4">
-            <svg class="w-16 h-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <x-font-awesome-icon name="circle-check" class="h-16 w-16 text-green-600" />
         </div>
         <h2 class="text-3xl font-bold text-gray-900 mb-2">{{ ($routerReady ?? false) ? 'Access Granted' : 'Payment received' }}</h2>
         <p class="text-sm text-gray-600">
@@ -49,6 +46,9 @@
         <form id="router-login" method="POST" action="{{ $routerLoginUrl }}" class="mb-5">
             <input type="hidden" name="username" value="{{ $customer['username'] }}">
             <input type="hidden" name="password" value="{{ $hotspotPassword }}">
+            @if(!empty($destinationUrl))
+                <input type="hidden" name="dst" value="{{ $destinationUrl }}">
+            @endif
             <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Connect to the internet</button>
         </form>
         <p class="text-xs text-gray-500 mb-6">Connecting this device to the hotspot now…</p>

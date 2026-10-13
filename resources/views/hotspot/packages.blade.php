@@ -25,9 +25,7 @@
         @if($plans->isEmpty())
             <div class="text-center py-12">
                 <div class="text-gray-400 text-6xl mb-4">
-                    <svg class="w-24 h-24 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
+                    <x-font-awesome-icon name="clock" class="mx-auto h-24 w-24" />
                 </div>
                 <h3 class="text-xl font-medium text-gray-900 mb-2">No packages available</h3>
                 <p class="text-gray-600">Please check back later or contact support.</p>
@@ -58,9 +56,7 @@
                                 <!-- Speed -->
                                 @if($plan->download_speed || $plan->upload_speed)
                                     <div class="flex items-center text-gray-700">
-                                        <svg class="w-5 h-5 mr-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                                        </svg>
+                                        <x-font-awesome-icon name="bolt" class="mr-3 h-5 w-5 text-green-500" />
                                         <div>
                                             <span class="font-medium">{{ $plan->download_speed }}{{ $plan->download_speed_unit ?? 'Mbps' }}</span>
                                             @if($plan->upload_speed)
@@ -74,9 +70,7 @@
                                 <!-- Data Limit -->
                                 @if($plan->data_limit)
                                     <div class="flex items-center text-gray-700">
-                                        <svg class="w-5 h-5 mr-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                        </svg>
+                                        <x-font-awesome-icon name="chart-line" class="mr-3 h-5 w-5 text-blue-500" />
                                         <div>
                                             <span class="font-medium">{{ $plan->data_limit }}{{ $plan->data_limit_unit ?? 'GB' }}</span>
                                             <span class="text-sm text-gray-500 block">Monthly Data Limit</span>
@@ -84,9 +78,7 @@
                                     </div>
                                 @else
                                     <div class="flex items-center text-gray-700">
-                                        <svg class="w-5 h-5 mr-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
+                                        <x-font-awesome-icon name="circle-check" class="mr-3 h-5 w-5 text-blue-500" />
                                         <div>
                                             <span class="font-medium">Unlimited Data</span>
                                             <span class="text-sm text-gray-500 block">No data restrictions</span>
@@ -97,9 +89,7 @@
                                 <!-- Duration -->
                                 @if($plan->duration)
                                     <div class="flex items-center text-gray-700">
-                                        <svg class="w-5 h-5 mr-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
+                                        <x-font-awesome-icon name="clock" class="mr-3 h-5 w-5 text-purple-500" />
                                         <div>
                                             <span class="font-medium">{{ $plan->duration }} {{ $plan->duration_unit ?? 'days' }}</span>
                                             <span class="text-sm text-gray-500 block">Package Duration</span>
@@ -136,17 +126,13 @@
                     <div class="flex flex-col sm:flex-row gap-4 justify-center text-gray-600">
                         @if($portalSettings->contact_email)
                             <div class="flex items-center">
-                                <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                                </svg>
+                                <x-font-awesome-icon name="envelope" class="mr-2 h-5 w-5 text-gray-400" />
                                 {{ $portalSettings->contact_email }}
                             </div>
                         @endif
                         @if($portalSettings->contact_phone)
                             <div class="flex items-center">
-                                <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
-                                </svg>
+                                <x-font-awesome-icon name="mobile-phone" class="mr-2 h-5 w-5 text-gray-400" />
                                 {{ $portalSettings->contact_phone }}
                             </div>
                         @endif

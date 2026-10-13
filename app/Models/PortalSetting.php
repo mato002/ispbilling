@@ -19,6 +19,9 @@ class PortalSetting extends Model
         'show_packages',
         'show_payment_button',
         'payment_button_text',
+        'mpesa_till_number',
+        'support_phone',
+        'support_whatsapp',
         'theme_color',
         'custom_css',
     ];

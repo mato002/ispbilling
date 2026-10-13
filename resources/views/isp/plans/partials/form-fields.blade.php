@@ -20,10 +20,10 @@
             return ['hotspot','pppoe','data_bundle','unlimited'].includes(this.packageType);
         },
         showDataLimit() {
-            return this.packageType === 'data_bundle' || this.billingType === 'data';
+            return this.packageType === 'data_bundle' || this.packageType === 'hotspot' || this.billingType === 'data';
         },
         showTimeLimit() {
-            return this.billingType === 'time';
+            return this.packageType === 'hotspot' || this.billingType === 'time';
         },
         showSpeedFields() {
             return ['hotspot','pppoe','data_bundle','unlimited'].includes(this.packageType);
@@ -116,6 +116,8 @@
         <div x-show="showTimeLimit()">
             <label class="isp-form-label" for="time_limit_hours">Time limit (hours)</label>
             <input id="time_limit_hours" type="number" name="time_limit_hours" min="0" value="{{ old('time_limit_hours', $planModel->time_limit_hours ?? '') }}" class="isp-form-input">
+            <label class="isp-form-label mt-3" for="time_limit_minutes">Time limit (minutes, for short passes)</label>
+            <input id="time_limit_minutes" type="number" name="time_limit_minutes" min="1" max="10080" value="{{ old('time_limit_minutes', $planModel->time_limit_minutes ?? '') }}" class="isp-form-input" placeholder="e.g. 30">
         </div>
 
         <div x-show="showSpeedFields()">

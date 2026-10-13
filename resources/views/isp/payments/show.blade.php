@@ -9,7 +9,13 @@
         :description="$payment->customer?->full_name ?? 'Payment'"
         primaryLabel="All payments"
         :primaryHref="route('isp.payments.index')"
-    />
+    >
+        <x-slot:actions>
+            @if ($payment->status === 'completed')
+                <a href="{{ route('isp.payments.receipt.pdf', $payment) }}" class="pb-btn">Download receipt PDF</a>
+            @endif
+        </x-slot:actions>
+    </x-isp-page-header>
 @endsection
 
 @section('content')
@@ -45,6 +51,10 @@
                 <div>
                     <dt class="isp-form-label mb-1">Method</dt>
                     <dd><span class="pb-pill pb-pill-info">{{ strtoupper($payment->payment_method) }}</span></dd>
+                </div>
+                <div>
+                    <dt class="isp-form-label mb-1">Service</dt>
+                    <dd><span class="pb-pill {{ $payment->serviceTypeLabel() === 'Hotspot' ? 'pb-pill-cyan' : 'pb-pill-info' }}">{{ $payment->serviceTypeLabel() }}</span></dd>
                 </div>
                 <div>
                     <dt class="isp-form-label mb-1">Transaction ID</dt>

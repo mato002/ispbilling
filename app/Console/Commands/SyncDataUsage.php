@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Customer;
+use App\Models\HotspotSession;
 use App\Models\Router;
 use App\Services\DataUsageRecordingService;
 use App\Services\MikroTikService;
@@ -38,6 +39,13 @@ class SyncDataUsage extends Command
             try {
                 $mikrotik = new MikroTikService($router);
                 $mikrotik->syncActiveSessions();
+                foreach (HotspotSession::query()
+                    ->where('router_id', $router->id)
+                    ->where('status', 'active')
+                    ->whereNotNull('customer_id')
+                    ->get() as $session) {
+                    $recorder->recordHotspotSessionEnd($session);
+                }
                 $hotspotRecorded += $recorder->finalizeEndedHotspotSessions($router);
 
                 if ($mikrotik->connect()) {

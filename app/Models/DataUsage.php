@@ -22,6 +22,7 @@ class DataUsage extends Model
         'isp_id',
         'customer_id',
         'package_id',
+        'subscription_id',
         'router_id',
         'upload_bytes',
         'download_bytes',
@@ -53,6 +54,11 @@ class DataUsage extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class, 'package_id');
+    }
+
+    public function subscription(): BelongsTo
+    {
+        return $this->belongsTo(Subscription::class);
     }
 
     public function router(): BelongsTo

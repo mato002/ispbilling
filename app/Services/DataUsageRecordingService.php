@@ -15,11 +15,7 @@ class DataUsageRecordingService
      */
     public function recordHotspotSessionEnd(HotspotSession $session): ?DataUsage
     {
-        if (! $session->customer_id || $session->total_bytes <= 0) {
-            return null;
-        }
-
-        if (DataUsage::where('hotspot_session_id', $session->id)->exists()) {
+        if (! $session->customer_id) {
             return null;
         }
 
@@ -27,12 +23,15 @@ class DataUsageRecordingService
             ? $session->customer
             : Customer::find($session->customer_id);
 
-        $packageId = $customer?->activeSubscription()?->plan_id;
-
-        return DataUsage::create([
+        $existing = DataUsage::query()->where('hotspot_session_id', $session->id)->first();
+        $subscription = $existing?->subscription_id ? null : $this->subscriptionForSession($session);
+        return DataUsage::updateOrCreate([
+            'hotspot_session_id' => $session->id,
+        ], [
             'isp_id' => $session->isp_id,
             'customer_id' => $session->customer_id,
-            'package_id' => $packageId,
+            'package_id' => $existing?->package_id ?? $subscription?->plan_id,
+            'subscription_id' => $existing?->subscription_id ?? $subscription?->id,
             'router_id' => $session->router_id,
             'upload_bytes' => $session->bytes_uploaded,
             'download_bytes' => $session->bytes_downloaded,
@@ -43,7 +42,7 @@ class DataUsageRecordingService
             'mac_address' => $session->mac_address,
             'source' => DataUsage::SOURCE_HOTSPOT,
             'started_at' => $session->started_at,
-            'ended_at' => $session->ended_at ?? now(),
+            'ended_at' => $session->ended_at,
             'external_session_id' => $session->mikrotik_session_id,
         ]);
     }
@@ -88,12 +87,14 @@ class DataUsageRecordingService
         }
 
         $packageId = $customer->activeSubscription()?->plan_id;
+        $subscriptionId = $customer->activeSubscription()?->id;
         $now = now();
 
         return DataUsage::create([
             'isp_id' => $router->isp_id,
             'customer_id' => $customer->id,
             'package_id' => $packageId,
+            'subscription_id' => $subscriptionId,
             'router_id' => $router->id,
             'upload_bytes' => $deltaUpload,
             'download_bytes' => $deltaDownload,
@@ -148,17 +149,38 @@ class DataUsageRecordingService
         $sessions = HotspotSession::query()
             ->where('router_id', $router->id)
             ->where('status', 'ended')
-            ->whereDoesntHave('dataUsageRecord')
             ->get();
 
         $recorded = 0;
         foreach ($sessions as $session) {
-            if ($this->recordHotspotSessionEnd($session)) {
+            $before = DataUsage::query()->where('hotspot_session_id', $session->id)->exists();
+            $this->recordHotspotSessionEnd($session);
+            if (! $before) {
                 $recorded++;
             }
         }
 
         return $recorded;
+    }
+
+    private function subscriptionForSession(HotspotSession $session): ?\App\Models\Subscription
+    {
+        if (! $session->customer_id) {
+            return null;
+        }
+
+        $at = $session->started_at ?? now();
+        return \App\Models\Subscription::query()->withoutIspTenant()
+            ->where('customer_id', $session->customer_id)
+            ->where('start_date', '<=', $at->toDateString())
+            ->where(function ($query) use ($at) {
+                $query->where('ends_at', '>=', $at)
+                    ->orWhere(function ($legacy) use ($at) {
+                        $legacy->whereNull('ends_at')->where('end_date', '>=', $at->toDateString());
+                    });
+            })
+            ->orderByDesc('start_date')
+            ->first();
     }
 
     protected function parseMikrotikUptimeStart(?string $uptime, Carbon $now): ?Carbon

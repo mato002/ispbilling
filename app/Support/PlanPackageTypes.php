@@ -162,6 +162,7 @@ final class PlanPackageTypes
             $rules['duration_days'] = ['nullable', 'integer', 'min:1'];
             $rules['data_limit_mb'] = ['nullable', 'integer', 'min:1'];
             $rules['time_limit_hours'] = ['nullable', 'integer', 'min:0'];
+            $rules['time_limit_minutes'] = ['nullable', 'integer', 'min:1', 'max:10080'];
         }
 
         if ($packageType === self::DATA_BUNDLE) {
@@ -229,6 +230,7 @@ final class PlanPackageTypes
             $validated['billing_type'] = 'unlimited';
             $validated['data_limit_mb'] = null;
             $validated['time_limit_hours'] = null;
+            $validated['time_limit_minutes'] = null;
             $validated['is_one_time'] = false;
             $validated['is_recurring'] = true;
             $validated['service_type'] = null;

@@ -4,9 +4,7 @@
 <div>
     <div class="text-center mb-6">
         <div class="inline-block p-3 bg-yellow-100 rounded-full mb-4">
-            <svg class="w-12 h-12 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2m0 0V5.5A2.5 2.5 0 1016 8h-2m2 0v13m2-13V10a2 2 0 10-2 0"></path>
-            </svg>
+            <x-font-awesome-icon name="barcode" class="h-12 w-12 text-yellow-600" />
         </div>
         <h2 class="text-2xl font-bold text-gray-900 mb-2">Redeem Voucher</h2>
         <p class="text-sm text-gray-600">Enter your voucher code to get internet access</p>

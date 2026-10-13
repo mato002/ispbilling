@@ -90,6 +90,12 @@
                                 <td class="py-3 text-right font-mono">KES {{ number_format($invoice->penalty, 2) }}</td>
                             </tr>
                         @endif
+                        @foreach($invoice->adjustments as $adjustment)
+                            <tr class="border-b border-slate-100 dark:border-slate-800">
+                                <td class="py-3 text-emerald-700 dark:text-emerald-300">{{ ucfirst($adjustment->type) }}: {{ $adjustment->reason }}</td>
+                                <td class="py-3 text-right font-mono text-emerald-700 dark:text-emerald-300">− KES {{ number_format($adjustment->amount, 2) }}</td>
+                            </tr>
+                        @endforeach
                         <tr>
                             <td class="py-3 font-semibold text-slate-900 dark:text-white">Total</td>
                             <td class="py-3 text-right text-lg font-bold font-mono text-slate-900 dark:text-white">KES {{ number_format($invoice->total_amount, 2) }}</td>
@@ -138,6 +144,25 @@
                     </tbody>
                 </x-data-table>
             </div>
+        @endif
+
+        @if($invoice->auditLogs->isNotEmpty() || $invoice->adjustments->isNotEmpty())
+            <x-form-section title="Invoice activity">
+                <ul class="space-y-3 text-sm">
+                    @foreach($invoice->auditLogs as $event)
+                        <li class="border-b border-slate-100 pb-3 last:border-0 dark:border-slate-800">
+                            <p class="font-medium text-slate-800 dark:text-slate-100">{{ $event->description }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ $event->created_at->format('M j, Y g:i A') }} · {{ $event->user?->name ?? 'System' }}</p>
+                        </li>
+                    @endforeach
+                    @foreach($invoice->adjustments as $adjustment)
+                        <li class="border-b border-slate-100 pb-3 last:border-0 dark:border-slate-800">
+                            <p class="font-medium text-slate-800 dark:text-slate-100">{{ ucfirst($adjustment->type) }} of KES {{ number_format($adjustment->amount, 2) }}: {{ $adjustment->reason }}</p>
+                            <p class="mt-1 text-xs text-slate-500">Balance KES {{ number_format($adjustment->before_total, 2) }} → KES {{ number_format($adjustment->after_total, 2) }} · {{ $adjustment->created_at->format('M j, Y g:i A') }}</p>
+                        </li>
+                    @endforeach
+                </ul>
+            </x-form-section>
         @endif
     </div>
 

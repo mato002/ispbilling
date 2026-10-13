@@ -82,7 +82,7 @@ Schedule::job(new ReconcileHardwareStateJob())
     ->withoutOverlapping(25);
 
 Schedule::command('usage:sync')
-    ->everyFifteenMinutes()
+    ->everyFiveMinutes()
     ->name('usage:sync-fleet')
     ->withoutOverlapping(10);
 

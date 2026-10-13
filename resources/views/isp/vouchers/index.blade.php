@@ -13,7 +13,7 @@
         <x-slot name="actions">
             <a href="{{ route('isp.vouchers.create-bulk') }}" class="pb-btn">Bulk create</a>
             @if(request()->filled('plan_id'))
-                <a href="{{ route('isp.vouchers.print', request()->only('plan_id')) }}" target="_blank" rel="noopener" class="pb-btn">Print codes</a>
+                <a href="{{ route('isp.vouchers.print', request()->only('plan_id', 'batch_reference')) }}" target="_blank" rel="noopener" class="pb-btn">Print codes</a>
                 <a href="{{ route('isp.vouchers.export.csv', request()->only('plan_id')) }}" class="pb-btn">Export codes CSV</a>
             @endif
         </x-slot>
@@ -34,7 +34,7 @@
     >
         <x-slot:filters>
             <x-listing-filters.search
-                placeholder="Code or notes…"
+                placeholder="Code, batch, or notes…"
             />
             <x-listing-filters.select
                 name="status"
@@ -61,6 +61,13 @@
                 :options="$plans->mapWithKeys(fn ($plan) => [(string) $plan->id => $plan->name])->all()"
             />
             <x-listing-filters.select
+                name="batch_reference"
+                label="Batch"
+                placeholder="All batches"
+                class="min-w-[160px] flex-1"
+                :options="$batchReferences"
+            />
+            <x-listing-filters.select
                 name="voucher_type"
                 label="Type"
                 placeholder="All"
@@ -80,6 +87,7 @@
                 <thead>
                     <tr>
                         <th>Code</th>
+                        <th>Batch</th>
                         <th>Plan</th>
                         <th>Router</th>
                         <th>Type</th>
@@ -93,6 +101,7 @@
                     @foreach ($vouchers as $voucher)
                         <x-listing-table.row :href="route('isp.vouchers.show', $voucher)">
                             <td class="font-mono font-semibold">{{ $voucher->voucher_code }}</td>
+                            <td class="font-mono text-xs">{{ $voucher->batch_reference ?? '—' }}</td>
                             <td>
                                 @if ($voucher->plan)
                                     <div class="font-medium text-slate-900 dark:text-white">{{ $voucher->plan->name }}</div>
@@ -104,13 +113,7 @@
                             <td>{{ $voucher->router?->name ?? '—' }}</td>
                             <td><span class="pb-pill">{{ ucfirst($voucher->voucher_type) }}</span></td>
                             <td>
-                                @if ($voucher->status === 'active')
-                                    <x-status-badge status="active" />
-                                @elseif ($voucher->status === 'used')
-                                    <span class="pb-pill">Used</span>
-                                @else
-                                    <x-status-badge status="expired" />
-                                @endif
+                                <x-status-badge :status="$voucher->reportStatusLabel()" />
                             </td>
                             <td class="whitespace-nowrap text-sm">{{ $voucher->created_at->format('M j, Y H:i') }}</td>
                             <td>

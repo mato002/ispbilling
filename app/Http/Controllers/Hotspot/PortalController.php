@@ -43,6 +43,9 @@ class PortalController extends Controller
         $plans = collect();
         if ($isp) {
             $plans = \App\Models\Plan::where('isp_id', $isp->id)
+                ->where(function ($query) {
+                    $query->where('package_type', 'hotspot')->orWhere('access_type', 'hotspot');
+                })
                 ->where('is_active', true)
                 ->where('customer_visible', true)
                 ->whereNull('archived_at')
@@ -56,7 +59,7 @@ class PortalController extends Controller
             $portalSettings = PortalSetting::getForISP($isp->id);
         }
         
-        return view('hotspot.packages', compact('isp', 'router', 'plans', 'portalSettings'));
+        return view('hotspot.splash', compact('isp', 'router', 'plans', 'portalSettings'));
     }
 
     /**
@@ -84,6 +87,9 @@ class PortalController extends Controller
         $plans = collect();
         if ($isp) {
             $plans = \App\Models\Plan::where('isp_id', $isp->id)
+                ->where(function ($query) {
+                    $query->where('package_type', 'hotspot')->orWhere('access_type', 'hotspot');
+                })
                 ->where('is_active', true)
                 ->where('customer_visible', true)
                 ->whereNull('archived_at')
@@ -600,7 +606,7 @@ class PortalController extends Controller
             return back()->withErrors(['error' => 'Package not found.']);
         }
 
-        if (! $plan->is_active || ! $plan->customer_visible || $plan->archived_at) {
+        if (! $plan->isHotspot() || ! $plan->is_active || ! $plan->customer_visible || $plan->archived_at) {
             abort(404);
         }
         
@@ -620,8 +626,10 @@ class PortalController extends Controller
             'phone_number' => 'required|string',
             'router_ip' => 'nullable|ip',
             'router_id' => 'nullable|integer',
+            'ip_address' => 'nullable|ip',
             'mac' => ['nullable', 'regex:/^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
             'link_login_only' => 'nullable|url|max:2048',
+            'link_orig' => 'nullable|url|max:2048',
         ]);
         
         $routerIp = $request->router_ip ?? $request->ip();
@@ -650,7 +658,7 @@ class PortalController extends Controller
                 : back()->withErrors(['error' => 'Package not found.']);
         }
 
-        if (! $plan->is_active || ! $plan->customer_visible || $plan->archived_at) {
+        if (! $plan->isHotspot() || ! $plan->is_active || ! $plan->customer_visible || $plan->archived_at) {
             return $request->wantsJson()
                 ? response()->json(['success' => false, 'message' => 'Package is not available.'], 404)
                 : back()->withErrors(['error' => 'Package is not available.']);
@@ -705,6 +713,17 @@ class PortalController extends Controller
             'status' => 'inactive',
         ]);
 
+        if ($request->filled('link_orig')) {
+            $attributes = $customer->custom_attributes ?? [];
+            $attributes['hotspot_original_url'] = $request->input('link_orig');
+            $attributes['hotspot_client_ip'] = $request->input('ip_address');
+            $customer->update(['custom_attributes' => $attributes]);
+        } elseif ($request->filled('ip_address')) {
+            $attributes = $customer->custom_attributes ?? [];
+            $attributes['hotspot_client_ip'] = $request->input('ip_address');
+            $customer->update(['custom_attributes' => $attributes]);
+        }
+
         // Subscription + invoice (payment row is created when user pays via customer.payments.initiate)
         $subscription = Subscription::updateOrCreate(
             [
@@ -713,9 +732,11 @@ class PortalController extends Controller
             ],
             [
                 'start_date' => now(),
-                'end_date' => now()->addDays($plan->duration_days),
-                'ends_at' => now()->addDays($plan->duration_days),
-                'renewal_date' => now()->addDays($plan->duration_days),
+                // The package clock starts only after payment is confirmed.
+                // PaymentCompletionService::renew() sets its real expiry then.
+                'end_date' => today(),
+                'ends_at' => now(),
+                'renewal_date' => now(),
                 'status' => 'suspended',
                 'auto_renew' => false,
             ]

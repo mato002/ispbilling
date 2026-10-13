@@ -59,6 +59,16 @@ class Invoice extends Model
         return $this->hasMany(Payment::class, 'invoice_id');
     }
 
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(InvoiceAdjustment::class);
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(PaymentAuditLog::class, 'invoice_id')->latest();
+    }
+
     public function isOverdue(): bool
     {
         return $this->due_date < now() && $this->status === 'pending';

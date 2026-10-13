@@ -395,6 +395,7 @@ target.searchParams.set('router_id', {$routerId});
 target.searchParams.set('mac', '$(mac)');
 target.searchParams.set('ip', '$(ip)');
 target.searchParams.set('link-login-only', '$(link-login-only)');
+target.searchParams.set('link-orig', '$(link-orig)');
 window.location.replace(target.toString());
 </script></body></html>
 HTML;

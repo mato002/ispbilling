@@ -10,6 +10,8 @@ use App\Services\PaymentCompletionService;
 use App\Services\PaymentPostingService;
 use App\Support\Export\CsvExporter;
 use App\Support\Search\SearchHelper;
+use App\Support\Export\XlsxExporter;
+use Dompdf\Dompdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,11 +70,22 @@ class PaymentController extends Controller
                     'voucher' => 'Voucher',
                 ],
             ],
+            'connection_type' => [
+                'label' => 'Service',
+                'values' => ['hotspot' => 'Hotspot', 'pppoe' => 'PPPoE'],
+            ],
             'date_from' => 'From',
             'date_to' => 'To',
         ]);
 
-        $exportFormats = $this->listingExportFormats($request, route('isp.payments.export.csv'));
+        $exportQuery = http_build_query($request->except('page'));
+        $exportSuffix = $exportQuery !== '' ? '?'.$exportQuery : '';
+        $exportFormats = [
+            ['label' => 'Export CSV', 'url' => route('isp.payments.export.csv').$exportSuffix, 'download' => true],
+            ['label' => 'Export Excel', 'url' => route('isp.payments.export.xlsx').$exportSuffix, 'download' => true],
+            ['label' => 'Export PDF', 'url' => route('isp.payments.export.pdf').$exportSuffix, 'download' => true],
+            ['label' => 'Reconciliation CSV', 'url' => route('isp.payments.reconciliation.csv').$exportSuffix, 'download' => true],
+        ];
 
         return view('isp.payments.index', compact('payments', 'filterChips', 'exportFormats'));
     }
@@ -125,27 +138,64 @@ class PaymentController extends Controller
     {
         $ispId = auth()->user()->isp_id;
 
+        $query = $this->failedPaymentsQuery($request, $ispId);
+
+        $payments = $query->latest()->paginate(20)->withQueryString();
+        $exportFormats = $this->listingExportFormats($request, route('isp.payments.failed.export.csv'));
+
+        return view('isp.payments.failed', compact('payments', 'exportFormats'));
+    }
+
+    public function exportFailedCsv(Request $request): StreamedResponse
+    {
+        $query = $this->failedPaymentsQuery($request, (int) auth()->user()->isp_id)->latest();
+
+        return CsvExporter::download('failed-payment-attempts-'.now()->format('Ymd-His').'.csv', [
+            'Reference', 'Gateway transaction', 'Customer', 'Phone', 'Service', 'Method', 'Status',
+            'Failure reason', 'Amount', 'Created at', 'Processed at',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($payments) use ($out) {
+                foreach ($payments as $payment) {
+                    fputcsv($out, [
+                        $payment->payment_reference,
+                        $payment->transaction_id,
+                        $payment->customer?->full_name,
+                        $payment->phone_number ?? $payment->customer?->phone_number,
+                        $payment->serviceTypeLabel(),
+                        $payment->payment_method,
+                        $payment->status,
+                        $payment->metadata['failure_reason'] ?? data_get($payment->metadata, 'stk_query_response.ResultDesc'),
+                        $payment->amount,
+                        $payment->created_at?->format('Y-m-d H:i:s'),
+                        $payment->processed_at?->format('Y-m-d H:i:s'),
+                    ]);
+                }
+            });
+        });
+    }
+
+    private function failedPaymentsQuery(Request $request, int $ispId): Builder
+    {
         $query = Payment::where('isp_id', $ispId)
             ->whereIn('status', ['pending', 'failed'])
             ->with(['customer', 'invoice']);
 
+        if ($request->filled('connection_type')) {
+            $this->applyConnectionTypeFilter($query, $request->string('connection_type')->toString());
+        }
         if ($pattern = SearchHelper::likePattern($request->search)) {
             $query->where(function ($q) use ($pattern) {
                 $q->where('payment_reference', 'like', $pattern)
                     ->orWhere('transaction_id', 'like', $pattern)
-                    ->orWhereHas('customer', function ($customerQuery) use ($pattern) {
-                        $customerQuery->where('full_name', 'like', $pattern);
-                    });
+                    ->orWhere('phone_number', 'like', $pattern)
+                    ->orWhereHas('customer', fn ($customer) => $customer->where('full_name', 'like', $pattern));
             });
         }
+        if ($request->filled('status')) $query->where('status', $request->status);
+        if ($request->filled('date_from')) $query->whereDate('created_at', '>=', $request->date_from);
+        if ($request->filled('date_to')) $query->whereDate('created_at', '<=', $request->date_to);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        $payments = $query->latest()->paginate(20)->withQueryString();
-
-        return view('isp.payments.failed', compact('payments'));
+        return $query;
     }
 
     public function assignUnposted(Request $request, Payment $payment): RedirectResponse
@@ -196,11 +246,12 @@ class PaymentController extends Controller
     public function exportCsv(Request $request): StreamedResponse
     {
         $ispId = auth()->user()->isp_id;
-        $query = $this->filteredPaymentsQuery($request, $ispId)->latest('processed_at')->latest();
+        $query = $this->filteredPaymentsQuery($request, $ispId)
+            ->posted()->where('status', 'completed')->latest('processed_at')->latest();
         $filename = 'payments-'.now()->format('Ymd-His').'.csv';
 
         return CsvExporter::download($filename, [
-            'Reference', 'Transaction ID', 'Customer', 'Phone', 'Invoice',
+            'Reference', 'Transaction ID', 'Customer', 'Phone', 'Service', 'Invoice',
             'Method', 'Status', 'Amount', 'Processed at', 'Created',
         ], function ($out) use ($query) {
             $query->chunk(200, function ($payments) use ($out) {
@@ -210,6 +261,7 @@ class PaymentController extends Controller
                         $payment->transaction_id,
                         $payment->customer?->full_name,
                         $payment->customer?->phone_number,
+                        $payment->serviceTypeLabel(),
                         $payment->invoice?->invoice_number,
                         $payment->payment_method,
                         $payment->status,
@@ -220,6 +272,128 @@ class PaymentController extends Controller
                 }
             });
         });
+    }
+
+    public function exportXlsx(Request $request)
+    {
+        $query = $this->filteredPaymentsQuery($request, (int) auth()->user()->isp_id)
+            ->posted()->where('status', 'completed')->with(['customer', 'invoice.subscription.plan'])
+            ->reorder();
+
+        return XlsxExporter::download(
+            'payments-'.now()->format('Ymd-His').'.xlsx',
+            ['Reference', 'Transaction ID', 'Customer', 'Phone', 'Service', 'Plan', 'Invoice', 'Method', 'Status', 'Amount', 'Processed at'],
+            $this->paymentRows($query),
+            'Payments'
+        );
+    }
+
+    public function exportPdf(Request $request)
+    {
+        $query = $this->filteredPaymentsQuery($request, (int) auth()->user()->isp_id)
+            ->posted()->where('status', 'completed')->with(['customer', 'invoice.subscription.plan'])
+            ->latest('processed_at')->latest();
+        $payments = $query->limit(500)->get();
+        $isp = \App\Models\ISP::findOrFail(auth()->user()->isp_id);
+        $rangeLabel = trim(($request->date_from ?: 'All dates').' to '.($request->date_to ?: 'Today'));
+
+        return $this->renderPdf('isp.payments.statement-pdf', [
+            'payments' => $payments,
+            'isp' => $isp,
+            'rangeLabel' => $rangeLabel,
+            'total' => (float) $payments->sum('amount'),
+            'exportedAt' => now(),
+            'truncated' => $payments->count() === 500,
+        ], 'payment-statement-'.now()->format('Ymd-His').'.pdf');
+    }
+
+    public function exportReconciliationCsv(Request $request): StreamedResponse
+    {
+        $query = $this->filteredPaymentsQuery($request, (int) auth()->user()->isp_id)
+            ->with(['customer.router', 'invoice.subscription.plan'])
+            ->addSelect([
+                'latest_stk_log_status' => \App\Models\PaymentTransactionLog::query()
+                    ->select('status')->whereColumn('payment_id', 'payments.id')
+                    ->whereIn('transaction_type', ['webhook', 'webhook_verification', 'status_query'])->latest('created_at')->limit(1),
+                'latest_stk_log_error' => \App\Models\PaymentTransactionLog::query()
+                    ->select('error_message')->whereColumn('payment_id', 'payments.id')
+                    ->whereIn('transaction_type', ['webhook', 'webhook_verification', 'status_query'])->latest('created_at')->limit(1),
+            ])->latest('created_at')->latest();
+
+        return CsvExporter::download('payment-reconciliation-'.now()->format('Ymd-His').'.csv', [
+            'Reference', 'Gateway transaction', 'Phone', 'Amount', 'Service', 'Plan', 'Router',
+            'Payment status', 'Latest gateway callback/query status', 'Gateway error', 'Customer status', 'Subscription status', 'Provisioning automation run', 'Created at', 'Processed at',
+        ], function ($out) use ($query) {
+            $query->chunk(200, function ($payments) use ($out) {
+                foreach ($payments as $payment) {
+                    $customer = $payment->customer;
+                    $subscription = $payment->invoice?->subscription;
+                    fputcsv($out, [
+                        $payment->payment_reference,
+                        $payment->transaction_id,
+                        $payment->phone_number,
+                        $payment->amount,
+                        $payment->serviceTypeLabel(),
+                        $subscription?->plan?->name,
+                        $customer?->router?->name,
+                        $payment->status,
+                        $payment->latest_stk_log_status,
+                        $payment->latest_stk_log_error,
+                        $customer?->status,
+                        $subscription?->status,
+                        $payment->metadata['payment_success_side_effects_at'] ?? null,
+                        $payment->created_at?->format('Y-m-d H:i:s'),
+                        $payment->processed_at?->format('Y-m-d H:i:s'),
+                    ]);
+                }
+            });
+        });
+    }
+
+    public function receiptPdf(Payment $payment)
+    {
+        if ($payment->isp_id !== auth()->user()->isp_id) abort(403);
+        if ($payment->status !== 'completed') abort(404, 'A receipt is available after payment is completed.');
+        $payment->load(['isp', 'customer', 'invoice.subscription.plan']);
+
+        return $this->renderPdf('isp.payments.receipt-pdf', [
+            'payment' => $payment,
+            'isp' => $payment->isp,
+        ], 'receipt-'.$payment->payment_reference.'.pdf');
+    }
+
+    private function renderPdf(string $view, array $data, string $filename)
+    {
+        if (! class_exists(Dompdf::class)) abort(503, 'PDF export is unavailable on this server.');
+        $pdf = new Dompdf;
+        $pdf->loadHtml(view($view, $data)->render());
+        $pdf->setPaper('A4', 'portrait');
+        $pdf->render();
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /** @return \Generator<int, array<int, scalar|null>> */
+    private function paymentRows(Builder $query): \Generator
+    {
+        foreach ($query->lazyById(500) as $payment) {
+            yield [
+                $payment->payment_reference,
+                $payment->transaction_id,
+                $payment->customer?->full_name,
+                $payment->customer?->phone_number,
+                $payment->serviceTypeLabel(),
+                $payment->invoice?->subscription?->plan?->name,
+                $payment->invoice?->invoice_number,
+                $payment->payment_method,
+                $payment->status,
+                (float) $payment->amount,
+                $payment->processed_at?->format('Y-m-d H:i:s'),
+            ];
+        }
     }
 
     protected function filteredPaymentsQuery(Request $request, int $ispId): Builder
@@ -237,6 +411,10 @@ class PaymentController extends Controller
 
         if ($request->filled('payment_method')) {
             $query->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('connection_type')) {
+            $this->applyConnectionTypeFilter($query, $request->string('connection_type')->toString());
         }
 
         if ($request->filled('date_from')) {
@@ -259,6 +437,28 @@ class PaymentController extends Controller
         }
 
         return $query;
+    }
+
+    private function applyConnectionTypeFilter(Builder $query, string $connectionType): void
+    {
+        if ($connectionType === 'hotspot') {
+            $query->where(function (Builder $q) {
+                $q->where('metadata->service_type', 'hotspot')
+                    ->orWhere(function (Builder $legacy) {
+                        $legacy->whereNull('metadata->service_type')
+                            ->whereHas('customer', fn (Builder $customer) => $customer->where('connection_type', 'hotspot'));
+                    })
+                    ->orWhereNotNull('voucher_id');
+            });
+        } elseif ($connectionType === 'pppoe') {
+            $query->where(function (Builder $q) {
+                $q->where('metadata->service_type', 'pppoe')
+                    ->orWhere(function (Builder $legacy) {
+                        $legacy->whereNull('metadata->service_type')
+                            ->whereHas('customer', fn (Builder $customer) => $customer->where('connection_type', 'pppoe'));
+                    });
+            });
+        }
     }
 
     /**
@@ -388,6 +588,13 @@ class PaymentController extends Controller
             }
 
             return back()->with('error', 'This invoice has already been paid.');
+        }
+
+        if ($invoice->status === 'cancelled') {
+            if ($wantsJson) {
+                return response()->json(['success' => false, 'message' => 'Cancelled invoices cannot accept payments.'], 422);
+            }
+            return back()->with('error', 'Cancelled invoices cannot accept payments.');
         }
 
         $phoneNumber = $request->phone_number ?? $invoice->customer->phone_number;

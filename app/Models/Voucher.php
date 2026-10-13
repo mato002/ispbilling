@@ -18,6 +18,7 @@ class Voucher extends Model
         'plan_id',
         'created_by',
         'voucher_code',
+        'batch_reference',
         'voucher_type',
         'time_limit_hours',
         'data_limit_mb',
@@ -85,6 +86,15 @@ class Voucher extends Model
     public function isUsed(): bool
     {
         return $this->status === 'used';
+    }
+
+    public function reportStatusLabel(): string
+    {
+        if ($this->status === 'used') return 'Used';
+        if ($this->isExpired()) return 'Expired';
+        if ($this->status === 'active') return 'Unused';
+
+        return ucfirst($this->status);
     }
 
     public function markAsUsed(?int $customerId = null, ?string $ipAddress = null): void

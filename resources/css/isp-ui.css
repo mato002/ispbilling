@@ -172,9 +172,31 @@
 
 .isp-filter-bar {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.625rem;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
     align-items: end;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+    scrollbar-width: thin;
+}
+
+.isp-filter-bar > * {
+    flex: 0 0 auto;
+}
+
+.isp-filter-bar .isp-form-label {
+    margin-bottom: 0.25rem;
+    font-size: 10px;
+}
+
+.isp-filter-bar .isp-form-input,
+.isp-filter-bar .isp-form-select {
+    min-height: 2.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 0.8125rem;
 }
 
 .isp-table-wrap {

@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Support\Export\CsvExporter;
+use Dompdf\Dompdf;
 use App\Services\IspReportBuilder;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -513,6 +514,52 @@ class ReportController extends Controller
                 }
             }
         );
+    }
+
+    public function exportRevenueStatementPdf(Request $request)
+    {
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date_format:Y-m-d'],
+            'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+        ]);
+        $start = Carbon::parse($validated['start_date'] ?? now()->startOfMonth()->toDateString())->startOfDay();
+        $end = Carbon::parse($validated['end_date'] ?? now()->toDateString())->endOfDay();
+        $ispId = (int) auth()->user()->isp_id;
+        $groups = [];
+        $total = 0.0;
+        $count = 0;
+
+        Payment::query()->where('isp_id', $ispId)->where('status', 'completed')
+            ->whereBetween(DB::raw('COALESCE(processed_at, created_at)'), [$start, $end])
+            ->with(['customer.router', 'invoice.subscription.plan'])
+            ->chunkById(500, function ($payments) use (&$groups, &$total, &$count) {
+                foreach ($payments as $payment) {
+                    $day = ($payment->processed_at ?? $payment->created_at)?->format('Y-m-d') ?? 'Unknown';
+                    $service = $payment->serviceTypeLabel();
+                    $plan = $payment->invoice?->subscription?->plan?->name ?? 'Unattributed';
+                    $location = $payment->customer?->router?->name ?? $payment->customer?->location ?? 'Unknown';
+                    $key = implode('|', [$day, $payment->payment_method, $service, $plan, $location]);
+                    $groups[$key] ??= ['day' => $day, 'method' => strtoupper($payment->payment_method), 'service' => $service, 'plan' => $plan, 'location' => $location, 'count' => 0, 'amount' => 0.0];
+                    $groups[$key]['count']++;
+                    $groups[$key]['amount'] += (float) $payment->amount;
+                    $total += (float) $payment->amount;
+                    $count++;
+                }
+            });
+
+        if (! class_exists(Dompdf::class)) abort(503, 'PDF export is unavailable on this server.');
+        $pdf = new Dompdf;
+        $pdf->loadHtml(view('isp.reports.revenue-statement-pdf', [
+            'isp' => ISP::findOrFail($ispId), 'groups' => array_values($groups), 'total' => $total,
+            'paymentCount' => $count, 'start' => $start, 'end' => $end, 'exportedAt' => now(),
+        ])->render());
+        $pdf->setPaper('A4', 'landscape');
+        $pdf->render();
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="revenue-statement-'.$start->format('Ymd').'-'.$end->format('Ymd').'.pdf"',
+        ]);
     }
 
     public function exportCollectionsCsv(Request $request): StreamedResponse

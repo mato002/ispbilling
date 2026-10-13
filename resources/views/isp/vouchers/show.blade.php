@@ -44,6 +44,10 @@
                         <dd class="font-mono text-lg font-semibold tracking-wide text-slate-900 dark:text-white">{{ $voucher->voucher_code }}</dd>
                     </div>
                     <div>
+                        <dt class="isp-form-label mb-1">Batch</dt>
+                        <dd class="font-mono text-sm text-slate-800 dark:text-slate-100">{{ $voucher->batch_reference ?? 'Single voucher' }}</dd>
+                    </div>
+                    <div>
                         <dt class="isp-form-label mb-1">Router</dt>
                         <dd class="text-sm text-slate-800 dark:text-slate-100">
                             @if($voucher->router)

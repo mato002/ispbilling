@@ -51,9 +51,7 @@
             aria-label="Close menu"
             title="Close menu"
         >
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="15 18 9 12 15 6"/>
-            </svg>
+            <x-font-awesome-icon name="arrow-left" class="h-5 w-5" />
         </button>
     </div>
 
@@ -97,9 +95,7 @@
             :aria-label="$store.sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
             :aria-expanded="(!$store.sidebar.collapsed).toString()"
         >
-            <svg class="h-4 w-4 shrink-0 transition-transform duration-300" :class="$store.sidebar.collapsed ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="15 18 9 12 15 6"/>
-            </svg>
+            <x-font-awesome-icon name="arrow-left" class="h-4 w-4 shrink-0 transition-transform duration-300" ::class="$store.sidebar.collapsed ? 'rotate-180' : ''" />
             <span class="text-xs font-semibold" x-show="!$store.sidebar.collapsed" x-cloak>Collapse</span>
         </button>
     </div>

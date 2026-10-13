@@ -36,6 +36,12 @@
                     'voucher' => 'Voucher',
                 ]"
             />
+            <x-listing-filters.select
+                name="connection_type"
+                label="Service"
+                placeholder="All"
+                :options="['hotspot' => 'Hotspot', 'pppoe' => 'PPPoE']"
+            />
             <x-listing-filters.date name="date_from" label="From" />
             <x-listing-filters.date name="date_to" label="To" />
             <x-listing-filters.per-page />
@@ -47,6 +53,7 @@
                     <tr>
                         <th>Reference</th>
                         <th>Customer</th>
+                        <th>Service</th>
                         <th>Invoice</th>
                         <th>Amount</th>
                         <th>Method</th>
@@ -66,6 +73,7 @@
                                     <div class="text-sm text-slate-500">{{ $payment->customer->phone_number }}</div>
                                 @endif
                             </td>
+                            <td><span class="pb-pill {{ $payment->serviceTypeLabel() === 'Hotspot' ? 'pb-pill-cyan' : 'pb-pill-info' }}">{{ $payment->serviceTypeLabel() }}</span></td>
                             <td>
                                 @if ($payment->invoice)
                                     <a href="{{ route('isp.invoices.show', $payment->invoice) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">#{{ $payment->invoice->id }}</a>

@@ -100,6 +100,20 @@ class Payment extends Model
         return ($this->metadata['purpose'] ?? null) === \App\Services\PlatformSmsWalletService::PURPOSE;
     }
 
+    /** Human-readable service category for tenant payment reporting. */
+    public function serviceTypeLabel(): string
+    {
+        $serviceType = $this->metadata['service_type'] ?? null;
+
+        if ($serviceType === 'hotspot' || $this->voucher_id || (! $serviceType && $this->customer?->connection_type === 'hotspot')) {
+            return 'Hotspot';
+        }
+
+        return $serviceType === 'pppoe' || (! $serviceType && $this->customer?->connection_type === 'pppoe')
+            ? 'PPPoE'
+            : 'Unassigned';
+    }
+
     /**
      * Locate a tenant payment row for an STK callback using the CheckoutRequestID.
      * After completion, {@see $transaction_id} holds the Mpesa receipt, so we also match metadata.
@@ -232,6 +246,21 @@ class Payment extends Model
                     ? self::POSTING_UNPOSTED
                     : self::POSTING_POSTED;
             }
+
+            // Snapshot the service category on the payment so later customer
+            // edits cannot relabel historical revenue in admin reports.
+            $metadata = $payment->metadata ?? [];
+            if (empty($metadata['service_type'])) {
+                if (! empty($payment->voucher_id)) {
+                    $metadata['service_type'] = 'hotspot';
+                } elseif (! empty($payment->customer_id)) {
+                    $connectionType = Customer::query()->whereKey($payment->customer_id)->value('connection_type');
+                    if (in_array($connectionType, ['hotspot', 'pppoe'], true)) {
+                        $metadata['service_type'] = $connectionType;
+                    }
+                }
+            }
+            $payment->metadata = $metadata;
         });
     }
 

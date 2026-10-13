@@ -151,6 +151,33 @@
 
                         <div class="row mt-4">
                             <div class="col-12">
+                                <h4>Hotspot checkout &amp; support</h4>
+                                <p class="text-muted">These details appear on this ISP's public Wi-Fi portal. The Till number is tenant-specific.</p>
+                            </div>
+                            <div class="col-md-4 form-group mb-3">
+                                <label for="mpesa_till_number">M-Pesa Till / Buy Goods number</label>
+                                <input type="text" inputmode="numeric" class="form-control @error('mpesa_till_number') is-invalid @enderror"
+                                       id="mpesa_till_number" name="mpesa_till_number"
+                                       value="{{ old('mpesa_till_number', $portalSetting->mpesa_till_number ?? '5234330') }}" placeholder="5234330">
+                                @error('mpesa_till_number')<span class="invalid-feedback">{{ $message }}</span>@enderror
+                                <small class="form-text text-muted">Use 5234330 or enter this ISP's own Till.</small>
+                            </div>
+                            <div class="col-md-4 form-group mb-3">
+                                <label for="support_phone">Call support</label>
+                                <input type="tel" class="form-control @error('support_phone') is-invalid @enderror"
+                                       id="support_phone" name="support_phone" value="{{ old('support_phone', $portalSetting->support_phone ?? '0728883160') }}" placeholder="0728883160">
+                                @error('support_phone')<span class="invalid-feedback">{{ $message }}</span>@enderror
+                            </div>
+                            <div class="col-md-4 form-group mb-3">
+                                <label for="support_whatsapp">WhatsApp support</label>
+                                <input type="tel" class="form-control @error('support_whatsapp') is-invalid @enderror"
+                                       id="support_whatsapp" name="support_whatsapp" value="{{ old('support_whatsapp', $portalSetting->support_whatsapp ?? '0728883160') }}" placeholder="0728883160">
+                                @error('support_whatsapp')<span class="invalid-feedback">{{ $message }}</span>@enderror
+                            </div>
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-12">
                                 <h4>Preview</h4>
                                 <div class="border rounded p-3" style="background: {{ $portalSetting->background_value }};">
                                     <div class="text-center text-white">

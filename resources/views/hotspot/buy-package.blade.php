@@ -4,9 +4,7 @@
 <div class="max-w-full mx-auto px-1 sm:px-4">
     <div class="text-center mb-3 sm:mb-6">
         <div class="inline-block p-2 sm:p-3 bg-blue-100 rounded-full mb-1 sm:mb-4">
-            <svg class="w-8 h-8 sm:w-16 sm:h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-            </svg>
+            <x-font-awesome-icon name="credit-card" class="h-8 w-8 text-blue-600 sm:h-16 sm:w-16" />
         </div>
         <h2 class="text-xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Complete Purchase</h2>
         <p class="text-xs sm:text-base text-gray-600">Get connected instantly</p>

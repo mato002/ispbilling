@@ -232,29 +232,55 @@ class MikroTikService
         }
     }
 
-    /** Push idle and keepalive behavior to the Hotspot user profile used by this server. */
+    /** Push host idle behavior and authorized-user timeouts to RouterOS. */
     public function syncHotspotSessionTimeouts(HotspotServer $server): bool
     {
-        $profileName = trim((string) $server->default_profile);
-        if ($profileName === '' || ! $this->routerOsLibraryAvailable() || ! $this->connect()) {
+        if (! $this->routerOsLibraryAvailable() || ! $this->connect()) {
             return false;
         }
 
         try {
-            $profiles = $this->apiPrint('/ip/hotspot/user/profile/print');
-            $profile = collect($profiles)->first(fn ($row) => is_array($row) && ($row['name'] ?? null) === $profileName);
-            if (! $profile || empty($profile['.id'])) {
+            $servers = $this->apiPrint('/ip/hotspot/print');
+            $routerServer = collect($servers)->first(fn ($row) => is_array($row)
+                && ($row['name'] ?? null) === $server->name
+                && ($row['interface'] ?? null) === $server->interface);
+            if (! $routerServer || empty($routerServer['.id'])) {
                 return false;
             }
 
             $duration = static fn ($seconds) => (int) $seconds > 0 ? (int) $seconds.'s' : 'none';
-            return $this->apiCommand('/ip/hotspot/user/profile/set', [
-                '.id' => $profile['.id'],
+            $serverUpdated = $this->apiCommand('/ip/hotspot/set', [
+                '.id' => $routerServer['.id'],
                 'idle-timeout' => $duration($server->idle_timeout),
-                'keepalive-timeout' => $duration($server->keepalive_timeout),
             ]);
+            $routerProfiles = $this->apiPrint('/ip/hotspot/user/profile/print');
+            $planProfileNames = Plan::query()
+                ->where('isp_id', $server->isp_id)
+                ->whereNotNull('speed_profile')
+                ->pluck('speed_profile')
+                ->map(fn ($name) => trim((string) $name))
+                ->filter()
+                ->unique()
+                ->values();
+
+            $profilesUpdated = true;
+            foreach ($planProfileNames as $profileName) {
+                $profile = collect($routerProfiles)->first(fn ($row) => is_array($row) && ($row['name'] ?? null) === $profileName);
+                if (! $profile || empty($profile['.id'])) {
+                    $profilesUpdated = false;
+                    continue;
+                }
+
+                $profilesUpdated = $this->apiCommand('/ip/hotspot/user/profile/set', [
+                    '.id' => $profile['.id'],
+                    'idle-timeout' => $duration($server->idle_timeout),
+                    'keepalive-timeout' => $duration($server->keepalive_timeout),
+                ]) && $profilesUpdated;
+            }
+
+            return $serverUpdated && $profilesUpdated;
         } catch (\Throwable $e) {
-            Log::warning('MikroTik hotspot timeout profile sync failed', [
+            Log::warning('MikroTik hotspot server timeout sync failed', [
                 'router_id' => $this->router->id,
                 'hotspot_server_id' => $server->id,
                 'exception' => $e->getMessage(),
@@ -452,8 +478,8 @@ class MikroTikService
                 $params['limit-bytes-total'] = '0';
             }
 
-            if ($plan->billing_type === 'time' && $plan->time_limit_hours) {
-                $params['limit-uptime'] = $plan->time_limit_hours.'h';
+            if ($uptimeLimit = $plan->hotspotUptimeLimit()) {
+                $params['limit-uptime'] = $uptimeLimit;
             }
 
             // Check if connection has comm method (old API) or query method (new API)
@@ -627,14 +653,8 @@ class MikroTikService
                 $params['mac-address'] = $customer->hotspot_mac_address;
             }
 
-            // Set session expiry based on plan duration
-            if ($plan->duration_days) {
-                $params['limit-uptime'] = ($plan->duration_days * 24).'h';
-            }
-
-            // Set time limit if specified
-            if ($plan->billing_type === 'time' && $plan->time_limit_hours) {
-                $params['limit-uptime'] = $plan->time_limit_hours.'h';
+            if ($uptimeLimit = $plan->hotspotUptimeLimit()) {
+                $params['limit-uptime'] = $uptimeLimit;
             }
 
             // Set data limit if specified
@@ -688,17 +708,15 @@ class MikroTikService
                 $params['mac-address'] = $customer->hotspot_mac_address;
             }
 
-            // Update session expiry
-            if ($plan->duration_days) {
-                $params['limit-uptime'] = ($plan->duration_days * 24).'h';
-            }
-
-            if ($plan->billing_type === 'time' && $plan->time_limit_hours) {
-                $params['limit-uptime'] = $plan->time_limit_hours.'h';
+            if ($uptimeLimit = $plan->hotspotUptimeLimit()) {
+                $params['limit-uptime'] = $uptimeLimit;
             }
 
             if ($plan->tracksDataUsage() && $plan->data_limit_mb > 0) {
                 $params['limit-bytes-total'] = (string) ((int) $plan->data_limit_mb * 1024 * 1024);
+            } else {
+                // Clear a prior quota when the subscriber moves to an unlimited plan.
+                $params['limit-bytes-total'] = '0';
             }
 
             if ($plan->upload_speed_kbps || $plan->download_speed_kbps) {
@@ -1652,9 +1670,25 @@ class MikroTikService
 
         $synced = 0;
         try {
-            $activeSessions = $this->getActiveHotspotSessions();
+            // Read directly so an API exception never looks like a successful
+            // empty session list and ends every locally tracked session.
+            $activeSessions = $this->connection->comm('/ip/hotspot/active/print');
+            if (! is_array($activeSessions)) {
+                return 0;
+            }
+            foreach ($activeSessions as $row) {
+                if (is_array($row) && (isset($row['!trap']) || isset($row['!fatal']))) {
+                    Log::warning('RouterOS returned an error while syncing hotspot sessions', [
+                        'router_id' => $this->router->id,
+                    ]);
+                    return 0;
+                }
+            }
 
             foreach ($activeSessions as $session) {
+                if (! is_array($session)) {
+                    continue;
+                }
                 $username = $session['user'] ?? null;
                 if (! $username) {
                     continue;
@@ -1665,25 +1699,32 @@ class MikroTikService
                     ->where('router_id', $this->router->id)
                     ->first();
 
-                // Update or create session record
-                \App\Models\HotspotSession::updateOrCreate(
-                    [
-                        'username' => $username,
-                        'router_id' => $this->router->id,
-                        'status' => 'active',
-                    ],
-                    [
+                $sessionId = $session['.id'] ?? null;
+                $record = $sessionId
+                    ? \App\Models\HotspotSession::query()->where('router_id', $this->router->id)
+                        ->where('mikrotik_session_id', $sessionId)->where('status', 'active')->first()
+                    : null;
+                $record ??= \App\Models\HotspotSession::query()->where('router_id', $this->router->id)
+                    ->where('username', $username)->where('status', 'active')->first();
+
+                $uptime = $this->parseUptime((string) ($session['uptime'] ?? '0s'));
+                $record ??= new \App\Models\HotspotSession();
+                $record->fill([
                         'isp_id' => $this->router->isp_id,
+                        'router_id' => $this->router->id,
                         'customer_id' => $customer?->id,
+                        'username' => $username,
                         'ip_address' => $session['address'] ?? null,
                         'mac_address' => $session['mac-address'] ?? null,
-                        'mikrotik_session_id' => $session['.id'] ?? null,
+                        'mikrotik_session_id' => $sessionId,
                         'bytes_uploaded' => $session['bytes-up'] ?? 0,
                         'bytes_downloaded' => $session['bytes-down'] ?? 0,
-                        'uptime_seconds' => $this->parseUptime($session['uptime'] ?? '0s'),
-                        'started_at' => now(),
-                    ]
-                );
+                        'uptime_seconds' => $uptime,
+                        'started_at' => $record->started_at ?? now()->subSeconds($uptime),
+                        'ended_at' => null,
+                        'status' => 'active',
+                    ]);
+                $record->save();
                 $synced++;
             }
 
@@ -1698,7 +1739,9 @@ class MikroTikService
                 ]);
 
         } catch (Exception $e) {
-            Log::error('Failed to sync active sessions: '.$e->getMessage());
+            Log::error('Failed to sync active sessions: '.$e->getMessage(), [
+                'router_id' => $this->router->id ?? null,
+            ]);
         }
 
         return $synced;

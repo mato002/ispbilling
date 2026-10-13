@@ -158,6 +158,7 @@ class CheckoutController extends Controller
                 'routerReady' => false,
                 'routerLoginUrl' => null,
                 'hotspotPassword' => null,
+                'destinationUrl' => null,
             ], 503);
         }
 
@@ -167,6 +168,7 @@ class CheckoutController extends Controller
             'routerReady' => true,
             'routerLoginUrl' => $customer->hotspot_login_url,
             'hotspotPassword' => $customer->hotspot_password,
+            'destinationUrl' => $customer->custom_attributes['hotspot_original_url'] ?? null,
         ]);
     }
 

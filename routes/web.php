@@ -341,6 +341,9 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
         Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
         Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
         Route::post('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])->name('invoices.mark-paid');
+        Route::post('/invoices/{invoice}/remind', [InvoiceController::class, 'sendReminder'])->name('invoices.remind');
+        Route::post('/invoices/{invoice}/adjust', [InvoiceController::class, 'adjust'])->name('invoices.adjust');
+        Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
         Route::get('/customers/{customer}/invoices/create', [InvoiceController::class, 'createForCustomer'])->name('invoices.create-for-customer');
         Route::post('/customers/{customer}/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
 
@@ -349,7 +352,11 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
         Route::get('/payments/unposted', [App\Http\Controllers\ISP\Web\PaymentController::class, 'unposted'])->name('payments.unposted');
         Route::get('/payments/credits', [App\Http\Controllers\ISP\Web\PaymentController::class, 'credits'])->name('payments.credits');
         Route::get('/payments/failed', [App\Http\Controllers\ISP\Web\PaymentController::class, 'failed'])->name('payments.failed');
+        Route::get('/payments/failed/export.csv', [App\Http\Controllers\ISP\Web\PaymentController::class, 'exportFailedCsv'])->name('payments.failed.export.csv');
         Route::get('/payments/export.csv', [App\Http\Controllers\ISP\Web\PaymentController::class, 'exportCsv'])->name('payments.export.csv');
+        Route::get('/payments/export.xlsx', [App\Http\Controllers\ISP\Web\PaymentController::class, 'exportXlsx'])->name('payments.export.xlsx');
+        Route::get('/payments/export.pdf', [App\Http\Controllers\ISP\Web\PaymentController::class, 'exportPdf'])->name('payments.export.pdf');
+        Route::get('/payments/reconciliation.csv', [App\Http\Controllers\ISP\Web\PaymentController::class, 'exportReconciliationCsv'])->name('payments.reconciliation.csv');
         Route::get('/payments/initiate', [App\Http\Controllers\ISP\Web\PaymentController::class, 'create'])->name('payments.initiate');
         Route::post('/payments/initiate', [App\Http\Controllers\ISP\Web\PaymentController::class, 'initiate'])->name('payments.initiate.store');
         Route::get('/payments/transaction-logs', [App\Http\Controllers\ISP\Web\PaymentController::class, 'transactionLogs'])->name('payments.transaction-logs');
@@ -358,6 +365,7 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
         Route::post('/payments/{payment}/force-sync', [App\Http\Controllers\ISP\Web\PaymentController::class, 'forceSync'])->name('payments.force-sync');
         Route::post('/payments/{payment}/activate-internet', [App\Http\Controllers\ISP\Web\PaymentController::class, 'activateInternet'])->name('payments.activate-internet');
         Route::post('/payments/{payment}/confirm-manual', [App\Http\Controllers\ISP\Web\PaymentController::class, 'confirmManual'])->name('payments.confirm-manual');
+        Route::get('/payments/{payment}/receipt.pdf', [App\Http\Controllers\ISP\Web\PaymentController::class, 'receiptPdf'])->name('payments.receipt.pdf');
         Route::get('/payments/{payment}', [App\Http\Controllers\ISP\Web\PaymentController::class, 'show'])->name('payments.show');
         Route::get('/payments/{payment}/status', [App\Http\Controllers\ISP\Web\PaymentController::class, 'checkStatus'])->name('payments.status');
         Route::get('/customers/{customer}/payments', [App\Http\Controllers\ISP\Web\PaymentController::class, 'customerPayments'])->name('payments.customer');
@@ -370,6 +378,7 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
         Route::get('/reports/revenue-per-plan', [App\Http\Controllers\ISP\Web\ReportController::class, 'revenuePerPlanReport'])->name('reports.revenue-per-plan');
         Route::get('/reports/monthly-collections', [App\Http\Controllers\ISP\Web\ReportController::class, 'monthlyCollectionsReport'])->name('reports.monthly-collections');
         Route::get('/reports/export/revenue.csv', [App\Http\Controllers\ISP\Web\ReportController::class, 'exportRevenueCsv'])->name('reports.export.revenue');
+        Route::get('/reports/export/revenue.pdf', [App\Http\Controllers\ISP\Web\ReportController::class, 'exportRevenueStatementPdf'])->name('reports.export.revenue.pdf');
         Route::get('/reports/export/collections.csv', [App\Http\Controllers\ISP\Web\ReportController::class, 'exportCollectionsCsv'])->name('reports.export.collections');
         Route::get('/reports/export/growth.csv', [App\Http\Controllers\ISP\Web\ReportController::class, 'exportGrowthCsv'])->name('reports.export.growth');
 

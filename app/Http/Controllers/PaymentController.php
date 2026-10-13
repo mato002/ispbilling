@@ -319,17 +319,24 @@ class PaymentController extends Controller
                 $callbackMetadata = $data['Body']['stkCallback']['CallbackMetadata']['Item'] ?? [];
                 $mpesaReceiptNumber = null;
                 $amountPaid = null;
+                $phonePaid = null;
 
                 foreach ($callbackMetadata as $item) {
+                    if (! is_array($item) || ! isset($item['Name'])) {
+                        continue;
+                    }
                     if ($item['Name'] === 'MpesaReceiptNumber') {
                         $mpesaReceiptNumber = $item['Value'];
                     }
                     if ($item['Name'] === 'Amount') {
                         $amountPaid = $item['Value'];
                     }
+                    if ($item['Name'] === 'PhoneNumber') {
+                        $phonePaid = $item['Value'];
+                    }
                 }
 
-                if (! $mpesaReceiptNumber) {
+                if (! $mpesaReceiptNumber || ! is_numeric($amountPaid)) {
                     \App\Models\PaymentTransactionLog::log([
                         'payment_id' => $payment->id,
                         'isp_id' => $payment->isp_id,
@@ -340,14 +347,14 @@ class PaymentController extends Controller
                         'status' => 'failed',
                         'amount' => $payment->amount,
                         'request_data' => $data,
-                        'error_message' => 'Missing MpesaReceiptNumber in callback metadata',
+                        'error_message' => 'Missing receipt number or amount in callback metadata',
                     ]);
 
                     return response()->json(['error' => 'Invalid callback metadata'], 400);
                 }
 
                 // Verify amount matches
-                if ($amountPaid && abs($amountPaid - $payment->amount) > 0.01) {
+                if (abs((float) $amountPaid - (float) $payment->amount) > 0.01) {
                     \App\Models\PaymentTransactionLog::log([
                         'payment_id' => $payment->id,
                         'isp_id' => $payment->isp_id,
@@ -361,6 +368,47 @@ class PaymentController extends Controller
                         'error_message' => 'Amount mismatch. Expected: ' . $payment->amount . ', Received: ' . $amountPaid,
                     ]);
                     return response()->json(['error' => 'Amount mismatch'], 400);
+                }
+
+                if ($payment->phone_number && ! $phonePaid) {
+                    return response()->json(['error' => 'Missing phone number in callback metadata'], 400);
+                }
+                if ($payment->phone_number && $phonePaid) {
+                    $normalizePhone = static function ($phone): string {
+                        $digits = preg_replace('/\D+/', '', (string) $phone);
+                        return str_starts_with($digits, '0') ? '254'.substr($digits, 1) : $digits;
+                    };
+                    if (! hash_equals($normalizePhone($payment->phone_number), $normalizePhone($phonePaid))) {
+                        PaymentTransactionLog::log([
+                            'payment_id' => $payment->id,
+                            'isp_id' => $payment->isp_id,
+                            'transaction_type' => 'webhook',
+                            'payment_method' => 'mpesa',
+                            'transaction_id' => $checkoutRequestId,
+                            'status' => 'failed',
+                            'request_data' => $data,
+                            'error_message' => 'Callback phone number does not match the payment phone number',
+                        ]);
+                        return response()->json(['error' => 'Phone number mismatch'], 400);
+                    }
+                }
+
+                // Callback payloads are not signed by Daraja. Confirm the
+                // checkout ID against Daraja before granting service access.
+                $daraja = (new \App\Services\MpesaService($payment->isp))->verifyPayment($checkoutRequestId);
+                if (\App\Services\MpesaService::interpretStkQueryResult($daraja) !== 'paid') {
+                    PaymentTransactionLog::log([
+                        'payment_id' => $payment->id,
+                        'isp_id' => $payment->isp_id,
+                        'transaction_type' => 'webhook_verification',
+                        'payment_method' => 'mpesa',
+                        'transaction_id' => $checkoutRequestId,
+                        'status' => 'failed',
+                        'request_data' => $data,
+                        'response_data' => $daraja,
+                        'error_message' => 'Daraja STK query did not confirm payment success',
+                    ]);
+                    return response()->json(['error' => 'Payment verification is pending'], 503);
                 }
 
                 $finalizedInTransaction = false;
