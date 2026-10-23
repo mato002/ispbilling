@@ -28,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Keep indexes within the limits used by older MySQL/MariaDB hosts.
+        Schema::defaultStringLength(191);
+
         try {
             if (Schema::hasTable('platform_settings')) {
                 foreach ([

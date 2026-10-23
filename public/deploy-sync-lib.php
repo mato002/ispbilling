@@ -84,6 +84,7 @@ function deploy_resolve_laravel_root(): ?string
 {
     foreach ([
         dirname(__DIR__),
+        dirname(__DIR__).'/ispbilling',
         dirname(__DIR__, 2).'/ispbilling',
     ] as $candidate) {
         if (is_file($candidate.'/vendor/autoload.php')) {
@@ -103,7 +104,9 @@ function deploy_public_web_root(string $laravelRoot): ?string
     }
 
     foreach ([
+        dirname($laravelRoot).'/public_html',
         dirname($laravelRoot).'/public_html/ispbilling',
+        dirname($laravelRoot, 2).'/public_html',
         dirname($laravelRoot, 2).'/public_html/ispbilling',
     ] as $candidate) {
         if (is_dir($candidate)) {

@@ -6,6 +6,8 @@ declare(strict_types=1);
  * Run pending Laravel migrations on production (no SSH required).
  *
  *   POST /deploy-migrate.php with Authorization: Bearer YOUR_TOKEN
+ *
+ * This public helper locates the sibling Laravel application directory.
  */
 require __DIR__.'/deploy-migrate-lib.php';
 

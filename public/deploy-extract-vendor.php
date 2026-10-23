@@ -9,7 +9,7 @@
  */
 declare(strict_types=1);
 
-require __DIR__.'/deploy-token.php';
+require __DIR__.'/deploy-sync-lib.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 
@@ -17,7 +17,11 @@ $provided = '';
 if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $provided = preg_replace('/^Bearer\s+/i', '', (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
 }
-$root = dirname(__DIR__);
+$root = deploy_resolve_laravel_root();
+if ($root === null) {
+    http_response_code(500);
+    exit("Laravel application root not found. Expected a sibling /ispbilling directory.\n");
+}
 $expected = deploy_extract_expected_token($root);
 
 if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || $expected === '' || $provided === '' || ! hash_equals($expected, $provided)) {

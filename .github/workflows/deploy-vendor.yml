@@ -51,6 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           HOST="${FTP_SERVER#ftp://}"; HOST="${HOST#ftps://}"; HOST="${HOST#sftp://}"; HOST="${HOST%%/*}"
+          FTP_DIR="${FTP_DIR:-/ispbilling/}"
           REMOTE_DIR="${FTP_DIR#/}"
           REMOTE_DIR="${REMOTE_DIR%/}"
 
@@ -97,6 +98,7 @@ jobs:
           fi
           echo "$DEPLOY_EXTRACT_TOKEN" > .deploy-extract-token
           HOST="${FTP_SERVER#ftp://}"; HOST="${HOST#ftps://}"; HOST="${HOST#sftp://}"; HOST="${HOST%%/*}"
+          FTP_DIR="${FTP_DIR:-/ispbilling/}"
           REMOTE_DIR="${FTP_DIR#/}"
           REMOTE_DIR="${REMOTE_DIR%/}"
           CURL_OPTS=(--ftp-pasv --connect-timeout 30 --max-time 120)

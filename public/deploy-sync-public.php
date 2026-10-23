@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Copy Laravel public/ to cPanel document root (public_html/ispbilling).
+ * Copy Laravel public/ to the cPanel document root (public_html).
  *
  *   POST /deploy-sync-public.php with Authorization: Bearer YOUR_TOKEN
  */

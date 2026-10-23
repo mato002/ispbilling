@@ -55,7 +55,11 @@ jobs:
           echo "host=${HOST}" >> "$GITHUB_OUTPUT"
           echo "Using ${PROTO}://${HOST}:${PORT}"
 
-          PUBLIC_DIR="${FTP_PUBLIC_DIR:-/public_html/ispbilling/}"
+          APP_DIR="${FTP_SERVER_DIR:-/ispbilling/}"
+          echo "app_dir=${APP_DIR}" >> "$GITHUB_OUTPUT"
+          echo "Laravel application directory: ${APP_DIR}"
+
+          PUBLIC_DIR="${FTP_PUBLIC_DIR:-/public_html/}"
           echo "public_dir=${PUBLIC_DIR}" >> "$GITHUB_OUTPUT"
           echo "Public web root: ${PUBLIC_DIR}"
 
@@ -126,7 +130,7 @@ jobs:
           port: ${{ steps.ftp.outputs.port }}
           protocol: ${{ steps.ftp.outputs.protocol }}
           local-dir: ./
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          server-dir: ${{ steps.ftp.outputs.app_dir }}
           state-name: ftp-deploy-sync-state.json
           timeout: 1200000
           log-level: verbose
@@ -165,9 +169,8 @@ jobs:
             **/public/qrcodes/**
             **/public/qrcodes
 
-      # Publish the protected migration fallback into the new domain's document
-      # root before invoking it. The main application FTP target is a separate
-      # directory from public_html on this cPanel account.
+      # Publish the protected migration fallback into public_html before invoking
+      # it. The Laravel application lives in the sibling /ispbilling directory.
       - name: Deploy public web files (document root)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
