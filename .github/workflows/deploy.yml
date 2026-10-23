@@ -53,12 +53,13 @@ jobs:
           echo "host=${HOST}" >> "$GITHUB_OUTPUT"
           echo "Using ${PROTO}://${HOST}:${PORT}"
 
-          # FTP-Deploy paths are relative to the FTP account root.
-          APP_DIR="ispbilling/"
+          # The FTP account opens in the Laravel app directory (ispbilling).
+          # Deploy app files in-place and public files to its sibling document root.
+          APP_DIR="./"
           echo "app_dir=${APP_DIR}" >> "$GITHUB_OUTPUT"
           echo "Laravel application directory: ${APP_DIR}"
 
-          PUBLIC_DIR="public_html/"
+          PUBLIC_DIR="../public_html/"
           echo "public_dir=${PUBLIC_DIR}" >> "$GITHUB_OUTPUT"
           echo "Public web root: ${PUBLIC_DIR}"
 
