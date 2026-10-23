@@ -163,6 +163,28 @@ jobs:
             **/public/storage
             **/public/favicon.ico
 
+      # Publish the protected migration fallback into the new domain's document
+      # root before invoking it. The main application FTP target is a separate
+      # directory from public_html on this cPanel account.
+      - name: Deploy public web files (document root)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ steps.ftp.outputs.host }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ steps.ftp.outputs.port }}
+          protocol: ${{ steps.ftp.outputs.protocol }}
+          local-dir: ./public/
+          server-dir: ${{ steps.ftp.outputs.public_dir }}
+          state-name: ftp-deploy-public-state.json
+          timeout: 1200000
+          log-level: verbose
+          exclude: |
+            **/build/**
+            **/favicon.ico
+            **/hot
+            **/storage
+
       - name: Run database migrations (HTTP)
         env:
           DEPLOY_EXTRACT_TOKEN: ${{ secrets.DEPLOY_EXTRACT_TOKEN }}
@@ -211,26 +233,6 @@ jobs:
           state-name: ftp-deploy-public-build-state.json
           timeout: 1200000
           log-level: verbose
-
-      - name: Deploy public web files (document root)
-        continue-on-error: true
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ steps.ftp.outputs.host }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ steps.ftp.outputs.port }}
-          protocol: ${{ steps.ftp.outputs.protocol }}
-          local-dir: ./public/
-          server-dir: ${{ steps.ftp.outputs.public_dir }}
-          state-name: ftp-deploy-public-state.json
-          timeout: 1200000
-          log-level: verbose
-          exclude: |
-            **/build/**
-            **/favicon.ico
-            **/hot
-            **/storage
 
       - name: Sync public files on server (HTTP)
         env:
