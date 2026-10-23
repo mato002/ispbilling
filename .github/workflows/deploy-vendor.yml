@@ -60,13 +60,16 @@ jobs:
           fi
 
           CURL_OPTS=(--ftp-pasv --connect-timeout 30 --max-time 900 --retry 5 --retry-delay 10 --retry-all-errors)
-          if [ "$FTP_PROTOCOL" = "ftps" ] || [ "$FTP_PROTOCOL" = "ftps-legacy" ]; then
+          URL_SCHEME="ftp"
+          if [ "$FTP_PROTOCOL" = "ftps" ]; then
             CURL_OPTS+=(--ssl-reqd)
+          elif [ "$FTP_PROTOCOL" = "ftps-legacy" ]; then
+            URL_SCHEME="ftps"
           fi
 
           upload() {
             local file="$1"
-            local url="${FTP_PROTOCOL}://${HOST}:${FTP_PORT}/${REMOTE_DIR}/${file}"
+            local url="${URL_SCHEME}://${HOST}:${FTP_PORT}/${REMOTE_DIR}/${file}"
             echo "Uploading ${file} ..."
             curl "${CURL_OPTS[@]}" -T "$file" --user "${FTP_USER}:${FTP_PASS}" "$url"
           }
@@ -93,12 +96,18 @@ jobs:
             exit 0
           fi
           echo "$DEPLOY_EXTRACT_TOKEN" > .deploy-extract-token
+          HOST="${FTP_SERVER#ftp://}"; HOST="${HOST#ftps://}"; HOST="${HOST#sftp://}"; HOST="${HOST%%/*}"
           REMOTE_DIR="${FTP_DIR#/}"
           REMOTE_DIR="${REMOTE_DIR%/}"
           CURL_OPTS=(--ftp-pasv --connect-timeout 30 --max-time 120)
-          if [ "$FTP_PROTOCOL" = "ftps" ]; then CURL_OPTS+=(--ssl-reqd); fi
+          URL_SCHEME="ftp"
+          if [ "$FTP_PROTOCOL" = "ftps" ]; then
+            CURL_OPTS+=(--ssl-reqd)
+          elif [ "$FTP_PROTOCOL" = "ftps-legacy" ]; then
+            URL_SCHEME="ftps"
+          fi
           curl "${CURL_OPTS[@]}" -T .deploy-extract-token --user "${FTP_USER}:${FTP_PASS}" \
-            "${FTP_PROTOCOL}://${FTP_SERVER}:${FTP_PORT}/${REMOTE_DIR}/storage/app/.deploy-extract-token" \
+            "${URL_SCHEME}://${HOST}:${FTP_PORT}/${REMOTE_DIR}/storage/app/.deploy-extract-token" \
             --ftp-create-dirs
 
       - name: Next step reminder

@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <x-seo-meta
-        :title="($title ?? 'Sign in').' · '.config('app.name', 'PrimeBilling')"
+        :title="($title ?? 'Sign in').' · '.config('app.name')"
         :description="$metaDescription ?? config('seo.default_description')"
         robots="noindex, nofollow"
     />
@@ -388,7 +388,7 @@
                             </svg>
                         </div>
                         <div class="leading-tight">
-                            <div class="text-base font-bold tracking-tight text-white">PrimeBilling</div>
+                            <div class="text-base font-bold tracking-tight text-white">{{ config('app.name') }}</div>
                             <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">ISP Operating System</div>
                         </div>
                     </div>
@@ -397,7 +397,7 @@
                     <div class="max-w-xl">
                         <div class="pb-brand-live-badge pb-fade-up delay-1 mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
                             <span class="pb-pulse"></span>
-                            <span>Live network operations · running on PrimeBilling</span>
+                            <span>Live network operations · running on {{ config('app.name') }}</span>
                         </div>
 
                         <h1 class="pb-fade-up delay-1 text-4xl font-extrabold leading-[1.05] tracking-tight text-white xl:text-5xl">
@@ -502,7 +502,7 @@
                             <span class="pb-pill"><span class="h-1.5 w-1.5 rounded-full bg-violet-400"></span> Hotspot Automation</span>
                             <span class="pb-pill"><span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span> Multi-Tenant SaaS</span>
                         </div>
-                        <p class="mt-4 text-[11px] text-slate-500">&copy; {{ date('Y') }} PrimeBilling · Built for African ISPs</p>
+                        <p class="mt-4 text-[11px] text-slate-500">&copy; {{ date('Y') }} {{ config('app.name') }} · Built for African ISPs</p>
                     </div>
                 </div>
             </aside>
@@ -531,7 +531,7 @@
                                 <circle cx="12" cy="18" r="1.4" fill="currentColor"/>
                             </svg>
                         </div>
-                        <div class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">PrimeBilling</div>
+                        <div class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">{{ config('app.name') }}</div>
                         <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">ISP Operating System</div>
                     </div>
 
@@ -563,7 +563,7 @@
                     </div>
 
                     <p class="mt-4 text-center text-[11px] text-slate-400 lg:hidden">
-                        &copy; {{ date('Y') }} PrimeBilling · Built for African ISPs
+                        &copy; {{ date('Y') }} {{ config('app.name') }} · Built for African ISPs
                     </p>
                 </div>
             </main>

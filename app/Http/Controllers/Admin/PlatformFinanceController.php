@@ -21,7 +21,7 @@ class PlatformFinanceController extends Controller
         $commissionPercent = PlatformSetting::getDecimal('platform_commission_percent', 0.0);
         $saasGraceDays = PlatformSetting::getInt('saas_payment_grace_days', 3);
         $saasDefaultTrialDays = PlatformSetting::getInt('saas_default_trial_days', 14);
-        $saasLockOnPastDue = PlatformSetting::getBool('saas_lock_on_past_due', false);
+        $saasLockOnPastDue = true;
         $saasSuspendCustomerServices = PlatformSetting::getBool('saas_suspend_customer_services', false);
 
         $months = min(24, max(3, (int) $request->get('months', 12)));
@@ -146,7 +146,7 @@ class PlatformFinanceController extends Controller
 
         PlatformSetting::put('saas_payment_grace_days', (string) $validated['saas_payment_grace_days']);
         PlatformSetting::put('saas_default_trial_days', (string) $validated['saas_default_trial_days']);
-        PlatformSetting::put('saas_lock_on_past_due', $request->boolean('saas_lock_on_past_due') ? '1' : '0');
+        PlatformSetting::put('saas_lock_on_past_due', '1');
         PlatformSetting::put('saas_suspend_customer_services', $request->boolean('saas_suspend_customer_services') ? '1' : '0');
 
         return back()->with('success', 'Platform SaaS billing policy saved.');

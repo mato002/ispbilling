@@ -53,6 +53,8 @@ class PlatformIntegration extends Model
             'daraja_consumer_key',
             'daraja_consumer_secret',
             'daraja_passkey',
+            'paystack_public_key',
+            'paystack_secret_key',
             'flutterwave_public_key',
             'flutterwave_secret_key',
             'flutterwave_encryption_key',

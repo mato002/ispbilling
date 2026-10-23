@@ -99,11 +99,25 @@
                 <div class="border-b border-gray-200 p-6 dark:border-gray-700">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">API credentials vault</h3>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Optional platform-level secrets (Daraja, Flutterwave, Pesapal) encrypted at rest with your application key. Leave a field blank to keep the current value.
+                        Platform-level secrets are encrypted at rest with your application key. Leave a field blank to keep the current value.
                         Tenant-specific keys should continue to live under each ISP’s payment methods (also encrypted).
                     </p>
                 </div>
                 <div class="space-y-6 p-6">
+                    <div>
+                        <h4 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Paystack platform billing</h4>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400" for="vault_paystack_public_key">Public key</label>
+                                <input id="vault_paystack_public_key" name="vault_paystack_public_key" type="password" autocomplete="off" class="w-full rounded-md border-gray-300 font-mono text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300" placeholder="{{ ($vaultPresence['paystack_public_key'] ?? false) ? '•••• saved' : 'Not set' }}" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400" for="vault_paystack_secret_key">Secret key</label>
+                                <input id="vault_paystack_secret_key" name="vault_paystack_secret_key" type="password" autocomplete="off" class="w-full rounded-md border-gray-300 font-mono text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300" placeholder="{{ ($vaultPresence['paystack_secret_key'] ?? false) ? '•••• saved' : 'Not set' }}" />
+                            </div>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Used for platform subscription invoices paid by ISP operators. This is separate from each ISP’s own Paystack keys. The webhook endpoint is <code>{{ url('/api/payments/platform/paystack/webhook') }}</code>.</p>
+                    </div>
                     <div>
                         <h4 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Safaricom Daraja</h4>
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-3">

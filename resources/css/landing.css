@@ -36,6 +36,44 @@
     color: transparent;
 }
 
+.pb-hero-slide { display: grid; }
+.pb-hero-slide-content { grid-area: 1 / 1; }
+.pb-hero-arrow,
+.pb-hero-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease, opacity .2s ease;
+}
+.pb-hero-arrow {
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid rgba(148, 163, 184, .35);
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, .82);
+    color: #334155;
+    font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
+}
+.pb-hero-arrow:hover { transform: translateY(-1px); border-color: #93c5fd; color: var(--pb-brand); }
+.pb-hero-dot { width: .5rem; height: .5rem; border-radius: 9999px; background: #cbd5e1; }
+.pb-hero-dot.is-active { width: 1.5rem; background: var(--pb-brand); }
+.pb-hero-arrow:focus-visible,
+.pb-hero-dot:focus-visible { outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 3px; }
+
+/* A consistent, restrained response across landing page controls and content. */
+.pb-landing a,
+.pb-landing button,
+.pb-landing summary,
+.pb-landing input,
+.pb-landing select,
+.pb-landing textarea { transition-duration: .22s; }
+.pb-landing a:focus-visible,
+.pb-landing button:focus-visible,
+.pb-landing summary:focus-visible { outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 3px; }
+.pb-landing .pb-card { box-shadow: 0 1px 2px rgba(15, 23, 42, .025); }
+.pb-landing .pb-card:hover { box-shadow: 0 16px 36px -14px rgba(15, 23, 42, .18); }
+
 /* Glass nav */
 .pb-nav-glass {
     background: rgba(255, 255, 255, 0.82);
@@ -317,4 +355,13 @@
         opacity: 1;
         transform: none;
     }
+    .pb-hero-arrow,
+    .pb-hero-dot,
+    .pb-hero-slide-content,
+    .pb-landing a,
+    .pb-landing button,
+    .pb-landing summary,
+    .pb-landing input,
+    .pb-landing select,
+    .pb-landing textarea { transition: none !important; }
 }

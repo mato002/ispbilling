@@ -1,4 +1,4 @@
-@php($title = 'Reset password · PrimeBilling')
+@php($title = 'Reset password · '.config('app.name'))
 
 <x-guest-layout>
     <div class="mb-7">

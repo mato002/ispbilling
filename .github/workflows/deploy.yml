@@ -161,6 +161,7 @@ jobs:
             **/storage/pail/**
             **/public/hot
             **/public/storage
+            **/public/favicon.ico
 
       - name: Run database migrations (HTTP)
         env:

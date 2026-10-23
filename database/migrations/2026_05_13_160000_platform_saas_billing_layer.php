@@ -50,7 +50,7 @@ return new class extends Migration
 
         if (! Schema::hasColumn('i_s_p_s', 'platform_saas_plan_id')) {
             Schema::table('i_s_p_s', function (Blueprint $table) {
-                $table->foreignId('platform_saas_plan_id')->nullable()->after('saas_tier')->constrained('platform_saas_plans')->nullOnDelete();
+                $table->foreignId('platform_saas_plan_id')->nullable()->constrained('platform_saas_plans')->nullOnDelete();
                 $table->string('saas_subscription_status', 24)->default('none')->after('platform_saas_plan_id');
                 $table->timestamp('saas_trial_ends_at')->nullable()->after('saas_subscription_status');
                 $table->date('saas_current_period_start')->nullable()->after('saas_trial_ends_at');

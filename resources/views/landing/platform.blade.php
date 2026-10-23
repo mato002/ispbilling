@@ -4,25 +4,22 @@
 @endphp
 
 {{-- Hero --}}
-<section class="pb-hero-mesh px-4 pb-16 pt-28 sm:px-6 lg:px-8">
+<section class="pb-hero-mesh px-4 pb-16 pt-28 sm:px-6 lg:px-8" x-data="landingHero()" @mouseenter="pause()" @mouseleave="resume()" @focusin="pause()" @focusout="if (!$el.contains($event.relatedTarget)) resume()" aria-roledescription="carousel" aria-label="Platform highlights">
     <div class="mx-auto max-w-7xl">
         <div class="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
             <div class="pb-reveal">
-                <div class="mb-6 flex flex-wrap gap-2">
-                    @foreach (['MikroTik-native', 'M-Pesa STK Push', 'Hotspot & PPPoE', 'Multi-tenant SaaS'] as $badge)
-                        <span class="rounded-full border border-blue-200/80 bg-white/80 px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">{{ $badge }}</span>
-                    @endforeach
+                <div class="mb-6 flex flex-wrap gap-2" aria-label="Platform capabilities">
+                    <template x-for="badge in slides[active].badges" :key="badge"><span class="rounded-full border border-blue-200/80 bg-white/85 px-3 py-1 text-xs font-bold text-blue-700 shadow-sm" x-text="badge"></span></template>
                 </div>
 
-                <h1 class="text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.25rem]">
-                    Run billing, network access, and
-                    <span class="pb-gradient-text">customer operations</span>
-                    from one platform
-                </h1>
-
-                <p class="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-                    {{ $appName }} connects M-Pesa collections, MikroTik provisioning, subscriber management, and field operations — built for African ISPs who need automation without enterprise complexity.
-                </p>
+                <div class="pb-hero-slide" aria-live="polite" aria-atomic="true">
+                    <template x-for="(slide, index) in slides" :key="slide.emphasis">
+                        <div x-show="active === index" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 -translate-y-2" class="pb-hero-slide-content">
+                            <h1 class="text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.25rem]"><span x-text="slide.lead"></span> <span class="pb-gradient-text" x-text="slide.emphasis"></span> <span x-text="slide.end"></span></h1>
+                            <p class="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg" x-text="slide.description"></p>
+                        </div>
+                    </template>
+                </div>
 
                 <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                     @guest
@@ -34,6 +31,12 @@
                 </div>
 
                 <p class="mt-4 text-sm text-slate-500">No credit card required · Typical setup within 24 hours · Unlimited MikroTik routers</p>
+                <div class="mt-6 flex items-center gap-3" aria-label="Choose a platform highlight">
+                    <button type="button" class="pb-hero-arrow" @click="previous()" aria-label="Previous highlight">←</button>
+                    <template x-for="(slide, index) in slides" :key="index"><button type="button" class="pb-hero-dot" :class="{ 'is-active': active === index }" @click="goTo(index)" :aria-label="`Show highlight ${index + 1}`" :aria-current="active === index ? 'true' : null"></button></template>
+                    <button type="button" class="pb-hero-arrow" @click="next()" aria-label="Next highlight">→</button>
+                    <span class="ml-1 text-xs font-semibold text-slate-500" x-text="`${String(active + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`"></span>
+                </div>
             </div>
 
             <div class="pb-reveal lg:pl-4" style="transition-delay: 0.1s">

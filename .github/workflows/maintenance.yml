@@ -1,0 +1,84 @@
+name: Production maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Select the server maintenance operation
+        required: true
+        type: choice
+        default: migrations
+        options:
+          - migrations
+          - clear-cache
+          - both
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-maintenance
+  cancel-in-progress: false
+
+jobs:
+  maintenance:
+    name: Run production maintenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Run selected operation
+        env:
+          OPERATION: ${{ inputs.operation }}
+          DEPLOY_EXTRACT_TOKEN: ${{ secrets.DEPLOY_EXTRACT_TOKEN }}
+          DEPLOY_SITE_URL: ${{ secrets.DEPLOY_SITE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DEPLOY_EXTRACT_TOKEN" ]; then
+            echo "::error::Add DEPLOY_EXTRACT_TOKEN to GitHub Secrets."
+            exit 1
+          fi
+
+          BASE="${DEPLOY_SITE_URL:-https://ispbilling.zhengkyc.com}"
+          BASE="${BASE%/}"
+
+          run_endpoint() {
+            local label="$1"
+            shift
+            local succeeded=0
+            for path in "$@"; do
+              local url="${BASE}${path}"
+              echo "Running ${label} via ${path} ..."
+              local http
+              http=$(curl -sS --connect-timeout 30 --max-time 300 \
+                -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" \
+                -o /tmp/maintenance-response.txt -w "%{http_code}" "$url" || true)
+              echo "HTTP ${http:-000}"
+              cat /tmp/maintenance-response.txt 2>/dev/null || true
+              echo
+              if [ "$http" = "200" ]; then
+                succeeded=1
+                break
+              fi
+            done
+            if [ "$succeeded" -ne 1 ]; then
+              echo "::error::${label} failed. Check DEPLOY_SITE_URL, DEPLOY_EXTRACT_TOKEN, and the deployed maintenance endpoint."
+              exit 1
+            fi
+          }
+
+          case "$OPERATION" in
+            migrations)
+              run_endpoint "Database migrations" /api/deploy/migrate /deploy-migrate.php
+              ;;
+            clear-cache)
+              run_endpoint "Bootstrap cache clear" /deploy-clear-cache.php
+              ;;
+            both)
+              run_endpoint "Database migrations" /api/deploy/migrate /deploy-migrate.php
+              run_endpoint "Bootstrap cache clear" /deploy-clear-cache.php
+              ;;
+            *)
+              echo "::error::Unsupported operation: ${OPERATION}"
+              exit 1
+              ;;
+          esac

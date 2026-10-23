@@ -1,4 +1,4 @@
-@php($title = 'Register your ISP · PrimeBilling')
+@php($title = 'Register your ISP · '.config('app.name'))
 
 <x-guest-layout compact>
     <div class="mb-4">

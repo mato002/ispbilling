@@ -43,7 +43,7 @@
     <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6 mb-8">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Platform SaaS billing policy</h3>
         <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
-            Controls grace period, trial defaults for new plans, console lock on unpaid invoices, and optional customer-network kill switch when a tenant is suspended.
+            Controls the payment grace period, trial defaults for new plans, and optional customer-network suspension after a tenant is locked.
         </p>
         <form method="POST" action="{{ route('admin.finance.saas-policy') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             @csrf
@@ -52,7 +52,7 @@
                 <input id="saas_payment_grace_days" name="saas_payment_grace_days" type="number" min="0" max="90" required
                        value="{{ old('saas_payment_grace_days', $saasGraceDays) }}"
                        class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 text-sm" />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Days after invoice before suspend. Use <strong>0</strong> for immediate suspend after grace window ends on due date.</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">The ISP admin console locks as soon as the paid period expires. This grace period controls when optional subscriber network suspension runs.</p>
             </div>
             <div>
                 <label for="saas_default_trial_days" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Default trial (new plans)</label>
@@ -62,11 +62,11 @@
             </div>
             <div class="space-y-3">
                 <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
-                    <input type="checkbox" name="saas_lock_on_past_due" value="1" class="mt-1 rounded border-gray-300 dark:border-gray-600"
-                           @checked(old('saas_lock_on_past_due', $saasLockOnPastDue)) />
+                    <input type="hidden" name="saas_lock_on_past_due" value="1" />
+                    <input type="checkbox" checked disabled class="mt-1 rounded border-gray-300 dark:border-gray-600" />
                     <span>
-                        Lock console on first unpaid invoice
-                        <span class="block text-xs text-gray-500 dark:text-gray-400">Blocks dashboard/API immediately when billing enters <code class="text-xs">past_due</code> (Platform subscription page stays open).</span>
+                        Lock console when paid access expires
+                        <span class="block text-xs text-gray-500 dark:text-gray-400">Billing remains available so the ISP admin can renew and regain access.</span>
                     </span>
                 </label>
                 <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">

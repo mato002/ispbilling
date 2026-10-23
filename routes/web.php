@@ -56,11 +56,15 @@ use App\Http\Controllers\ISP\Web\VoucherController;
 use App\Http\Controllers\FeatureDiscoveryController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaystackPlatformBillingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\StaticPageController;
 use App\Http\Middleware\HandlePaymentWebhook;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/payments/platform/paystack/callback', [PaystackPlatformBillingController::class, 'callback'])
+    ->name('payments.platform.paystack.callback');
 
 Route::get('/', [LandingController::class, 'show'])->name('welcome');
 
@@ -130,6 +134,7 @@ Route::middleware(['auth', 'load.tenant.isp'])->group(function () {
         Route::get('/platform-subscription', [PlatformSubscriptionController::class, 'index'])->name('platform-subscription.index');
         Route::post('/platform-subscription/change-plan', [PlatformSubscriptionController::class, 'changePlan'])->name('platform-subscription.change-plan');
         Route::post('/platform-subscription/invoices/{invoice}/pay', [PlatformSubscriptionController::class, 'payInvoice'])->name('platform-subscription.pay');
+        Route::post('/platform-subscription/invoices/{invoice}/pay/paystack', [PlatformSubscriptionController::class, 'payWithPaystack'])->name('platform-subscription.pay.paystack');
         Route::get('/platform-subscription/invoices/{invoice}', [PlatformSubscriptionController::class, 'downloadInvoice'])->name('platform-subscription.invoice');
 
         // Customers

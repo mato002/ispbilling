@@ -1,4 +1,4 @@
-@php($title = 'Create operator account · PrimeBilling')
+@php($title = 'Create operator account · '.config('app.name'))
 
 <x-guest-layout>
     <div class="mb-7">
@@ -123,7 +123,7 @@
         <label for="terms" class="flex cursor-pointer items-start gap-2.5 select-none">
             <input id="terms" type="checkbox" required class="pb-check mt-0.5">
             <span class="text-sm text-slate-600 dark:text-slate-300">
-                I agree to PrimeBilling's
+                I agree to {{ config('app.name') }}'s
                 <a href="#" class="font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300">Terms of Service</a>
                 and
                 <a href="#" class="font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300">Privacy Policy</a>.

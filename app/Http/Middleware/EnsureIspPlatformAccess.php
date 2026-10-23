@@ -29,7 +29,7 @@ class EnsureIspPlatformAccess
             }
 
             $message = $isp->platform_access_message
-                ?? 'Your PrimeBilling platform subscription is suspended. Please pay your invoice to restore access.';
+                ?? 'Your '.config('app.name').' platform subscription is suspended. Please pay your invoice to restore access.';
 
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -42,7 +42,7 @@ class EnsureIspPlatformAccess
             return response()
                 ->view('isp.platform-access-locked', [
                     'isp' => $isp,
-                    'message' => $isp->platform_access_message,
+                    'message' => $message,
                 ], 403);
         }
 

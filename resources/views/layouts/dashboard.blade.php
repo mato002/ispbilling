@@ -26,7 +26,8 @@
                 @endif
 
                 <!-- Main Content -->
-                <main class="flex-1 {{ Auth::check() && (Auth::user()->isIspAdmin() || Auth::user()->isIspStaff()) ? 'ml-64' : '' }}">
+                <turbo-frame id="pb-main" class="block flex-1 {{ Auth::check() && (Auth::user()->isIspAdmin() || Auth::user()->isIspStaff()) ? 'ml-64' : '' }}">
+                <main class="min-h-screen">
                     <!-- Page Heading -->
                     @isset($header)
                         <header class="bg-white dark:bg-gray-800 shadow mt-16">
@@ -43,6 +44,7 @@
                         </div>
                     </div>
                 </main>
+                </turbo-frame>
             </div>
         </div>
     </body>

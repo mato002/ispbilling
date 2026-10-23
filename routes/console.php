@@ -72,7 +72,7 @@ Schedule::call(function () {
     ->name('routers:trim-metrics');
 
 Schedule::job(new RunPlatformSaasDailyBillingJob())
-    ->dailyAt('06:10')
+    ->hourly()
     ->name('platform-saas:daily')
     ->withoutOverlapping();
 

@@ -7,13 +7,17 @@ use App\Jobs\SuspendEntireIspNetworkJob;
 use App\Models\ISP;
 use App\Models\Payment;
 use App\Models\PlatformSaasInvoice;
+use App\Models\PlatformSaasPaymentAttempt;
 use App\Models\PlatformSaasPlan;
 use App\Models\PlatformSaasSubscription;
+use App\Models\PlatformIntegration;
 use App\Models\PlatformSetting;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class PlatformSaasBillingService
 {
@@ -29,7 +33,8 @@ class PlatformSaasBillingService
 
     public function lockOnPastDue(): bool
     {
-        return PlatformSetting::getBool('saas_lock_on_past_due', false);
+        // Platform access must be locked when the paid period expires; billing routes remain allowlisted.
+        return true;
     }
 
     public function suspendCustomerServicesOnPlatformSuspend(): bool
@@ -286,6 +291,199 @@ class PlatformSaasBillingService
         return $mpesa->initiateStkPush($payment);
     }
 
+    /** Start a Paystack-hosted checkout for an ISP's platform invoice. */
+    public function initiatePaystackForInvoice(PlatformSaasInvoice $invoice): array
+    {
+        $secret = $this->paystackSecretKey();
+        if ($secret === '') {
+            return ['success' => false, 'message' => 'Paystack is not configured. Set PAYSTACK_SECRET_KEY on the server.'];
+        }
+
+        if ($invoice->status !== PlatformSaasInvoice::STATUS_PENDING) {
+            return ['success' => false, 'message' => 'This platform invoice is not awaiting payment.'];
+        }
+
+        $amount = round($invoice->totalAmount(), 2);
+        if ($amount <= 0) {
+            return ['success' => false, 'message' => 'The invoice amount must be greater than zero.'];
+        }
+
+        $email = filter_var($invoice->isp?->email, FILTER_VALIDATE_EMAIL)
+            ? $invoice->isp->email
+            : $invoice->isp?->users()->whereNotNull('email')->value('email');
+        if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Add a valid billing email to the ISP profile before paying online.'];
+        }
+
+        $attempt = PlatformSaasPaymentAttempt::create([
+            'isp_id' => $invoice->isp_id,
+            'platform_saas_invoice_id' => $invoice->id,
+            'reference' => 'PBSAAS-'.Str::upper(Str::random(24)),
+            'amount' => $amount,
+            'currency' => strtoupper($invoice->currency ?: 'KES'),
+            'status' => 'pending',
+        ]);
+
+        try {
+            $response = Http::withToken($secret)
+                ->acceptJson()
+                ->asJson()
+                ->timeout(20)
+                ->post(rtrim((string) config('services.paystack.base_url'), '/').'/transaction/initialize', [
+                    'email' => $email,
+                    'amount' => (int) round($amount * 100),
+                    'currency' => $attempt->currency,
+                    'reference' => $attempt->reference,
+                    'callback_url' => route('payments.platform.paystack.callback'),
+                    'metadata' => [
+                        'purpose' => 'platform_saas_invoice',
+                        'invoice_id' => $invoice->id,
+                        'isp_id' => $invoice->isp_id,
+                    ],
+                ]);
+
+            $payload = $response->json();
+            $authorizationUrl = data_get($payload, 'data.authorization_url');
+            if (! $response->successful() || ! data_get($payload, 'status') || ! is_string($authorizationUrl)) {
+                $attempt->update(['status' => 'failed', 'metadata' => ['initialize_error' => data_get($payload, 'message', 'Paystack could not start checkout.')]]);
+                return ['success' => false, 'message' => data_get($payload, 'message', 'Paystack could not start checkout.')];
+            }
+
+            $attempt->update(['authorization_url' => $authorizationUrl]);
+
+            return ['success' => true, 'url' => $authorizationUrl];
+        } catch (\Throwable $exception) {
+            $attempt->update(['status' => 'failed', 'metadata' => ['initialize_error' => 'Paystack could not be reached.']]);
+            Log::warning('Paystack platform checkout initialization failed', [
+                'invoice_id' => $invoice->id,
+                'isp_id' => $invoice->isp_id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return ['success' => false, 'message' => 'Paystack could not be reached. Please try again.'];
+        }
+    }
+
+    /** Verify a Paystack reference directly with Paystack and apply only a matching successful payment. */
+    public function verifyAndApplyPaystackPayment(string $reference): bool
+    {
+        $secret = $this->paystackSecretKey();
+        if ($secret === '' || $reference === '') {
+            return false;
+        }
+
+        $attempt = PlatformSaasPaymentAttempt::query()->where('reference', $reference)->first();
+        if (! $attempt) {
+            return false;
+        }
+        if ($attempt->status === 'paid') {
+            return true;
+        }
+        if ($attempt->status !== 'pending') {
+            return false;
+        }
+
+        try {
+            $response = Http::withToken($secret)
+                ->acceptJson()
+                ->timeout(20)
+                ->get(rtrim((string) config('services.paystack.base_url'), '/').'/transaction/verify/'.rawurlencode($reference));
+        } catch (\Throwable $exception) {
+            Log::warning('Paystack platform payment verification failed', ['reference' => $reference, 'message' => $exception->getMessage()]);
+            return false;
+        }
+
+        $data = $response->json('data');
+        if (! $response->successful()
+            || ! $response->json('status')
+            || data_get($data, 'status') !== 'success'
+            || ! hash_equals($attempt->reference, (string) data_get($data, 'reference'))
+            || (int) data_get($data, 'amount', 0) !== (int) round((float) $attempt->amount * 100)
+            || strtoupper((string) data_get($data, 'currency')) !== strtoupper($attempt->currency)) {
+            return false;
+        }
+
+        return DB::transaction(function () use ($attempt, $data): bool {
+            $attempt = PlatformSaasPaymentAttempt::query()->lockForUpdate()->find($attempt->id);
+            if (! $attempt) {
+                return false;
+            }
+            if ($attempt->status === 'paid') {
+                return true;
+            }
+            if ($attempt->status !== 'pending') {
+                return false;
+            }
+
+            $invoice = PlatformSaasInvoice::query()->lockForUpdate()->find($attempt->platform_saas_invoice_id);
+            $isp = $invoice?->isp;
+            if (! $invoice || ! $isp) {
+                return false;
+            }
+
+            $attempt->update([
+                'status' => 'paid',
+                'gateway_transaction_id' => (string) data_get($data, 'id'),
+                'paid_at' => now(),
+                'metadata' => ['channel' => data_get($data, 'channel'), 'paid_at' => data_get($data, 'paid_at')],
+            ]);
+
+            if ($invoice->status !== PlatformSaasInvoice::STATUS_PAID) {
+                $invoice->update([
+                    'status' => PlatformSaasInvoice::STATUS_PAID,
+                    'paid_at' => now(),
+                    'metadata' => array_merge($invoice->metadata ?? [], [
+                        'paystack_reference' => $attempt->reference,
+                        'paystack_transaction_id' => (string) data_get($data, 'id'),
+                    ]),
+                ]);
+
+                $periodStart = now()->startOfDay();
+                $periodEnd = $periodStart->copy()->addMonth()->subDay();
+                $planId = $isp->saas_pending_platform_plan_id ?: $invoice->platform_saas_plan_id;
+                $updates = [
+                    'saas_subscription_status' => 'active',
+                    'saas_current_period_start' => $periodStart->toDateString(),
+                    'saas_current_period_end' => $periodEnd->toDateString(),
+                    'saas_next_billing_at' => $periodStart->copy()->addMonth(),
+                    'saas_grace_ends_at' => null,
+                    'platform_access_locked' => false,
+                    'platform_access_message' => null,
+                    'is_active' => true,
+                    'saas_setup_fee_paid_at' => (float) $invoice->setup_fee_amount > 0 ? now() : $isp->saas_setup_fee_paid_at,
+                ];
+                if ($planId && (int) $planId !== (int) $isp->platform_saas_plan_id) {
+                    $plan = PlatformSaasPlan::query()->find($planId);
+                    if ($plan) {
+                        $updates['platform_saas_plan_id'] = $plan->id;
+                        $updates['saas_tier'] = $plan->slug;
+                        $updates['saas_pending_platform_plan_id'] = null;
+                    }
+                }
+                $isp->update($updates);
+                User::where('isp_id', $isp->id)->update(['is_active' => true]);
+                PlatformSaasSubscription::query()->updateOrCreate(
+                    ['isp_id' => $isp->id],
+                    [
+                        'platform_saas_plan_id' => $updates['platform_saas_plan_id'] ?? $isp->platform_saas_plan_id,
+                        'status' => PlatformSaasSubscription::STATUS_ACTIVE,
+                        'current_period_start' => $periodStart,
+                        'current_period_end' => $periodEnd,
+                    ]
+                );
+            }
+
+            return true;
+        });
+    }
+
+    protected function paystackSecretKey(): string
+    {
+        $vault = PlatformIntegration::current()->credentials_vault ?? [];
+
+        return (string) ($vault['paystack_secret_key'] ?? config('services.paystack.secret_key', ''));
+    }
+
     public function onMpesaPaymentSucceeded(Payment $payment): void
     {
         $invoiceId = $payment->metadata['platform_saas_invoice_id'] ?? null;
@@ -322,6 +520,7 @@ class PlatformSaasBillingService
                 'saas_next_billing_at' => $nextBill,
                 'saas_grace_ends_at' => null,
                 'platform_access_locked' => false,
+                'platform_access_message' => null,
                 'is_active' => true,
                 'saas_setup_fee_paid_at' => $setupPaid ? now() : $isp->saas_setup_fee_paid_at,
             ];
@@ -340,15 +539,15 @@ class PlatformSaasBillingService
 
             $isp->update($planUpdates);
 
-            if (! empty($planUpdates['platform_saas_plan_id'])) {
-                PlatformSaasSubscription::query()->updateOrCreate(
-                    ['isp_id' => $isp->id],
-                    [
-                        'platform_saas_plan_id' => $planUpdates['platform_saas_plan_id'],
-                        'status' => PlatformSaasSubscription::STATUS_ACTIVE,
-                    ]
-                );
-            }
+            PlatformSaasSubscription::query()->updateOrCreate(
+                ['isp_id' => $isp->id],
+                [
+                    'platform_saas_plan_id' => $planUpdates['platform_saas_plan_id'] ?? $isp->platform_saas_plan_id,
+                    'status' => PlatformSaasSubscription::STATUS_ACTIVE,
+                    'current_period_start' => $periodStart,
+                    'current_period_end' => $periodEnd,
+                ]
+            );
 
             User::where('isp_id', $isp->id)->update(['is_active' => true]);
         });
@@ -361,13 +560,10 @@ class PlatformSaasBillingService
     public function suspendIspForOverdueSaas(ISP $isp, ?string $message = null): void
     {
         $isp->update([
-            'is_active' => false,
             'platform_access_locked' => true,
-            'platform_access_message' => $message ?? 'Your PrimeBilling platform subscription is suspended after the payment grace period. Please pay your invoice to restore access.',
+            'platform_access_message' => $message ?? 'Your platform subscription is suspended after the payment grace period. Pay your invoice to restore access.',
             'saas_subscription_status' => 'suspended',
         ]);
-
-        User::where('isp_id', $isp->id)->update(['is_active' => false]);
 
         if ($this->suspendCustomerServicesOnPlatformSuspend()) {
             SuspendEntireIspNetworkJob::dispatch($isp->id, markPlatformSuspension: true);
@@ -412,7 +608,7 @@ class PlatformSaasBillingService
 
         if ($this->lockOnPastDue()) {
             $updates['platform_access_locked'] = true;
-            $updates['platform_access_message'] = 'Your PrimeBilling platform invoice is unpaid. Pay from Platform subscription to restore console access.';
+            $updates['platform_access_message'] = 'Your '.config('app.name').' platform invoice is unpaid. Pay from Platform subscription to restore console access.';
         }
 
         $isp->update($updates);
@@ -436,7 +632,7 @@ class PlatformSaasBillingService
         if ($pending) {
             $meta = $pending->metadata ?? [];
             $sentDate = $meta['stk_sent_on'] ?? null;
-            if ($sentDate !== $today->toDateString()) {
+            if ($isp->saas_billing_method === 'mpesa' && $sentDate !== $today->toDateString()) {
                 $result = $this->initiateStkForInvoice($pending);
                 $meta['stk_sent_on'] = $today->toDateString();
                 $meta['last_stk_result'] = $result;
@@ -454,13 +650,15 @@ class PlatformSaasBillingService
 
         $anchor = $isp->saas_next_billing_at->copy();
         $invoice = $this->createPendingInvoice($isp, $anchor);
-        $result = $this->initiateStkForInvoice($invoice);
-        $invoice->update([
-            'metadata' => array_merge($invoice->metadata ?? [], [
-                'stk_sent_on' => $today->toDateString(),
-                'first_stk_result' => $result,
-            ]),
-        ]);
+        if ($isp->saas_billing_method === 'mpesa') {
+            $result = $this->initiateStkForInvoice($invoice);
+            $invoice->update([
+                'metadata' => array_merge($invoice->metadata ?? [], [
+                    'stk_sent_on' => $today->toDateString(),
+                    'first_stk_result' => $result,
+                ]),
+            ]);
+        }
 
         $graceEnds = $invoice->due_date
             ? Carbon::parse($invoice->due_date)->endOfDay()

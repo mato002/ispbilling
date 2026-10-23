@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaystackPlatformBillingController;
 use App\Http\Controllers\DeployMigrateController;
 use App\Http\Controllers\DeploySyncController;
 use App\Http\Controllers\ISP\CustomerController;
@@ -54,6 +55,8 @@ Route::post('/payments/selcom/callback', [PaymentController::class, 'selcomCallb
     ->name('payments.selcom.callback');
 Route::post('/payments/stripe/webhook', [PaymentController::class, 'stripeWebhook'])
     ->name('payments.stripe.webhook');
+Route::post('/payments/platform/paystack/webhook', [PaystackPlatformBillingController::class, 'webhook'])
+    ->name('payments.platform.paystack.webhook');
 
 // Public Hotspot API (for MikroTik router integration)
 Route::prefix('hotspot')->name('hotspot.')->group(function () {

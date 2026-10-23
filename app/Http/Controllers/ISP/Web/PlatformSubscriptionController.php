@@ -92,6 +92,21 @@ class PlatformSubscriptionController extends Controller
             ->with('error', $result['message'] ?? 'Could not start M-Pesa payment.');
     }
 
+    public function payWithPaystack(PlatformSaasInvoice $invoice, PlatformSaasBillingService $billing): RedirectResponse
+    {
+        $user = auth()->user();
+        abort_unless((int) $user->isp_id === (int) $invoice->isp_id, 403);
+        abort_unless($user->isIspAdmin(), 403);
+
+        $result = $billing->initiatePaystackForInvoice($invoice);
+        if ($result['success'] ?? false) {
+            return redirect()->away($result['url']);
+        }
+
+        return redirect()->route('isp.platform-subscription.index')
+            ->with('error', $result['message'] ?? 'Could not start Paystack checkout.');
+    }
+
     public function downloadInvoice(PlatformSaasInvoice $invoice): View
     {
         $user = auth()->user();

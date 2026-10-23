@@ -1,4 +1,4 @@
-@php($title = 'Sign in to PrimeBilling')
+@php($title = 'Sign in to '.config('app.name'))
 
 <x-guest-layout>
     {{-- Header --}}
@@ -172,7 +172,7 @@
             </div>
             <div class="relative flex justify-center">
                 <span class="bg-white/0 px-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                    New to PrimeBilling?
+                    New to {{ config('app.name') }}?
                 </span>
             </div>
         </div>

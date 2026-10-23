@@ -76,6 +76,12 @@ return [
         'environment' => env('SELCOM_ENVIRONMENT', 'sandbox'), // sandbox or production
     ],
 
+    'paystack' => [
+        'public_key' => env('PAYSTACK_PUBLIC_KEY'),
+        'secret_key' => env('PAYSTACK_SECRET_KEY'),
+        'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
+    ],
+
     'vonage' => [
         'key' => env('VONAGE_KEY'),
         'secret' => env('VONAGE_SECRET'),

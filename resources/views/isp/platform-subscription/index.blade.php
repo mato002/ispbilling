@@ -1,12 +1,12 @@
 @extends('layouts.admin')
 
-@section('title', 'PrimeBilling subscription')
+@section('title', config('app.name').' subscription')
 
 @section('header')
     <x-isp-page-header
-        title="PrimeBilling subscription"
+        :title="config('app.name').' subscription'"
         module="Platform billing"
-        description="Your organisation’s subscription to the PrimeBilling platform (separate from subscriber billing)."
+        :description="'Your organisation’s subscription to the '.config('app.name').' platform (separate from subscriber billing).'"
     />
 @endsection
 
@@ -45,13 +45,13 @@
                     @endif
                 </dl>
             @else
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">No SaaS plan is linked to this tenant yet. Complete onboarding or ask PrimeBilling support.</p>
+                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">No SaaS plan is linked to this tenant yet. Complete onboarding or contact {{ config('app.name') }} support.</p>
             @endif
         </div>
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <h2 class="text-base font-semibold text-slate-900 dark:text-white">M-Pesa</h2>
+            <h2 class="text-base font-semibold text-slate-900 dark:text-white">Online payment &amp; M-Pesa</h2>
             <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Automated STK uses your billing number on file: <span class="font-mono font-semibold">{{ $isp->saas_billing_phone ?? '—' }}</span></p>
-            <p class="mt-3 text-xs text-slate-500">Platform collections use Daraja credentials configured in the server environment (<code>.env</code> / <code>config/services.php</code>), not your subscriber M-Pesa till.</p>
+            <p class="mt-3 text-xs text-slate-500">Paystack checkout is available for pending platform invoices. The payment is verified on the server before access is restored. Configure platform credentials in Admin → Integrations; never place a secret key in browser code.</p>
         </div>
     </div>
 
@@ -71,7 +71,7 @@
                         @endforeach
                     </select>
                 </div>
-                <button type="submit" class="pb-btn pb-btn-primary" onclick="return confirm('Change your PrimeBilling plan?');">
+                <button type="submit" class="pb-btn pb-btn-primary" onclick="return confirm('Change your current plan?');">
                     Switch plan
                 </button>
             </form>
@@ -81,7 +81,7 @@
     <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div class="border-b border-slate-100 px-6 py-4 dark:border-slate-700">
             <h2 class="text-base font-semibold text-slate-900 dark:text-white">Platform invoices</h2>
-            <p class="text-sm text-slate-500">Invoices for PrimeBilling access. Use Pay to trigger an STK push for a pending invoice.</p>
+            <p class="text-sm text-slate-500">Pay a pending invoice with Paystack checkout or request an M-Pesa STK push.</p>
         </div>
         <div class="isp-table-wrap">
             <table class="isp-table min-w-full text-sm">
@@ -113,6 +113,11 @@
                                         <x-table-actions.form
                                             :action="route('isp.platform-subscription.pay', $inv)"
                                             label="Pay with M-Pesa"
+                                            :danger="false"
+                                        />
+                                        <x-table-actions.form
+                                            :action="route('isp.platform-subscription.pay.paystack', $inv)"
+                                            label="Pay with Paystack"
                                             :danger="false"
                                         />
                                     @endif

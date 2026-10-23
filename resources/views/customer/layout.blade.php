@@ -27,19 +27,20 @@
             </div>
         </div>
         <nav class="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-4 pb-3 text-sm font-medium">
-            <a href="{{ route('customer.dashboard') }}"
+            <a href="{{ route('customer.dashboard') }}" data-turbo-frame="pb-main" data-turbo-action="advance"
                class="whitespace-nowrap rounded-lg px-3 py-1.5 {{ request()->routeIs('customer.dashboard') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100' }}">Home</a>
-            <a href="{{ route('customer.usage') }}"
+            <a href="{{ route('customer.usage') }}" data-turbo-frame="pb-main" data-turbo-action="advance"
                class="whitespace-nowrap rounded-lg px-3 py-1.5 {{ request()->routeIs('customer.usage') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100' }}">Usage</a>
-            <a href="{{ route('customer.invoices') }}"
+            <a href="{{ route('customer.invoices') }}" data-turbo-frame="pb-main" data-turbo-action="advance"
                class="whitespace-nowrap rounded-lg px-3 py-1.5 {{ request()->routeIs('customer.invoices') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100' }}">Bills</a>
-            <a href="{{ route('customer.sessions') }}"
+            <a href="{{ route('customer.sessions') }}" data-turbo-frame="pb-main" data-turbo-action="advance"
                class="whitespace-nowrap rounded-lg px-3 py-1.5 {{ request()->routeIs('customer.sessions') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100' }}">Sessions</a>
-            <a href="{{ route('customer.tickets.index') }}"
+            <a href="{{ route('customer.tickets.index') }}" data-turbo-frame="pb-main" data-turbo-action="advance"
                class="whitespace-nowrap rounded-lg px-3 py-1.5 {{ request()->routeIs('customer.tickets.*') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100' }}">Support</a>
         </nav>
     </header>
 
+    <turbo-frame id="pb-main" class="block">
     <main class="mx-auto max-w-5xl px-4 py-8">
         @if(session('success'))
             <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('success') }}</div>
@@ -53,5 +54,6 @@
 
         @yield('content')
     </main>
+    </turbo-frame>
 </body>
 </html>
