@@ -53,14 +53,29 @@ jobs:
                 -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" \
                 -o /tmp/maintenance-response.txt -w "%{http_code}" "$url" || true)
               echo "HTTP ${http:-000}"
-              cat /tmp/maintenance-response.txt 2>/dev/null || true
+
+              python3 -c "
+import sys, re, html
+try:
+    with open('/tmp/maintenance-response.txt', 'r', encoding='utf-8', errors='ignore') as f:
+        content = f.read()
+    content = re.sub(r'<script[\s\S]*?</script>', '', content, flags=re.IGNORECASE)
+    content = re.sub(r'<style[\s\S]*?</style>', '', content, flags=re.IGNORECASE)
+    text = re.sub(r'<[^>]+>', ' ', content)
+    text = html.unescape(text)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if lines:
+        print('\n'.join(lines))
+except Exception:
+    pass
+" 2>/dev/null || true
               echo
+
               if [ "$http" = "200" ]; then
                 succeeded=1
                 break
               fi
-              # Do not try a legacy Laravel route after the migration helper
-              # has actually run and returned an application error.
+
               if [ -n "${http:-}" ] && [ "$http" != "000" ] && [ "$http" != "404" ] && [ "$http" != "502" ] && [ "$http" != "503" ] && [ "$http" != "504" ]; then
                 echo "::error::${label} endpoint ${path} returned HTTP ${http}; stopping before any fallback endpoint."
                 exit 1
