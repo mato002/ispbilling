@@ -38,8 +38,6 @@ jobs:
           INPUT_PROTOCOL: ${{ github.event.inputs.protocol }}
           SECRET_PROTOCOL: ${{ secrets.FTP_PROTOCOL }}
           SECRET_PORT: ${{ secrets.FTP_PORT }}
-          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
-          FTP_PUBLIC_DIR: ${{ secrets.FTP_PUBLIC_DIR }}
         run: |
           PROTO="${INPUT_PROTOCOL:-${SECRET_PROTOCOL:-ftps}}"
           case "$PROTO" in
@@ -55,11 +53,11 @@ jobs:
           echo "host=${HOST}" >> "$GITHUB_OUTPUT"
           echo "Using ${PROTO}://${HOST}:${PORT}"
 
-          APP_DIR="${FTP_SERVER_DIR:-/ispbilling/}"
+          APP_DIR="/ispbilling/"
           echo "app_dir=${APP_DIR}" >> "$GITHUB_OUTPUT"
           echo "Laravel application directory: ${APP_DIR}"
 
-          PUBLIC_DIR="${FTP_PUBLIC_DIR:-/public_html/}"
+          PUBLIC_DIR="/public_html/"
           echo "public_dir=${PUBLIC_DIR}" >> "$GITHUB_OUTPUT"
           echo "Public web root: ${PUBLIC_DIR}"
 
@@ -237,6 +235,15 @@ jobs:
           BASE="${BASE%/}"
           URL="${BASE}/migration-runner/deploy.php"
           echo "Trying protected POST ${URL} ..."
+          PROBE=$(curl -sS --connect-timeout 20 --max-time 30 -o /tmp/deploy-migrate-probe.out -w "%{http_code}" "${URL}" || true)
+          if [ "$PROBE" != "403" ]; then
+            echo "HTTP ${PROBE:-000} while checking the migration runner. Expected 403 for an unauthenticated GET."
+            cat /tmp/deploy-migrate-probe.out || true
+            echo ""
+            echo "::error::The migration runner is not reachable at the configured public_html document root. No migration was started."
+            exit 1
+          fi
+          echo "Migration runner is present in the document root."
           for attempt in 1 2 3; do
             HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" -o /tmp/deploy-migrate.out -w "%{http_code}" "$URL" || echo "000")
             echo "HTTP ${HTTP}"
@@ -262,7 +269,7 @@ jobs:
             fi
           done
 
-          echo "::error::Could not reach /deploy-migrate.php after 3 attempts. Verify FTP_PUBLIC_DIR and DEPLOY_SITE_URL."
+          echo "::error::Could not reach the migration runner after 3 attempts. Verify the /public_html document root and DEPLOY_SITE_URL."
           exit 1
 
       - name: Deploy public build assets (document root)
