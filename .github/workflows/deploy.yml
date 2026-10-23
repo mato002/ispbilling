@@ -169,7 +169,24 @@ jobs:
             **/public/qrcodes/**
             **/public/qrcodes
 
-      # Publish the protected migration fallback into public_html before invoking
+      # Keep migration source deployment independent from the application
+      # tree's FTP state. This refreshes the PHP files that the HTTP migration
+      # helper executes, even when the main deploy state is stale.
+      - name: Refresh Laravel migration sources
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ steps.ftp.outputs.host }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ steps.ftp.outputs.port }}
+          protocol: ${{ steps.ftp.outputs.protocol }}
+          local-dir: ./database/migrations/
+          server-dir: ${{ steps.ftp.outputs.app_dir }}database/migrations/
+          state-name: ftp-deploy-migrations-state.json
+          timeout: 1200000
+          log-level: verbose
+
+      # Publish the protected migration helper into public_html before invoking
       # it. The Laravel application lives in the sibling /ispbilling directory.
       - name: Deploy public web files (document root)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
