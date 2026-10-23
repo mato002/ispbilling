@@ -38,7 +38,7 @@ jobs:
             exit 1
           fi
 
-          BASE="${DEPLOY_SITE_URL:-https://ispbilling.zhengkyc.com}"
+          BASE="${DEPLOY_SITE_URL:-https://updrivehub.com}"
           BASE="${BASE%/}"
 
           run_endpoint() {

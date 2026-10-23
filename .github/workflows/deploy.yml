@@ -172,7 +172,7 @@ jobs:
             echo "::error::Add DEPLOY_EXTRACT_TOKEN to GitHub Secrets (same value as production .env)"
             exit 1
           fi
-          BASE="${DEPLOY_SITE_URL:-https://ispbilling.zhengkyc.com}"
+          BASE="${DEPLOY_SITE_URL:-https://updrivehub.com}"
           BASE="${BASE%/}"
           migrate_ok=0
           for path in /api/deploy/migrate /deploy-migrate.php; do
@@ -241,7 +241,7 @@ jobs:
             echo "::error::Add DEPLOY_EXTRACT_TOKEN to GitHub Secrets (same value as production .env)"
             exit 1
           fi
-          BASE="${DEPLOY_SITE_URL:-https://ispbilling.zhengkyc.com}"
+          BASE="${DEPLOY_SITE_URL:-https://updrivehub.com}"
           BASE="${BASE%/}"
           sync_ok=0
           for path in /api/deploy/sync-public /deploy-sync-public.php; do
