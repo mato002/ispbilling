@@ -203,28 +203,35 @@ jobs:
           fi
           BASE="${DEPLOY_SITE_URL:-https://updrivehub.com}"
           BASE="${BASE%/}"
-          migrate_ok=0
-          for path in /deploy-migrate.php /api/deploy/migrate; do
-            URL="${BASE}${path}"
-            echo "Trying protected POST ${URL} ..."
-            for attempt in 1 2 3; do
-              HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" -o /tmp/deploy-migrate.out -w "%{http_code}" "$URL" || echo "000")
-              echo "HTTP ${HTTP}"
-              cat /tmp/deploy-migrate.out || true
-              echo ""
-              if [ "$HTTP" = "200" ]; then
-                migrate_ok=1
-                break 2
-              fi
-              echo "Attempt ${attempt} failed, retrying in 15s..."
+          URL="${BASE}/deploy-migrate.php"
+          echo "Trying protected POST ${URL} ..."
+          for attempt in 1 2 3; do
+            HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" -o /tmp/deploy-migrate.out -w "%{http_code}" "$URL" || echo "000")
+            echo "HTTP ${HTTP}"
+            cat /tmp/deploy-migrate.out || true
+            echo ""
+            if [ "$HTTP" = "200" ]; then
+              echo "Migrations OK."
+              exit 0
+            fi
+
+            # A migration response (500) means Laravel ran and reported an
+            # actual failure. Never fall back to /api/deploy/migrate: that
+            # endpoint can be served by stale Laravel code and rerun the old
+            # migration against production.
+            if [ "$HTTP" != "000" ] && [ "$HTTP" != "404" ] && [ "$HTTP" != "502" ] && [ "$HTTP" != "503" ] && [ "$HTTP" != "504" ]; then
+              echo "::error::Migration endpoint returned HTTP ${HTTP}; stopping without invoking a legacy endpoint."
+              exit 1
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "Attempt ${attempt} could not reach the migration helper; retrying in 15s..."
               sleep 15
-            done
+            fi
           done
-          if [ "$migrate_ok" -ne 1 ]; then
-            echo "::error::HTTP migration failed. Check production .env DB_* settings and DEPLOY_EXTRACT_TOKEN."
-            exit 1
-          fi
-          echo "Migrations OK."
+
+          echo "::error::Could not reach /deploy-migrate.php after 3 attempts. Verify FTP_PUBLIC_DIR and DEPLOY_SITE_URL."
+          exit 1
 
       - name: Deploy public build assets (document root)
         continue-on-error: true

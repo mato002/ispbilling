@@ -59,6 +59,12 @@ jobs:
                 succeeded=1
                 break
               fi
+              # Do not try a legacy Laravel route after the migration helper
+              # has actually run and returned an application error.
+              if [ -n "${http:-}" ] && [ "$http" != "000" ] && [ "$http" != "404" ] && [ "$http" != "502" ] && [ "$http" != "503" ] && [ "$http" != "504" ]; then
+                echo "::error::${label} endpoint ${path} returned HTTP ${http}; stopping before any fallback endpoint."
+                exit 1
+              fi
             done
             if [ "$succeeded" -ne 1 ]; then
               echo "::error::${label} failed. Check DEPLOY_SITE_URL, DEPLOY_EXTRACT_TOKEN, and the deployed maintenance endpoint."
@@ -68,13 +74,13 @@ jobs:
 
           case "$OPERATION" in
             migrations)
-              run_endpoint "Database migrations" /api/deploy/migrate /deploy-migrate.php
+              run_endpoint "Database migrations" /deploy-migrate.php /api/deploy/migrate
               ;;
             clear-cache)
               run_endpoint "Bootstrap cache clear" /deploy-clear-cache.php
               ;;
             both)
-              run_endpoint "Database migrations" /api/deploy/migrate /deploy-migrate.php
+              run_endpoint "Database migrations" /deploy-migrate.php /api/deploy/migrate
               run_endpoint "Bootstrap cache clear" /deploy-clear-cache.php
               ;;
             *)
