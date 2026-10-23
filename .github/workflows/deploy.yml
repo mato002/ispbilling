@@ -204,7 +204,7 @@ jobs:
           BASE="${DEPLOY_SITE_URL:-https://updrivehub.com}"
           BASE="${BASE%/}"
           migrate_ok=0
-          for path in /api/deploy/migrate /deploy-migrate.php; do
+          for path in /deploy-migrate.php /api/deploy/migrate; do
             URL="${BASE}${path}"
             echo "Trying protected POST ${URL} ..."
             for attempt in 1 2 3; do

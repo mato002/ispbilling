@@ -31,6 +31,13 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || $expected === '' 
     exit(deploy_extract_forbidden_message());
 }
 
+// Shared-hosting OPcache may keep migration files from the previous deploy.
+// Reset it after authorization and before booting Laravel so retries use the
+// updated, partial-migration-safe migration code.
+if (function_exists('opcache_reset')) {
+    @opcache_reset();
+}
+
 $result = deploy_run_migrations($laravelRoot);
 
 if (is_string($result)) {
