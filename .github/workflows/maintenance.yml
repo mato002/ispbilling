@@ -89,13 +89,13 @@ except Exception:
 
           case "$OPERATION" in
             migrations)
-              run_endpoint "Database migrations" /deploy-migrate-v2.php /deploy-migrate.php /api/deploy/migrate
+              run_endpoint "Database migrations" /migration-runner/deploy.php /deploy-migrate.php /api/deploy/migrate
               ;;
             clear-cache)
               run_endpoint "Bootstrap cache clear" /deploy-clear-cache.php
               ;;
             both)
-              run_endpoint "Database migrations" /deploy-migrate-v2.php /deploy-migrate.php /api/deploy/migrate
+              run_endpoint "Database migrations" /migration-runner/deploy.php /deploy-migrate.php /api/deploy/migrate
               run_endpoint "Bootstrap cache clear" /deploy-clear-cache.php
               ;;
             *)

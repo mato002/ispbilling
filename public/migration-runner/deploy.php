@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Versioned migration endpoint for cPanel layouts where the Laravel app is a
- * sibling of public_html. The new filename avoids stale helper bytecode.
+ * Isolated, versioned migration endpoint for the cPanel public_html layout.
+ * Its dedicated FTP deployment state ensures this file is uploaded explicitly.
  */
-require __DIR__.'/deploy-migrate-lib.php';
+require dirname(__DIR__).'/deploy-migrate-lib.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 
@@ -15,13 +15,15 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $provided = preg_replace('/^Bearer\s+/i', '', (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
 }
 
-$laravelRoot = dirname(__DIR__).'/ispbilling';
+$laravelRoot = dirname(__DIR__, 2).'/ispbilling';
+$resolvedRoot = realpath($laravelRoot);
 
-if (! is_file($laravelRoot.'/vendor/autoload.php')) {
+if ($resolvedRoot === false || ! is_file($resolvedRoot.'/vendor/autoload.php')) {
     http_response_code(500);
     exit("Laravel application not found at expected sibling path: {$laravelRoot}\n");
 }
 
+$laravelRoot = $resolvedRoot;
 $expected = deploy_extract_expected_token($laravelRoot);
 
 if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || $expected === '' || $provided === '' || ! hash_equals($expected, $provided)) {

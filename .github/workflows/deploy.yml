@@ -208,6 +208,21 @@ jobs:
             **/storage
             **/qrcodes/**
             **/qrcodes
+            **/migration-runner/**
+
+      - name: Publish isolated migration runner
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ steps.ftp.outputs.host }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ steps.ftp.outputs.port }}
+          protocol: ${{ steps.ftp.outputs.protocol }}
+          local-dir: ./public/migration-runner/
+          server-dir: ${{ steps.ftp.outputs.public_dir }}migration-runner/
+          state-name: ftp-deploy-migration-runner-state.json
+          timeout: 1200000
+          log-level: verbose
 
       - name: Run database migrations (HTTP)
         env:
@@ -220,7 +235,7 @@ jobs:
           fi
           BASE="${DEPLOY_SITE_URL:-https://updrivehub.com}"
           BASE="${BASE%/}"
-          URL="${BASE}/deploy-migrate-v2.php"
+          URL="${BASE}/migration-runner/deploy.php"
           echo "Trying protected POST ${URL} ..."
           for attempt in 1 2 3; do
             HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" -o /tmp/deploy-migrate.out -w "%{http_code}" "$URL" || echo "000")
