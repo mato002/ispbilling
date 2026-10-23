@@ -16,7 +16,7 @@ return new class extends Migration
             return;
         }
 
-        foreach (['users', 'migrations'] as $table) {
+        foreach (['i_s_p_s', 'routers', 'users', 'migrations'] as $table) {
             if (Schema::hasTable($table)) {
                 DB::statement("ALTER TABLE `{$table}` ENGINE=InnoDB");
             }
@@ -24,8 +24,8 @@ return new class extends Migration
     }
 
     /**
-     * Keep core metadata and user tables on InnoDB when rolling back later
-     * migrations.
+     * Keep core metadata, user, and tenant tables on InnoDB when rolling back
+     * later migrations.
      */
     public function down(): void
     {
