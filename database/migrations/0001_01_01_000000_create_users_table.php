@@ -33,7 +33,8 @@ return new class extends Migration
 
         if (! Schema::hasTable('sessions')) {
             Schema::create('sessions', function (Blueprint $table) {
-                $table->string('id')->primary();
+                // Keep this primary key within the limit on older shared hosts.
+                $table->string('id', 191)->primary();
                 $table->foreignId('user_id')->nullable()->index();
                 $table->string('ip_address', 45)->nullable();
                 $table->text('user_agent')->nullable();
