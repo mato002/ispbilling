@@ -83,9 +83,9 @@ function deploy_sync_public_tree(string $laravelRoot): array|string
 function deploy_resolve_laravel_root(): ?string
 {
     foreach ([
-        dirname(__DIR__),
         dirname(__DIR__).'/ispbilling',
         dirname(__DIR__, 2).'/ispbilling',
+        dirname(__DIR__),
     ] as $candidate) {
         if (is_file($candidate.'/vendor/autoload.php')) {
             return $candidate;

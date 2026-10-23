@@ -31,6 +31,18 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || $expected === '' 
     exit(deploy_extract_forbidden_message());
 }
 
+$initialMigration = $laravelRoot.'/database/migrations/0001_01_01_000000_create_users_table.php';
+$initialMigrationSource = @file_get_contents($initialMigration);
+
+if (! is_string($initialMigrationSource)
+    || ! str_contains($initialMigrationSource, "string('email', 191)")
+    || ! str_contains($initialMigrationSource, "string('id', 191)")) {
+    http_response_code(409);
+    exit("Resolved Laravel root: {$laravelRoot}\nThe initial migration source is missing or stale; refusing to run migrations.\n");
+}
+
+echo "Resolved Laravel root: {$laravelRoot}\n";
+
 // Shared-hosting OPcache may keep migration files from the previous deploy.
 // Reset it after authorization and before booting Laravel so retries use the
 // updated, partial-migration-safe migration code.
