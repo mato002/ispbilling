@@ -220,7 +220,7 @@ jobs:
           fi
           BASE="${DEPLOY_SITE_URL:-https://updrivehub.com}"
           BASE="${BASE%/}"
-          URL="${BASE}/deploy-migrate.php"
+          URL="${BASE}/deploy-migrate-v2.php"
           echo "Trying protected POST ${URL} ..."
           for attempt in 1 2 3; do
             HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" -o /tmp/deploy-migrate.out -w "%{http_code}" "$URL" || echo "000")
