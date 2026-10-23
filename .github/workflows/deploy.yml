@@ -162,6 +162,8 @@ jobs:
             **/public/hot
             **/public/storage
             **/public/favicon.ico
+            **/public/qrcodes/**
+            **/public/qrcodes
 
       # Publish the protected migration fallback into the new domain's document
       # root before invoking it. The main application FTP target is a separate
@@ -184,6 +186,8 @@ jobs:
             **/favicon.ico
             **/hot
             **/storage
+            **/qrcodes/**
+            **/qrcodes
 
       - name: Run database migrations (HTTP)
         env:
