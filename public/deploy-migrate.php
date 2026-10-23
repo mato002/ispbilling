@@ -50,6 +50,13 @@ if (function_exists('opcache_reset')) {
     @opcache_reset();
 }
 
+if (function_exists('opcache_invalidate')) {
+    foreach (glob($laravelRoot.'/database/migrations/*.php') ?: [] as $migrationFile) {
+        clearstatcache(true, $migrationFile);
+        @opcache_invalidate($migrationFile, true);
+    }
+}
+
 $result = deploy_run_migrations($laravelRoot);
 
 if (is_string($result)) {
