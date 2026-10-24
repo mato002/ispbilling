@@ -8,26 +8,42 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('i_s_p_s', function (Blueprint $table) {
-            $table->boolean('platform_access_locked')->default(false)->after('is_active');
-            $table->text('platform_access_message')->nullable()->after('platform_access_locked');
-            $table->string('saas_tier', 32)->nullable()->after('platform_access_message');
-        });
+        if (Schema::hasTable('i_s_p_s')) {
+            $missingAccessLock = ! Schema::hasColumn('i_s_p_s', 'platform_access_locked');
+            $missingAccessMessage = ! Schema::hasColumn('i_s_p_s', 'platform_access_message');
+            $missingSaasTier = ! Schema::hasColumn('i_s_p_s', 'saas_tier');
 
-        Schema::create('global_promo_codes', function (Blueprint $table) {
-            $table->id();
-            $table->string('code', 64)->unique();
-            $table->string('kind', 32); // first_month_free, referral, percent_off
-            $table->string('title')->nullable();
-            $table->decimal('percent_off', 5, 2)->nullable();
-            $table->unsignedInteger('max_redemptions')->nullable();
-            $table->unsignedInteger('redemption_count')->default(0);
-            $table->timestamp('starts_at')->nullable();
-            $table->timestamp('ends_at')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->json('metadata')->nullable();
-            $table->timestamps();
-        });
+            if ($missingAccessLock || $missingAccessMessage || $missingSaasTier) {
+                Schema::table('i_s_p_s', function (Blueprint $table) use ($missingAccessLock, $missingAccessMessage, $missingSaasTier) {
+                    if ($missingAccessLock) {
+                        $table->boolean('platform_access_locked')->default(false);
+                    }
+                    if ($missingAccessMessage) {
+                        $table->text('platform_access_message')->nullable();
+                    }
+                    if ($missingSaasTier) {
+                        $table->string('saas_tier', 32)->nullable();
+                    }
+                });
+            }
+        }
+
+        if (! Schema::hasTable('global_promo_codes')) {
+            Schema::create('global_promo_codes', function (Blueprint $table) {
+                $table->id();
+                $table->string('code', 64)->unique();
+                $table->string('kind', 32); // first_month_free, referral, percent_off
+                $table->string('title')->nullable();
+                $table->decimal('percent_off', 5, 2)->nullable();
+                $table->unsignedInteger('max_redemptions')->nullable();
+                $table->unsignedInteger('redemption_count')->default(0);
+                $table->timestamp('starts_at')->nullable();
+                $table->timestamp('ends_at')->nullable();
+                $table->boolean('is_active')->default(true);
+                $table->json('metadata')->nullable();
+                $table->timestamps();
+            });
+        }
 
         if (Schema::hasTable('platform_integrations') && ! Schema::hasColumn('platform_integrations', 'messaging_channels')) {
             Schema::table('platform_integrations', function (Blueprint $table) {
