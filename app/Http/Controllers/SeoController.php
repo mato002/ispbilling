@@ -62,6 +62,10 @@ class SeoController extends Controller
     {
         $urls = [
             $this->entry(route('welcome'), 'weekly', '1.0'),
+            $this->entry(route('landing.features'), 'monthly', '0.8'),
+            $this->entry(route('landing.workflows'), 'monthly', '0.8'),
+            $this->entry(route('landing.pricing'), 'monthly', '0.8'),
+            $this->entry(route('landing.faq'), 'monthly', '0.7'),
             $this->entry(route('terms'), 'monthly', '0.5'),
             $this->entry(route('privacy'), 'monthly', '0.5'),
             $this->entry(route('documentation'), 'weekly', '0.7'),

@@ -63,10 +63,10 @@
                         <li><a href="{{ route('customer.login') }}" class="text-slate-300 transition hover:text-white">Customer sign in</a></li>
                         <li><a href="{{ route('customer.register') }}" class="text-slate-300 transition hover:text-white">Create an account</a></li>
                     @else
-                        <li><a href="#features" class="text-slate-300 transition hover:text-white">Features</a></li>
-                        <li><a href="#workflows" class="text-slate-300 transition hover:text-white">Workflows</a></li>
-                        <li><a href="#pricing" class="text-slate-300 transition hover:text-white">Pricing</a></li>
-                        <li><a href="#faq" class="text-slate-300 transition hover:text-white">FAQs</a></li>
+                        <li><a href="{{ route('landing.features') }}" class="text-slate-300 transition hover:text-white">Features</a></li>
+                        <li><a href="{{ route('landing.workflows') }}" class="text-slate-300 transition hover:text-white">Workflows</a></li>
+                        <li><a href="{{ route('landing.pricing') }}" class="text-slate-300 transition hover:text-white">Pricing</a></li>
+                        <li><a href="{{ route('landing.faq') }}" class="text-slate-300 transition hover:text-white">FAQs</a></li>
                     @endif
                 </ul>
             </div>

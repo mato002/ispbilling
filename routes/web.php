@@ -67,6 +67,10 @@ Route::get('/payments/platform/paystack/callback', [PaystackPlatformBillingContr
     ->name('payments.platform.paystack.callback');
 
 Route::get('/', [LandingController::class, 'show'])->name('welcome');
+Route::get('/features', [LandingController::class, 'page'])->defaults('page', 'features')->name('landing.features');
+Route::get('/workflows', [LandingController::class, 'page'])->defaults('page', 'workflows')->name('landing.workflows');
+Route::get('/pricing', [LandingController::class, 'page'])->defaults('page', 'pricing')->name('landing.pricing');
+Route::get('/faq', [LandingController::class, 'page'])->defaults('page', 'faq')->name('landing.faq');
 
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');

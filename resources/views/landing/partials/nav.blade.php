@@ -21,10 +21,10 @@
 
             <div class="hidden items-center gap-1 md:flex">
                 @unless($landingIsp)
-                    <a href="#features" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100/80 hover:text-blue-700">Features</a>
-                    <a href="#workflows" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100/80 hover:text-blue-700">Workflows</a>
-                    <a href="#pricing" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100/80 hover:text-blue-700">Pricing</a>
-                    <a href="#faq" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100/80 hover:text-blue-700">FAQ</a>
+                    <a href="{{ route('landing.features') }}" @class(['rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-slate-100/80 hover:text-blue-700', 'bg-blue-50 text-blue-700' => request()->routeIs('landing.features'), 'text-slate-600' => !request()->routeIs('landing.features')])>Features</a>
+                    <a href="{{ route('landing.workflows') }}" @class(['rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-slate-100/80 hover:text-blue-700', 'bg-blue-50 text-blue-700' => request()->routeIs('landing.workflows'), 'text-slate-600' => !request()->routeIs('landing.workflows')])>Workflows</a>
+                    <a href="{{ route('landing.pricing') }}" @class(['rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-slate-100/80 hover:text-blue-700', 'bg-blue-50 text-blue-700' => request()->routeIs('landing.pricing'), 'text-slate-600' => !request()->routeIs('landing.pricing')])>Pricing</a>
+                    <a href="{{ route('landing.faq') }}" @class(['rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-slate-100/80 hover:text-blue-700', 'bg-blue-50 text-blue-700' => request()->routeIs('landing.faq'), 'text-slate-600' => !request()->routeIs('landing.faq')])>FAQ</a>
                 @else
                     <a href="#plans" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100/80 hover:text-blue-700">Internet plans</a>
                 @endunless
@@ -52,10 +52,10 @@
         <div id="mobile-menu" class="hidden border-t border-slate-200/80 bg-white/95 px-4 pb-4 pt-3 md:hidden">
             <div class="flex flex-col gap-1">
                 @unless($landingIsp)
-                    <a href="#features" class="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Features</a>
-                    <a href="#workflows" class="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Workflows</a>
-                    <a href="#pricing" class="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Pricing</a>
-                    <a href="#faq" class="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">FAQ</a>
+                    <a href="{{ route('landing.features') }}" class="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Features</a>
+                    <a href="{{ route('landing.workflows') }}" class="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Workflows</a>
+                    <a href="{{ route('landing.pricing') }}" class="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Pricing</a>
+                    <a href="{{ route('landing.faq') }}" class="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">FAQ</a>
                 @else
                     <a href="#plans" class="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Internet plans</a>
                 @endunless
