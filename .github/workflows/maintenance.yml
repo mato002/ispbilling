@@ -7,11 +7,9 @@ on:
         description: Select the server maintenance operation
         required: true
         type: choice
-        default: migrations
+        default: clear-cache
         options:
-          - migrations
           - clear-cache
-          - both
 
 permissions:
   contents: read
@@ -88,18 +86,11 @@ except Exception:
           }
 
           case "$OPERATION" in
-            migrations)
-              run_endpoint "Database migrations" /migration-runner/deploy.php /deploy-migrate.php /api/deploy/migrate
-              ;;
             clear-cache)
               run_endpoint "Bootstrap cache clear" /deploy-clear-cache.php
               ;;
-            both)
-              run_endpoint "Database migrations" /migration-runner/deploy.php /deploy-migrate.php /api/deploy/migrate
-              run_endpoint "Bootstrap cache clear" /deploy-clear-cache.php
-              ;;
             *)
-              echo "::error::Unsupported operation: ${OPERATION}"
+              echo "::error::Unsupported operation: $OPERATION"
               exit 1
               ;;
           esac

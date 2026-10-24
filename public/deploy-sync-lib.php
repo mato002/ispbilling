@@ -30,7 +30,7 @@ function deploy_sync_public_tree(string $laravelRoot): array|string
     }
 
     $copied = [];
-    $skipped = ['hot', 'storage'];
+    $skipped = ['hot', 'storage', 'migration-runner', 'deploy-migrate.php', 'deploy-migrate-lib.php'];
 
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),

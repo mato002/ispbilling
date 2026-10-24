@@ -168,26 +168,10 @@ jobs:
             **/public/favicon.ico
             **/public/qrcodes/**
             **/public/qrcodes
+            **/public/migration-runner/**
+            **/public/deploy-migrate.php
+            **/public/deploy-migrate-lib.php
 
-      # Keep migration source deployment independent from the application
-      # tree's FTP state. This refreshes the PHP files that the HTTP migration
-      # helper executes, even when the main deploy state is stale.
-      - name: Refresh Laravel migration sources
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ steps.ftp.outputs.host }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ steps.ftp.outputs.port }}
-          protocol: ${{ steps.ftp.outputs.protocol }}
-          local-dir: ./database/migrations/
-          server-dir: ${{ steps.ftp.outputs.app_dir }}database/migrations/
-          state-name: ftp-deploy-migrations-state.json
-          timeout: 1200000
-          log-level: verbose
-
-      # Publish the protected migration helper into public_html before invoking
-      # it. The Laravel application lives in the sibling /ispbilling directory.
       - name: Deploy public web files (document root)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
@@ -209,70 +193,8 @@ jobs:
             **/qrcodes/**
             **/qrcodes
             **/migration-runner/**
-
-      - name: Publish isolated migration runner
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ steps.ftp.outputs.host }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ steps.ftp.outputs.port }}
-          protocol: ${{ steps.ftp.outputs.protocol }}
-          local-dir: ./public/migration-runner/
-          server-dir: ${{ steps.ftp.outputs.public_dir }}migration-runner/
-          state-name: ftp-deploy-migration-runner-state.json
-          timeout: 1200000
-          log-level: verbose
-
-      - name: Run database migrations (HTTP)
-        env:
-          DEPLOY_EXTRACT_TOKEN: ${{ secrets.DEPLOY_EXTRACT_TOKEN }}
-          DEPLOY_SITE_URL: ${{ secrets.DEPLOY_SITE_URL }}
-        run: |
-          if [ -z "$DEPLOY_EXTRACT_TOKEN" ]; then
-            echo "::error::Add DEPLOY_EXTRACT_TOKEN to GitHub Secrets (same value as production .env)"
-            exit 1
-          fi
-          BASE="${DEPLOY_SITE_URL:-https://updrivehub.com}"
-          BASE="${BASE%/}"
-          URL="${BASE}/migration-runner/deploy.php"
-          echo "Trying protected POST ${URL} ..."
-          PROBE=$(curl -sS --connect-timeout 20 --max-time 30 -o /tmp/deploy-migrate-probe.out -w "%{http_code}" "${URL}" || true)
-          if [ "$PROBE" != "403" ]; then
-            echo "HTTP ${PROBE:-000} while checking the migration runner. Expected 403 for an unauthenticated GET."
-            cat /tmp/deploy-migrate-probe.out || true
-            echo ""
-            echo "::error::The migration runner is not reachable at the configured public_html document root. No migration was started."
-            exit 1
-          fi
-          echo "Migration runner is present in the document root."
-          for attempt in 1 2 3; do
-            HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -X POST -H "Authorization: Bearer ${DEPLOY_EXTRACT_TOKEN}" -o /tmp/deploy-migrate.out -w "%{http_code}" "$URL" || echo "000")
-            echo "HTTP ${HTTP}"
-            cat /tmp/deploy-migrate.out || true
-            echo ""
-            if [ "$HTTP" = "200" ]; then
-              echo "Migrations OK."
-              exit 0
-            fi
-
-            # A migration response (500) means Laravel ran and reported an
-            # actual failure. Never fall back to /api/deploy/migrate: that
-            # endpoint can be served by stale Laravel code and rerun the old
-            # migration against production.
-            if [ "$HTTP" != "000" ] && [ "$HTTP" != "404" ] && [ "$HTTP" != "502" ] && [ "$HTTP" != "503" ] && [ "$HTTP" != "504" ]; then
-              echo "::error::Migration endpoint returned HTTP ${HTTP}; stopping without invoking a legacy endpoint."
-              exit 1
-            fi
-
-            if [ "$attempt" -lt 3 ]; then
-              echo "Attempt ${attempt} could not reach the migration helper; retrying in 15s..."
-              sleep 15
-            fi
-          done
-
-          echo "::error::Could not reach the migration runner after 3 attempts. Verify the /public_html document root and DEPLOY_SITE_URL."
-          exit 1
+            **/deploy-migrate.php
+            **/deploy-migrate-lib.php
 
       - name: Deploy public build assets (document root)
         continue-on-error: true

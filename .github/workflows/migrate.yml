@@ -1,0 +1,147 @@
+name: Run production migrations
+
+on:
+  workflow_run:
+    workflows:
+      - Deploy to production (FTP)
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      protocol:
+        description: Override protocol (blank = use FTP_PROTOCOL secret)
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - ftps
+          - ftp
+          - ftps-legacy
+          - sftp
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Run pending Laravel migrations
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout deployed revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve FTP settings
+        id: ftp
+        env:
+          INPUT_PROTOCOL: ${{ github.event.inputs.protocol }}
+          SECRET_PROTOCOL: ${{ secrets.FTP_PROTOCOL }}
+          SECRET_PORT: ${{ secrets.FTP_PORT }}
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        run: |
+          PROTO="${INPUT_PROTOCOL:-${SECRET_PROTOCOL:-ftps}}"
+          case "$PROTO" in
+            sftp) PORT="${SECRET_PORT:-22}" ;;
+            ftps-legacy) PORT="${SECRET_PORT:-990}" ;;
+            *) PORT="${SECRET_PORT:-21}" ;;
+          esac
+          HOST=$(printf '%s' "$FTP_SERVER" | sed -E 's#^(ftp|ftps|sftp)://##' | cut -d/ -f1)
+          echo "protocol=$PROTO" >> "$GITHUB_OUTPUT"
+          echo "port=$PORT" >> "$GITHUB_OUTPUT"
+          echo "host=$HOST" >> "$GITHUB_OUTPUT"
+          echo "Using $PROTO://$HOST:$PORT"
+          echo "app_dir=./" >> "$GITHUB_OUTPUT"
+          echo "public_dir=../public_html/" >> "$GITHUB_OUTPUT"
+
+      - name: Preflight — test FTP server port
+        run: |
+          HOST="${{ steps.ftp.outputs.host }}"
+          PORT="${{ steps.ftp.outputs.port }}"
+          echo "Testing TCP $HOST:$PORT ..."
+          if timeout 25 bash -c "echo >/dev/tcp/$HOST/$PORT" 2>/dev/null; then
+            echo "Port is reachable from GitHub Actions."
+          else
+            echo "::error::Cannot reach $HOST:$PORT. Check FTP_SERVER / FTP_PORT or host firewall settings."
+            exit 1
+          fi
+
+      - name: Refresh Laravel migration sources
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ steps.ftp.outputs.host }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ steps.ftp.outputs.port }}
+          protocol: ${{ steps.ftp.outputs.protocol }}
+          local-dir: ./database/migrations/
+          server-dir: ${{ steps.ftp.outputs.app_dir }}database/migrations/
+          state-name: ftp-deploy-migrations-state.json
+          timeout: 1200000
+          log-level: verbose
+
+      - name: Stage protected migration runner
+        run: |
+          PAYLOAD=".migration-payload"
+          mkdir -p "$PAYLOAD/migration-runner"
+          cp public/deploy-token.php "$PAYLOAD/deploy-token.php"
+          cp public/deploy-sync-lib.php "$PAYLOAD/deploy-sync-lib.php"
+          cp public/deploy-migrate-lib.php "$PAYLOAD/deploy-migrate-lib.php"
+          cp public/migration-runner/deploy.php "$PAYLOAD/migration-runner/deploy.php"
+
+      - name: Publish protected migration runner
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ steps.ftp.outputs.host }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ steps.ftp.outputs.port }}
+          protocol: ${{ steps.ftp.outputs.protocol }}
+          local-dir: ./.migration-payload/
+          server-dir: ${{ steps.ftp.outputs.public_dir }}
+          state-name: ftp-deploy-migration-runner-state.json
+          timeout: 1200000
+          log-level: verbose
+
+      - name: Run migrations once (HTTP)
+        env:
+          DEPLOY_EXTRACT_TOKEN: ${{ secrets.DEPLOY_EXTRACT_TOKEN }}
+          DEPLOY_SITE_URL: ${{ secrets.DEPLOY_SITE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DEPLOY_EXTRACT_TOKEN" ]; then
+            echo "::error::Add DEPLOY_EXTRACT_TOKEN to GitHub Secrets (same value as production .env)."
+            exit 1
+          fi
+          BASE="${DEPLOY_SITE_URL:-https://updrivehub.com}"
+          BASE="${BASE%/}"
+          URL="${BASE}/migration-runner/deploy.php"
+          echo "Checking protected migration runner at $URL ..."
+          PROBE=$(curl -sS --connect-timeout 20 --max-time 30 -o "$RUNNER_TEMP/migration-probe.out" -w "%{http_code}" "$URL" || true)
+          if [ "$PROBE" != "403" ]; then
+            echo "::error::Migration runner preflight returned HTTP ${PROBE:-000}; expected 403 for an unauthenticated GET. No migration was started."
+            cat "$RUNNER_TEMP/migration-probe.out" || true
+            exit 1
+          fi
+
+          echo "Sending one authenticated migration request. The request will not be replayed automatically."
+          HTTP=$(curl -sS --connect-timeout 30 --max-time 300 -X POST \
+            -H "Authorization: Bearer $DEPLOY_EXTRACT_TOKEN" \
+            -o "$RUNNER_TEMP/migration-response.out" -w "%{http_code}" "$URL" || true)
+          echo "HTTP ${HTTP:-000}"
+          cat "$RUNNER_TEMP/migration-response.out" || true
+          echo
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Migration request failed. It was sent once and will not be retried; inspect the migration output/state before manually running this workflow again."
+            exit 1
+          fi
+          echo "Migrations completed."
