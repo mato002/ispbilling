@@ -425,18 +425,18 @@
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-6 dark:border-slate-800">
             <div class="flex flex-wrap items-center gap-3">
                 <button type="submit" formnovalidate name="wizard_action" value="go_back" class="pb-btn px-6">Back</button>
-                <button type="submit" formnovalidate name="wizard_action" value="skip_mpesa_and_finish" class="text-sm font-medium text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline dark:text-slate-400 dark:hover:text-slate-200">
+                <button type="submit" formnovalidate name="wizard_action" value="skip_mpesa_and_finish" data-turbo-frame="_top" class="text-sm font-medium text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline dark:text-slate-400 dark:hover:text-slate-200">
                     Finish without M-Pesa
                 </button>
             </div>
-            <button type="submit" class="pb-btn pb-btn-primary px-8">Finish setup</button>
+            <button type="submit" data-turbo-frame="_top" class="pb-btn pb-btn-primary px-8">Finish setup</button>
         </div>
     </div>
 @endif
 
 @push('scripts')
 <script>
-(function () {
+function initSaasOnboardingWizardForm() {
     function syncPanels() {
         var checked = document.querySelector('input[name="saas_billing_method"]:checked');
         var v = checked ? checked.value : 'mpesa';
@@ -506,6 +506,17 @@
             }
         }
 
+        function visitWizardFrame(url) {
+            var frame = document.getElementById('pb-saas-onboarding-frame');
+            if (frame) {
+                frame.src = url;
+            } else if (window.Turbo) {
+                window.Turbo.visit(url);
+            } else {
+                window.location.assign(url);
+            }
+        }
+
         function redirectSuccess(url) {
             if (window.Swal) {
                 window.Swal.fire({
@@ -516,10 +527,10 @@
                     showConfirmButton: false,
                     timerProgressBar: true,
                 }).then(function () {
-                    window.location.href = url;
+                    visitWizardFrame(url);
                 });
             } else {
-                window.location.href = url;
+                visitWizardFrame(url);
             }
         }
 
@@ -631,10 +642,11 @@
     syncPanels();
 
     var form = document.getElementById('pb-saas-onboarding-form');
-    if (!form || !form.dataset.draftIsp) {
+    if (!form || !form.dataset.draftIsp || form.dataset.wizardHandlersBound === '1') {
         return;
     }
 
+    form.dataset.wizardHandlersBound = '1';
     var draftKey = 'pb-saas-onboarding/v1/' + form.dataset.draftIsp + '/' + form.dataset.draftStep;
 
     function setControlValue(name, value) {
@@ -719,6 +731,15 @@
     });
 
     initOnboardingMpesaPoll(form);
-})();
+}
+
+document.addEventListener('turbo:frame-render', function (event) {
+    if (event.target && ['pb-saas-onboarding-frame', 'pb-saas-onboarding-page-frame'].includes(event.target.id)) {
+        initSaasOnboardingWizardForm();
+    }
+});
+
+document.addEventListener('turbo:load', initSaasOnboardingWizardForm);
+initSaasOnboardingWizardForm();
 </script>
 @endpush

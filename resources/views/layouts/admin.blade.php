@@ -492,9 +492,12 @@
         </turbo-frame>
     </div>
 
-    @if ($pbSaasOnboardingOverlay)
-        @include('isp.saas-onboarding.partials.overlay')
-    @endif
+    <turbo-frame id="pb-saas-onboarding-frame" class="block">
+        @include('isp.saas-onboarding.partials.feedback')
+        @if ($pbSaasOnboardingOverlay)
+            @include('isp.saas-onboarding.partials.overlay')
+        @endif
+    </turbo-frame>
 
     @stack('scripts')
 

@@ -32,12 +32,15 @@
                 && ! $isp->saas_payment_verified_at
                 && ! $trialDeferred;
         @endphp
-        <form
+        <turbo-frame id="pb-saas-onboarding-page-frame" class="block">
+            @include('isp.saas-onboarding.partials.feedback')
+            <form
             id="pb-saas-onboarding-form"
             method="POST"
             action="{{ route('isp.saas-onboarding.store') }}"
             class="space-y-6"
-            data-turbo="false"
+            data-turbo="{{ $mpesaAsyncOnboarding ? 'false' : 'true' }}"
+            data-turbo-frame="pb-saas-onboarding-page-frame"
             data-draft-isp="{{ $isp->id }}"
             data-draft-step="{{ $onboardingStep }}"
             data-onboarding-step="{{ $onboardingStep }}"
@@ -61,6 +64,7 @@
                 'plans' => $plans,
                 'verifyAmount' => $verifyAmount ?? 1,
             ])
-        </form>
+            </form>
+        </turbo-frame>
     @endif
 @endsection

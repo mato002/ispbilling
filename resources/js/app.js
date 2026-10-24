@@ -38,6 +38,15 @@ document.addEventListener('turbo:load', () => {
     processPbFlashPayload();
     syncPbShellFromFrame();
     initClickableTableRows();
+    processOnboardingFeedback(document);
+});
+
+document.addEventListener('turbo:frame-render', (event) => {
+    if (!['pb-saas-onboarding-frame', 'pb-saas-onboarding-page-frame'].includes(event.target?.id)) {
+        return;
+    }
+
+    processOnboardingFeedback(event.target);
 });
 
 document.addEventListener('turbo:frame-render', (event) => {
@@ -61,7 +70,26 @@ document.addEventListener('DOMContentLoaded', () => {
     processPbFlashPayload();
     syncPbShellFromFrame();
     initClickableTableRows();
+    processOnboardingFeedback(document);
 });
+
+function processOnboardingFeedback(root) {
+    const feedback = root.querySelector?.('[data-pb-onboarding-alert]');
+    if (! feedback) {
+        return;
+    }
+
+    if (window.Swal) {
+        window.Swal.fire({
+            icon: feedback.dataset.icon || 'info',
+            title: feedback.dataset.title || 'Workspace setup',
+            text: feedback.dataset.message || '',
+            confirmButtonColor: '#4f46e5',
+        });
+    }
+
+    feedback.remove();
+}
 
 function shouldIgnoreTableRowNav(target) {
     return target.closest('a, button, input, select, textarea, form, label, [data-no-row-nav]');
