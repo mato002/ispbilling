@@ -14,7 +14,7 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Inter', 'Figtree', ...defaultTheme.fontFamily.sans],
+                sans: ['Roboto Condensed', ...defaultTheme.fontFamily.sans],
             },
             colors: {
                 pb: {

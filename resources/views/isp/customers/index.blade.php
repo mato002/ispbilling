@@ -5,7 +5,6 @@
 
 @php
     $stats = $stats ?? [];
-    $advancedFilterCount = collect(request()->only(['connection_type','router_id','plan_id','location','payment_status','online_only','expiring_only','created_from','created_to']))->filter(fn ($value) => filled($value))->count();
 @endphp
 
 @section('header')
@@ -16,7 +15,6 @@
     class="customer-list space-y-3"
     x-data="{
         drawerOpen: false,
-        filtersOpen: false,
         selected: null,
         quickOpen: false,
         viewCompact: localStorage.getItem('pb.customers.compact') === '1',
@@ -30,56 +28,24 @@
             localStorage.setItem('pb.customers.autorefresh', this.autoRefresh ? '1' : '0');
         },
         openDrawer(payload) { this.selected = payload; this.drawerOpen = true; document.body.classList.add('overflow-hidden'); },
-        closeDrawer() { this.drawerOpen = false; this.selected = null; if (!this.filtersOpen) document.body.classList.remove('overflow-hidden'); },
+        closeDrawer() { this.drawerOpen = false; this.selected = null; document.body.classList.toggle('overflow-hidden', this.drawerOpen); },
     }"
     x-init="if (autoRefresh) { setInterval(() => { if (!document.hidden) window.location.reload(); }, 120000); }"
-    @keydown.escape.window="closeDrawer(); quickOpen = false; filtersOpen = false; document.body.classList.remove('overflow-hidden')"
-    x-effect="document.body.classList.toggle('overflow-hidden', drawerOpen || filtersOpen)"
+    @keydown.escape.window="closeDrawer(); quickOpen = false; document.body.classList.remove('overflow-hidden')"
+    x-effect="document.body.classList.toggle('overflow-hidden', drawerOpen)"
 >
-    {{-- ========== OPERATIONAL TOOLBAR ========== --}}
-    <div class="pb-card relative overflow-visible p-3 sm:p-4">
-        <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
-            <div class="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-gradient-to-br from-indigo-500/15 to-cyan-400/10 blur-2xl"></div>
-        </div>
-        <form
-            method="GET"
-            action="{{ route('isp.customers.index') }}"
-            id="customer-search-form"
-            class="relative flex flex-col gap-2 lg:flex-row lg:items-center"
-            data-turbo-frame="pb-main"
-            x-data="pbFilterForm({ autoSearch: true })"
-        >
-            @foreach(request()->except(['search','status','page','export']) as $k => $v)
-                @if(is_array($v))
-                    @foreach($v as $vv)
-                        <input type="hidden" name="{{ $k }}[]" value="{{ $vv }}">
-                    @endforeach
-                @elseif($v !== null && $v !== '')
-                    <input type="hidden" name="{{ $k }}" value="{{ $v }}">
-                @endif
-            @endforeach
-
-            <div class="customer-toolbar-primary flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-                <h1 class="shrink-0 text-lg font-bold tracking-tight text-slate-900 dark:text-white">Customers <span class="text-slate-500">({{ number_format($stats['total'] ?? 0) }})</span></h1>
-                <div class="customer-search-box relative min-w-0 flex-1">
-                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-                    </span>
-                    <input
-                        type="search"
-                        name="search"
-                        value="{{ request('search') }}"
-                        placeholder="Search name, phone, email, username, router, invoice #, IP, MAC…"
-                        class="w-full rounded-xl border border-slate-200 bg-white/90 py-2 pl-10 pr-3 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100"
-                    >
-                </div>
-                <select name="status" aria-label="Quick status filter" class="rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-                    <option value="">All status</option>
-                    @foreach(['active','suspended','expired','inactive','pending_installation'] as $st)
-                        <option value="{{ $st }}" @selected(request('status') === $st)>{{ $st === 'pending_installation' ? 'Pending' : ucfirst($st) }}</option>
-                    @endforeach
-                </select>
-                <div class="customer-desktop-controls flex flex-wrap items-center gap-2">
+    <x-filter-bar
+        :action="route('isp.customers.index')"
+        :reset-url="route('isp.customers.index')"
+        :export-formats="$exportFormats ?? []"
+        :chips="$filterChips ?? []"
+    >
+        <x-slot:heading>
+            <h1 class="text-lg font-bold tracking-tight text-slate-900 dark:text-white">Customers <span class="text-slate-500">({{ number_format($stats['total'] ?? 0) }})</span></h1>
+        </x-slot:heading>
+        <x-slot:actions>
+            <div class="customer-desktop-actions flex items-center gap-2">
+                <div class="customer-desktop-controls flex items-center gap-2">
                     <button type="button" @click="toggleCompact()" class="pb-btn py-2 text-xs" :title="viewCompact ? 'Comfortable density' : 'Compact density'">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
                         <span x-text="viewCompact ? 'Comfortable' : 'Compact'"></span>
@@ -89,16 +55,12 @@
                         Auto refresh
                     </button>
                 </div>
-            </div>
-
-            <div class="customer-desktop-actions flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-2 dark:border-slate-800 lg:border-0 lg:pt-0">
                 <div class="relative">
                     <button type="button" @click="quickOpen = !quickOpen" class="pb-btn py-2 text-xs">
                         Quick actions
                         <svg class="h-3.5 w-3.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </button>
-                    <div x-show="quickOpen" x-cloak @click.outside="quickOpen = false" x-transition
-                         class="absolute right-0 z-40 mt-2 w-56 origin-top-right rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                    <div x-show="quickOpen" x-cloak @click.outside="quickOpen = false" x-transition class="absolute right-0 z-40 mt-2 w-56 origin-top-right rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
                         <a href="{{ route('isp.customers.create') }}" class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">New subscriber</a>
                         <a href="{{ route('isp.payments.initiate') }}" class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">Record payment</a>
                         <a href="{{ route('isp.subscriptions.create') }}" class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">New subscription</a>
@@ -109,105 +71,43 @@
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                     Add customer
                 </a>
-                <x-export-dropdown :formats="$exportFormats ?? []" label="Export" />
             </div>
-        </form>
-        @if (count($filterChips ?? []) > 0)
-            <div class="relative mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                <x-filter-chips :chips="$filterChips" />
+        </x-slot:actions>
+        <x-slot:filters>
+            <x-listing-filters.search placeholder="Search name, phone, email, username, router, invoice #, IP, MAC…" class="customer-search-box min-w-[220px] flex-1" />
+            <div class="customer-status-filter min-w-[130px]">
+                <label class="isp-form-label">Status</label>
+                <select name="status" class="isp-form-select">
+                    <option value="">All status</option>
+                    @foreach(['active','suspended','expired','inactive','pending_installation'] as $st)
+                        <option value="{{ $st }}" @selected(request('status') === $st)>{{ $st === 'pending_installation' ? 'Pending' : ucfirst($st) }}</option>
+                    @endforeach
+                </select>
             </div>
-        @endif
-    </div>
-
-    {{-- ========== VISIBLE FILTERS ========== --}}
-    <section class="customer-filter-panel pb-card p-3">
-        <div class="customer-filter-desktop-heading text-sm font-semibold text-slate-800 dark:text-slate-100">Filters <span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $advancedFilterCount }}</span></div>
-        <button type="button" class="customer-filter-open hidden w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" @click="filtersOpen = true">
-            <span>⚙ Filter</span>
-            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $advancedFilterCount }}</span>
-        </button>
-        <div class="customer-filter-content" role="dialog" aria-modal="true" :class="{ 'is-open': filtersOpen }" @click.self="filtersOpen = false">
-          <div class="customer-filter-modal-card">
-            <div class="customer-filter-modal-heading">
-                <span class="text-base font-semibold text-slate-900 dark:text-white">Filters</span>
-                <button type="button" class="pb-btn px-2 py-1" aria-label="Close filters" @click="filtersOpen = false">✕</button>
+            <div class="min-w-[130px]">
+                <label class="isp-form-label">Connection</label>
+                <select name="connection_type" class="isp-form-select">
+                    <option value="">All</option><option value="hotspot" @selected(request('connection_type') === 'hotspot')>Hotspot</option><option value="pppoe" @selected(request('connection_type') === 'pppoe')>PPPoE</option>
+                </select>
             </div>
-            <form
-                method="GET"
-                action="{{ route('isp.customers.index') }}"
-                class="customer-advanced-filters mt-3"
-                @submit="filtersOpen = false"
-                data-turbo-frame="pb-main"
-                x-data="pbFilterForm({ autoSearch: true })"
-            >
-                @if(request('search'))
-                    <input type="hidden" name="search" value="{{ request('search') }}">
-                @endif
-                @if(request('status'))<input type="hidden" name="status" value="{{ request('status') }}">@endif
-                <div class="w-32 shrink-0">
-                    <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Connection</label>
-                    <select name="connection_type" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                        <option value="">All</option>
-                        <option value="hotspot" {{ request('connection_type') === 'hotspot' ? 'selected' : '' }}>Hotspot</option>
-                        <option value="pppoe" {{ request('connection_type') === 'pppoe' ? 'selected' : '' }}>PPPoE</option>
-                    </select>
-                </div>
-                <div class="w-36 shrink-0">
-                    <x-searchable-select name="router_id" label="Router" :options="$routers->pluck('name', 'id')->all()" placeholder="Any router" :value="request('router_id')" />
-                </div>
-                <div class="w-36 shrink-0">
-                    <x-searchable-select name="plan_id" label="Package" :options="$plans->pluck('name', 'id')->all()" placeholder="Any active plan" :value="request('plan_id')" />
-                </div>
-                <div class="w-36 shrink-0">
-                    <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Location contains</label>
-                    <input type="text" name="location" value="{{ request('location') }}" placeholder="Town, estate, site…" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                </div>
-                <div class="w-36 shrink-0">
-                    <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Billing</label>
-                    <select name="payment_status" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                        <option value="">Any</option>
-                        <option value="overdue" {{ request('payment_status') === 'overdue' ? 'selected' : '' }}>Has overdue invoice</option>
-                        <option value="pending" {{ request('payment_status') === 'pending' ? 'selected' : '' }}>Has pending invoice</option>
-                        <option value="clear" {{ request('payment_status') === 'clear' ? 'selected' : '' }}>No pending/overdue</option>
-                    </select>
-                </div>
-                <div class="customer-filter-toggles flex shrink-0 flex-col justify-center gap-1 rounded-xl border border-slate-100 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-800/40">
-                    <label class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-700 dark:text-slate-200">
-                        <input type="checkbox" name="online_only" value="1" {{ request('online_only') ? 'checked' : '' }} class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800">
-                        Online now (active session)
-                    </label>
-                    <label class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-700 dark:text-slate-200">
-                        <input type="checkbox" name="expiring_only" value="1" {{ request('expiring_only') ? 'checked' : '' }} class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800">
-                        Subscription expiring ≤ 7 days
-                    </label>
-                </div>
-                <div class="customer-filter-dates grid w-[264px] shrink-0 grid-cols-2 gap-2">
-                    <div>
-                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Created from</label>
-                        <input type="date" name="created_from" value="{{ request('created_from') }}" class="w-full rounded-xl border border-slate-200 bg-white py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Created to</label>
-                        <input type="date" name="created_to" value="{{ request('created_to') }}" class="w-full rounded-xl border border-slate-200 bg-white py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                    </div>
-                </div>
-                <div class="w-24 shrink-0">
-                    <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Per page</label>
-                    <select name="per_page" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                        @foreach ([10, 15, 25, 50] as $size)
-                            <option value="{{ $size }}" @selected((int) request('per_page', 15) === $size)>{{ $size }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="customer-filter-reset shrink-0">
-                    <a href="{{ route('isp.customers.index') }}" data-turbo-frame="pb-main" class="inline-flex h-10 items-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Reset filters</a>
-                </div>
-            </form>
-          </div>
-        </div>
-    </section>
-
-
+            <x-listing-filters.select name="router_id" label="Router" placeholder="Any router" :options="$routers->pluck('name', 'id')->all()" class="min-w-[150px]" />
+            <x-listing-filters.select name="plan_id" label="Package" placeholder="Any active plan" :options="$plans->pluck('name', 'id')->mapWithKeys(fn ($name, $id) => [(string) $id => $name])->all()" class="min-w-[150px]" />
+            <div class="min-w-[150px]">
+                <label class="isp-form-label">Location</label>
+                <input type="text" name="location" value="{{ request('location') }}" placeholder="Town, estate, site…" class="isp-form-input">
+            </div>
+            <x-listing-filters.select name="payment_status" label="Billing" placeholder="Any" :options="['overdue' => 'Overdue invoice', 'pending' => 'Pending invoice', 'clear' => 'No pending / overdue']" class="min-w-[150px]" />
+            <div class="customer-filter-toggles flex shrink-0 flex-col justify-center gap-1 rounded-xl border border-slate-100 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-800/40">
+                <label class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-700 dark:text-slate-200"><input type="checkbox" name="online_only" value="1" @checked(request('online_only')) class="rounded border-slate-300 text-indigo-600">Online now</label>
+                <label class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-700 dark:text-slate-200"><input type="checkbox" name="expiring_only" value="1" @checked(request('expiring_only')) class="rounded border-slate-300 text-indigo-600">Expiring ≤ 7 days</label>
+            </div>
+            <div class="customer-filter-dates grid min-w-[264px] grid-cols-2 gap-2">
+                <div><label class="isp-form-label">Created from</label><input type="date" name="created_from" value="{{ request('created_from') }}" class="isp-form-input"></div>
+                <div><label class="isp-form-label">Created to</label><input type="date" name="created_to" value="{{ request('created_to') }}" class="isp-form-input"></div>
+            </div>
+            <x-listing-filters.per-page />
+        </x-slot:filters>
+    </x-filter-bar>
     {{-- ========== KPI STRIP ========== --}}
     <details class="customer-metrics pb-card px-3 py-2">
         <summary class="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">Show metrics</summary>

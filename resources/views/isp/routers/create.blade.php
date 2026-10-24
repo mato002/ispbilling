@@ -1,10 +1,10 @@
 @extends('layouts.admin')
 
-@section('title', 'Provision router')
+@section('title', 'Create router')
 
 @section('header')
     <x-isp-page-header
-        title="Provision router"
+        title="Create router"
         module="Network"
     >
         <x-slot name="actions">

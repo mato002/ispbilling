@@ -4,9 +4,8 @@
 
 @section('header')
     <x-isp-page-header
-        :title="'Edit · '.$router->name"
+        :title="'Edit router · '.$router->name"
         module="Network"
-        :description="'Update connection, asset metadata, and ownership.'"
     >
         <x-slot name="actions">
             <a href="{{ route('isp.routers.show', $router) }}" class="pb-btn">View router</a>

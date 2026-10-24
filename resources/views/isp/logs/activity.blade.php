@@ -107,92 +107,29 @@
 
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
         <div class="space-y-5 lg:col-span-8 xl:col-span-9 isp-audit-main">
-            <div class="pb-card isp-audit-toolbar border-slate-200/80 p-4 sm:p-5 dark:border-slate-800">
-                <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <h2 class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Filter audit stream</h2>
-                    <div class="flex flex-wrap items-center gap-2">
-                        @if($filterCount > 0)
-                            <span class="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-200">{{ $filterCount }} active</span>
-                        @endif
-                        <a href="{{ route('isp.logs.activity.index') }}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">Clear all</a>
+            <x-filter-bar
+                :action="route('isp.logs.activity.index')"
+                :reset-url="route('isp.logs.activity.index')"
+                :auto-search="false"
+            >
+                <x-slot:heading>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Audit filters</h2>
+                        @if($filterCount > 0)<span class="isp-filter-count">{{ $filterCount }}</span>@endif
                     </div>
-                </div>
-                <form action="{{ route('isp.logs.activity.index') }}" method="GET" class="space-y-4">
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:gap-3">
-                        <div class="lg:col-span-4">
-                            <label class="isp-form-label flex items-center gap-1">
-                                <svg class="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                Search
-                            </label>
-                            <input type="search" name="search" value="{{ request('search') }}" class="isp-form-input" placeholder="Description, action, IP…" autocomplete="off">
-                        </div>
-                        <div class="lg:col-span-2">
-                            <label class="isp-form-label">Severity</label>
-                            <select name="severity" class="isp-form-select">
-                                <option value="">All</option>
-                                @foreach(\App\Support\ActivityLogAudit::SEVERITIES as $sev)
-                                    <option value="{{ $sev }}" @selected(request('severity') === $sev)>{{ ucfirst($sev) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="lg:col-span-2">
-                            <label class="isp-form-label">Module</label>
-                            <select name="module" class="isp-form-select">
-                                <option value="">All</option>
-                                @foreach(\App\Support\ActivityLogAudit::MODULES as $key => $label)
-                                    <option value="{{ $key }}" @selected(request('module') === $key)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="lg:col-span-2">
-                            <label class="isp-form-label">Event type</label>
-                            <select name="event_type" class="isp-form-select">
-                                <option value="">All</option>
-                                <option value="authentication" @selected(request('event_type') === 'authentication')>Authentication</option>
-                                <option value="crud" @selected(request('event_type') === 'crud')>Create / update / delete</option>
-                                <option value="billing" @selected(request('event_type') === 'billing')>Billing</option>
-                                <option value="network" @selected(request('event_type') === 'network')>Network</option>
-                            </select>
-                        </div>
-                        <div class="lg:col-span-2">
-                            <label class="isp-form-label">Staff</label>
-                            <select name="user_id" class="isp-form-select">
-                                <option value="">All users</option>
-                                @foreach($staffUsers as $u)
-                                    <option value="{{ $u->id }}" @selected((string)request('user_id') === (string)$u->id)>{{ $u->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:gap-3">
-                        <div class="lg:col-span-2">
-                            <label class="isp-form-label">Action</label>
-                            <input type="text" name="action" value="{{ request('action') }}" class="isp-form-input font-mono text-xs" placeholder="login, update…">
-                        </div>
-                        <div class="lg:col-span-4">
-                            <label class="isp-form-label">Model class</label>
-                            <select name="model_type" class="isp-form-select font-mono text-xs">
-                                <option value="">Any model</option>
-                                @foreach($distinctModelTypes as $mt)
-                                    <option value="{{ $mt }}" @selected(request('model_type') === $mt)>{{ class_basename($mt) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="lg:col-span-2">
-                            <label class="isp-form-label">From</label>
-                            <input type="date" name="date_from" value="{{ request('date_from') }}" class="isp-form-input">
-                        </div>
-                        <div class="lg:col-span-2">
-                            <label class="isp-form-label">To</label>
-                            <input type="date" name="date_to" value="{{ request('date_to') }}" class="isp-form-input">
-                        </div>
-                        <div class="flex items-end gap-2 lg:col-span-2">
-                            <button type="submit" class="pb-btn pb-btn-primary w-full justify-center sm:w-auto">Apply filters</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-
+                </x-slot:heading>
+                <x-slot:filters>
+                    <x-listing-filters.search placeholder="Description, action, IP…" class="min-w-[220px] flex-1" />
+                    <x-listing-filters.select name="severity" label="Severity" placeholder="All" :options="collect(\App\Support\ActivityLogAudit::SEVERITIES)->mapWithKeys(fn ($value) => [$value => ucfirst($value)])->all()" class="min-w-[130px]" />
+                    <x-listing-filters.select name="module" label="Module" placeholder="All" :options="\App\Support\ActivityLogAudit::MODULES" class="min-w-[150px]" />
+                    <x-listing-filters.select name="event_type" label="Event type" placeholder="All" :options="['authentication' => 'Authentication', 'crud' => 'Create / update / delete', 'billing' => 'Billing', 'network' => 'Network']" class="min-w-[180px]" />
+                    <x-listing-filters.select name="user_id" label="Staff" placeholder="All users" :options="$staffUsers->pluck('name', 'id')->all()" class="min-w-[150px]" />
+                    <div class="min-w-[150px]"><label class="isp-form-label">Action</label><input type="text" name="action" value="{{ request('action') }}" class="isp-form-input font-mono text-xs" placeholder="login, update…"></div>
+                    <x-listing-filters.select name="model_type" label="Model" placeholder="Any model" :options="$distinctModelTypes->mapWithKeys(fn ($type) => [$type => class_basename($type)])->all()" class="min-w-[180px]" />
+                    <div class="min-w-[150px]"><label class="isp-form-label">From</label><input type="date" name="date_from" value="{{ request('date_from') }}" class="isp-form-input"></div>
+                    <div class="min-w-[150px]"><label class="isp-form-label">To</label><input type="date" name="date_to" value="{{ request('date_to') }}" class="isp-form-input"></div>
+                </x-slot:filters>
+            </x-filter-bar>
             @if($logs->isEmpty())
                 <div class="pb-card isp-audit-empty border-dashed border-slate-300/80 p-8 text-center dark:border-slate-600">
                     <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">

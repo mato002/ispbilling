@@ -12,7 +12,7 @@
 }
 
 .pb-landing {
-    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    font-family: 'Roboto Condensed', ui-sans-serif, system-ui, sans-serif;
     color: var(--pb-ink);
     background: var(--pb-surface);
 }

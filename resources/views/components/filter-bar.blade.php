@@ -5,20 +5,18 @@
     'exportUrl' => null,
     'exportLabel' => 'Export CSV',
     'exportFormats' => [],
-    /** When false, pages supply their own Apply / Reset / export controls in the filters slot. */
     'toolbar' => true,
     'autoSearch' => true,
     'chips' => [],
 ])
 
-<div class="pb-card p-3 sm:p-4" x-data="{ filtersOpen: false }" @keydown.escape.window="filtersOpen = false" {{ $attributes->except(['action', 'method', 'resetUrl', 'exportUrl', 'exportLabel', 'toolbar', 'autoSearch', 'chips']) }}>
-    <div class="mb-3 flex justify-end md:hidden">
-        <button type="button" class="pb-btn" @click="filtersOpen = true">
-            <x-font-awesome-icon name="filter" class="h-4 w-4" />
-            Filter
-        </button>
-    </div>
-    <div class="isp-filter-modal" role="dialog" aria-modal="true" :class="{ 'is-open': filtersOpen }" @click.self="filtersOpen = false">
+@php
+    $activeFilterCount = collect(request()->except(['search', 'q', 'page', 'per_page', 'export']))
+        ->filter(fn ($value) => is_array($value) ? count(array_filter($value, fn ($item) => filled($item))) > 0 : filled($value))
+        ->count();
+@endphp
+
+<div class="isp-resource-filter pb-card p-3 sm:p-4" x-data="{ filtersOpen: false }" x-init="$nextTick(() => { const bar = $el.querySelector('.isp-filter-bar'); const input = bar?.querySelector('input[type=search], input[name=q], input[name=search]'); if (input && bar) { let field = input; while (field.parentElement && field.parentElement !== bar) field = field.parentElement; $el.querySelector('.isp-filter-search-slot')?.append(field); } })" @keydown.escape.window="filtersOpen = false" {{ $attributes->except(['action', 'method', 'resetUrl', 'exportUrl', 'exportLabel', 'toolbar', 'autoSearch', 'chips']) }}>
     <form
         action="{{ $action }}"
         method="{{ $method }}"
@@ -27,46 +25,64 @@
         data-turbo-frame="pb-main"
         x-data="pbFilterForm({ autoSearch: @json($autoSearch) })"
     >
-        <div class="isp-filter-modal-heading md:hidden">
-            <h2 class="text-base font-semibold text-slate-900 dark:text-white">Filters</h2>
-            <button type="button" class="pb-btn px-2 py-1" aria-label="Close filters" @click="filtersOpen = false">✕</button>
-        </div>
-        <div class="isp-filter-bar flex flex-wrap items-end gap-2">
-            @isset($filters)
-                {{ $filters }}
-            @else
-                {{ $slot }}
+        <div class="isp-filter-search-row">
+            @isset($heading)<div class="isp-filter-heading">{{ $heading }}</div>@endisset
+            <div class="isp-filter-search-slot"></div>
+            <button type="button" class="isp-filter-open pb-btn shrink-0" @click="filtersOpen = true" aria-label="Open filters">
+                <x-font-awesome-icon name="filter" class="h-4 w-4" />
+                <span>Filter</span>
+                @if($activeFilterCount > 0)<span class="isp-filter-count">{{ $activeFilterCount }}</span>@endif
+            </button>
+            @isset($actions)
+                <div class="isp-filter-actions">{{ $actions }}</div>
             @endisset
-        </div>
-
-        @if (count($chips) > 0)
-            <x-filter-chips :chips="$chips" />
-        @endif
-
-        @if ($toolbar)
-            <div class="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-        @unless ($autoSearch)
-                    <button type="submit" class="pb-btn pb-btn-primary">Apply filters</button>
-                @endif
-                @if ($resetUrl)
-                    <a href="{{ $resetUrl }}" class="pb-btn" data-turbo-frame="pb-main">Reset</a>
-                @endif
-                @isset($exports)
-                    {{ $exports }}
-                @elseif (count($exportFormats) > 0)
-                    <x-export-dropdown :formats="$exportFormats" />
+            @if ($toolbar)
+                @if (count($exportFormats) > 0)
+                    <div class="isp-filter-export"><x-export-dropdown :formats="$exportFormats" label="Export" /></div>
                 @elseif ($exportUrl)
-                    <a href="{{ $exportUrl }}" class="pb-btn" data-turbo="false" download>
+                    <a href="{{ $exportUrl }}" class="isp-filter-export pb-btn" data-turbo="false" download>
                         <x-font-awesome-icon name="download" class="h-4 w-4 opacity-70" />
                         {{ $exportLabel }}
                     </a>
-                @endisset
+                @endif
+                @isset($exports){{ $exports }}@endisset
+            @endif
+        </div>
+
+        <div class="isp-filter-modal" role="dialog" aria-modal="true" :class="{ 'is-open': filtersOpen }" @click.self="filtersOpen = false">
+            <div class="isp-filter-modal-panel">
+                <div class="isp-filter-modal-heading">
+                    <h2 class="text-base font-semibold text-slate-900 dark:text-white">Filters</h2>
+                    <button type="button" class="pb-btn px-2 py-1" aria-label="Close filters" @click="filtersOpen = false">✕</button>
+                </div>
+                <div class="isp-filter-bar">
+                    @isset($filters)
+                        {{ $filters }}
+                    @else
+                        {{ $slot }}
+                    @endisset
+                </div>
+
+                @if (! $autoSearch && $toolbar)
+                    <div class="isp-filter-apply-row">
+                        <button type="submit" class="pb-btn pb-btn-primary">Apply filters</button>
+                    </div>
+                @endif
+
+                @if (count($chips) > 0)
+                    <x-filter-chips :chips="$chips" />
+                @endif
+
+                @if ($resetUrl && $toolbar)
+                    <div class="isp-filter-reset-row">
+                        <a href="{{ $resetUrl }}" class="pb-btn" data-turbo-frame="pb-main">Reset filters</a>
+                    </div>
+                @endif
+                <div class="isp-filter-modal-footer">
+                    @if ($toolbar)<button type="submit" class="pb-btn pb-btn-primary flex-1">Apply filters</button>@endif
+                    <button type="button" class="pb-btn flex-1" @click="filtersOpen = false">Close</button>
+                </div>
             </div>
-        @endif
-        <div class="mt-3 flex gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 md:hidden">
-            <button type="submit" class="pb-btn pb-btn-primary flex-1">Apply filters</button>
-            <button type="button" class="pb-btn" @click="filtersOpen = false">Close</button>
         </div>
     </form>
-    </div>
 </div>

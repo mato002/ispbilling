@@ -45,6 +45,9 @@
             @isset($exports)
                 <x-slot:exports>{{ $exports }}</x-slot:exports>
             @endisset
+            @isset($actions)
+                <x-slot:actions>{{ $actions }}</x-slot:actions>
+            @endisset
         </x-filter-bar>
     @elseif (isset($filters))
         {{ $filters }}

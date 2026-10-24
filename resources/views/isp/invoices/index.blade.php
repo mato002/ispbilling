@@ -96,7 +96,7 @@
     <script>
         function invoiceCreateModal(customers) {
             return {
-                open: @json($errors->has('customer_id') || $errors->has('subscription_id') || $errors->has('due_date')), paymentOpen: false, adjustmentOpen: false, paymentUrl: '', paymentAmount: '', paymentReference: '', adjustmentUrl: '', adjustmentBalance: '', adjustmentCredit: '0.00', adjustmentType: 'credit', customers, customerId: @json(old('customer_id', '')), subscriptionId: @json(old('subscription_id', '')), amount: @json(old('amount', '')),
+                open: false, paymentOpen: false, adjustmentOpen: false, paymentUrl: '', paymentAmount: '', paymentReference: '', adjustmentUrl: '', adjustmentBalance: '', adjustmentCredit: '0.00', adjustmentType: 'credit', customers, customerId: @json(old('customer_id', '')), subscriptionId: @json(old('subscription_id', '')), amount: @json(old('amount', '')),
                 get selectedCustomer() { return this.customers.find(customer => String(customer.id) === String(this.customerId)); },
                 syncAmount() {
                     const subscription = this.selectedCustomer?.subscriptions.find(item => String(item.id) === String(this.subscriptionId));

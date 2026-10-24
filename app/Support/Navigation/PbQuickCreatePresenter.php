@@ -52,7 +52,7 @@ class PbQuickCreatePresenter
                     ['label' => 'New subscription', 'route' => 'isp.subscriptions.create'],
                 ],
                 'isp.invoices' => [
-                    ['label' => 'New subscription', 'route' => 'isp.subscriptions.create'],
+                    ['label' => 'Create invoice', 'route' => 'isp.invoices.index', 'modal' => false],
                 ],
                 'isp.vouchers' => [
                     ['label' => 'New voucher', 'route' => 'isp.vouchers.create'],

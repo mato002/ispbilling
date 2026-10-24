@@ -93,17 +93,15 @@
     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         {{-- LEFT: greeting --}}
         <div class="min-w-0">
-            <div class="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
+            <div class="mb-1.5 hidden items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300 sm:inline-flex">
                 <span class="pb-pulse-dot"></span>
                 Live operations · {{ now()->format('D, M j · H:i') }}
             </div>
             <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
                 {{ $greeting }}, <span class="bg-gradient-to-r from-indigo-600 to-cyan-500 bg-clip-text text-transparent">{{ $user->name }}</span>
             </h1>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                You're managing <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $ispName }}</span>
-                as {{ $user->isIspAdmin() ? 'ISP Administrator' : 'ISP Staff' }} · Network operations are
-                <span class="font-semibold text-emerald-600 dark:text-emerald-400">healthy</span>.
+            <p class="mt-1 hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
+                {{ $ispName }} · {{ $user->isIspAdmin() ? 'ISP Administrator' : 'ISP Staff' }}
             </p>
 
             {{-- Live status pills --}}
@@ -120,7 +118,7 @@
                     <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     {{ $overdue }} pending payment{{ $overdue === 1 ? '' : 's' }}
                 </span>
-                <span class="pb-pill pb-pill-cyan">
+                <span class="pb-pill pb-pill-cyan hidden sm:inline-flex">
                     <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
                     M-Pesa connected
                 </span>
@@ -146,11 +144,10 @@
     {{-- =========================================================
          SECTION 1 · EXECUTIVE KPI STRIP
          ========================================================= --}}
-    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+    <section class="grid grid-cols-2 gap-2.5 mb-4 sm:gap-4 sm:mb-6 lg:grid-cols-4">
 
         <x-dashboard.kpi-card
             title="Total Customers"
-            badge="Subscriber base"
             :value="number_format($stats['total_customers'] ?? 0)"
             :subtext="number_format($stats['active_customers'] ?? 0).' active · '.number_format($stats['suspended_customers'] ?? 0).' suspended'"
             :comparison="isset($customerChange) ? (($customerChange >= 0 ? '+' : '').number_format($customerChange, 1).'%') : null"
@@ -168,7 +165,6 @@
 
         <x-dashboard.kpi-card
             title="Online Sessions"
-            badge="Real-time network load"
             :value="number_format($stats['active_sessions'] ?? 0)"
             :subtext="$activeRouters.' routers reporting · PPPoE + Hotspot'"
             iconBg="from-cyan-500 to-sky-500"
@@ -184,7 +180,6 @@
 
         <x-dashboard.kpi-card
             title="Monthly Revenue"
-            badge="Cash flow this month"
             :value="'KSh '.number_format($stats['monthly_revenue'] ?? 0, 0)"
             :subtext="'Last month: KSh '.number_format($lastMonthRevenue ?? 0, 0)"
             :comparison="isset($revenueChange) ? (($revenueChange >= 0 ? '+' : '').number_format($revenueChange, 1).'%') : null"
@@ -202,7 +197,6 @@
 
         <x-dashboard.kpi-card
             title="Outstanding Balances"
-            badge="Collections queue"
             :value="number_format($stats['overdue_invoices'] ?? 0)"
             :subtext="number_format($stats['pending_invoices'] ?? 0).' pending · follow-up needed'"
             :comparison="$overdue > 0 ? 'Action' : 'Healthy'"
@@ -220,7 +214,6 @@
 
         <x-dashboard.kpi-card
             title="Active Subscriptions"
-            badge="Subscriber health"
             :value="number_format($stats['active_subscriptions'] ?? 0)"
             :subtext="number_format($stats['expiring_soon'] ?? 0).' expiring within 7 days'"
             iconBg="from-violet-500 to-fuchsia-500"
@@ -236,7 +229,6 @@
 
         <x-dashboard.kpi-card
             title="Router Health"
-            badge="MikroTik fleet"
             :value="$routerHealthPct.'%'"
             :subtext="$activeRouters.' / '.$totalRouters.' routers reachable'"
             :comparison="$routerHealthPct >= 80 ? 'Healthy' : ($routerHealthPct >= 50 ? 'Degraded' : 'Critical')"
@@ -254,7 +246,6 @@
 
         <x-dashboard.kpi-card
             title="Churn Risk"
-            badge="At-risk accounts"
             :value="number_format($stats['suspended_customers'] ?? 0)"
             subtext="Suspended · need re-engagement"
             iconBg="from-amber-500 to-orange-500"
@@ -270,7 +261,6 @@
 
         <x-dashboard.kpi-card
             title="Collection Rate"
-            badge="Last 30 days"
             :value="$collectionRate.'%'"
             :subtext="(($recentPayments ?? collect())->count()).' payments processed'"
             :comparison="$collectionRate >= 80 ? 'On target' : 'Below target'"
@@ -677,7 +667,6 @@
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                     </span>
                     <span class="text-[12px] font-semibold text-slate-800 dark:text-slate-100">Add customer</span>
-                    <span class="text-[10px] text-slate-500">Onboard subscriber</span>
                 </a>
                 <a href="{{ route('isp.payments.initiate') }}"
                    class="group flex flex-col items-start rounded-xl border border-slate-200/70 bg-slate-50/60 p-3 transition hover:border-emerald-300 hover:bg-white hover:shadow-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:hover:bg-slate-800/80">
@@ -685,7 +674,6 @@
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                     </span>
                     <span class="text-[12px] font-semibold text-slate-800 dark:text-slate-100">Record payment</span>
-                    <span class="text-[10px] text-slate-500">M-Pesa / manual</span>
                 </a>
                 <a href="{{ route('isp.subscriptions.create') }}"
                    class="group flex flex-col items-start rounded-xl border border-slate-200/70 bg-slate-50/60 p-3 transition hover:border-violet-300 hover:bg-white hover:shadow-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:hover:bg-slate-800/80">
@@ -693,7 +681,6 @@
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
                     </span>
                     <span class="text-[12px] font-semibold text-slate-800 dark:text-slate-100">New subscription</span>
-                    <span class="text-[10px] text-slate-500">Activate plan</span>
                 </a>
                 <a href="{{ route('isp.routers.create') }}"
                    class="group flex flex-col items-start rounded-xl border border-slate-200/70 bg-slate-50/60 p-3 transition hover:border-cyan-300 hover:bg-white hover:shadow-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:hover:bg-slate-800/80">
@@ -701,7 +688,6 @@
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="9" rx="2"/><path d="M7 7v4M17 7v4M5 7h14"/></svg>
                     </span>
                     <span class="text-[12px] font-semibold text-slate-800 dark:text-slate-100">Add router</span>
-                    <span class="text-[10px] text-slate-500">Connect MikroTik</span>
                 </a>
                 <a href="{{ route('isp.vouchers.create-bulk') }}"
                    class="group flex flex-col items-start rounded-xl border border-slate-200/70 bg-slate-50/60 p-3 transition hover:border-amber-300 hover:bg-white hover:shadow-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:hover:bg-slate-800/80">
@@ -709,7 +695,6 @@
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V7H4v10h16v-5"/><path d="M16 12h2"/><path d="M8 7v10"/></svg>
                     </span>
                     <span class="text-[12px] font-semibold text-slate-800 dark:text-slate-100">Bulk vouchers</span>
-                    <span class="text-[10px] text-slate-500">Hotspot codes</span>
                 </a>
                 <a href="{{ route('isp.reports.index') }}"
                    class="group flex flex-col items-start rounded-xl border border-slate-200/70 bg-slate-50/60 p-3 transition hover:border-rose-300 hover:bg-white hover:shadow-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:hover:bg-slate-800/80">
@@ -717,7 +702,6 @@
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 5-5"/></svg>
                     </span>
                     <span class="text-[12px] font-semibold text-slate-800 dark:text-slate-100">Reports</span>
-                    <span class="text-[10px] text-slate-500">Analytics</span>
                 </a>
             </div>
         </article>

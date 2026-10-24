@@ -6,7 +6,7 @@
     <title>{{ $title }}</title>
     <style>
         body {
-            font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Roboto Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
             color: #374151;
             background-color: #f9fafb;

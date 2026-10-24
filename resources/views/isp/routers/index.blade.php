@@ -6,12 +6,11 @@
     <x-isp-page-header
         title="Network Routers"
         module="Network Operations"
-        description="Manage MikroTik infrastructure, monitor connectivity, and control subscriber routing."
-        primaryLabel="Provision router"
+        primaryLabel="Create router"
         :primaryHref="route('isp.routers.create')"
     >
         <x-slot name="actions">
-            <x-export-dropdown :formats="$exportFormats ?? []" label="Export" />
+
             <span class="isp-noc-live-pill" title="Live telemetry polled every minute via PollRouterHealthJob">
                 <span class="isp-noc-live-pill__dot" aria-hidden="true"></span>
                 Live NOC
@@ -51,302 +50,56 @@
     x-data="{
         detailOpen: false,
         detail: null,
-        refreshing: false,
-        filtersOpen: false,
+
         selected: [],
-        lastSyncLabel: @js(now()->format('H:i:s')),
         openDetail(payload) { this.detail = payload; this.detailOpen = true; document.body.classList.add('overflow-hidden'); },
         closeDetail() { this.detailOpen = false; this.detail = null; document.body.classList.remove('overflow-hidden'); },
         toggleAll(checked, ids) { this.selected = checked ? [...ids] : []; },
-        syncFleet() {
-            this.refreshing = true;
-            window.setTimeout(() => window.location.reload(), 200);
-        },
-        init() {
-            window.setInterval(() => {
-                const d = new Date();
-                this.lastSyncLabel = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            }, 1000);
-        }
     }"
-    @keydown.escape.window="closeDetail(); filtersOpen = false"
+    @keydown.escape.window="closeDetail()"
 >
-    {{-- Fleet KPI strip --}}
-    <details class="pb-card px-3 py-2">
-        <summary class="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">Fleet metrics</summary>
-        <div class="isp-noc-kpi-grid mt-2">
-        <div class="isp-noc-kpi pb-card p-4">
-            <p class="isp-noc-kpi__label">Total routers</p>
-            <p class="isp-noc-kpi__value">{{ number_format($fleetStats['total']) }}</p>
-            <p class="isp-noc-kpi__hint">Fleet inventory</p>
-        </div>
-        <div class="isp-noc-kpi pb-card p-4 isp-noc-kpi--ok">
-            <p class="isp-noc-kpi__label">Online</p>
-            <p class="isp-noc-kpi__value text-emerald-600 dark:text-emerald-400">{{ number_format($fleetStats['online']) }}</p>
-            <p class="isp-noc-kpi__hint">Operational</p>
-        </div>
-        <div class="isp-noc-kpi pb-card p-4 isp-noc-kpi--danger">
-            <p class="isp-noc-kpi__label">Offline</p>
-            <p class="isp-noc-kpi__value text-rose-600 dark:text-rose-400">{{ number_format($fleetStats['offline']) }}</p>
-            <p class="isp-noc-kpi__hint">Standby / unreachable</p>
-        </div>
-        <div class="isp-noc-kpi pb-card p-4">
-            <p class="isp-noc-kpi__label">Subscribers on routers</p>
-            <p class="isp-noc-kpi__value">{{ number_format($fleetStats['connected_customers']) }}</p>
-            <p class="isp-noc-kpi__hint">Assigned customers</p>
-        </div>
-        <div class="isp-noc-kpi pb-card p-4">
-            <p class="isp-noc-kpi__label">Avg latency</p>
-            <p class="isp-noc-kpi__value">
-                @if($fleetStats['avg_latency_ms'] !== null)
-                    {{ $fleetStats['avg_latency_ms'] }}<span class="text-base font-bold text-slate-400">ms</span>
-                @else
-                    —
-                @endif
-            </p>
-            <p class="isp-noc-kpi__hint">{{ $fleetStats['with_telemetry'] ?? 0 }} / {{ $fleetStats['total'] }} reporting</p>
-        </div>
-        <div class="isp-noc-kpi pb-card p-4 isp-noc-kpi--health">
-            <p class="isp-noc-kpi__label">Network health</p>
-            <p class="isp-noc-kpi__value">
-                @if($fleetStats['network_health'] !== null)
-                    {{ $fleetStats['network_health'] }}<span class="text-base font-bold text-slate-400">%</span>
-                @else
-                    —
-                @endif
-            </p>
-            <div class="isp-noc-health-bar mt-2" role="progressbar" aria-valuenow="{{ $fleetStats['network_health'] ?? 0 }}" aria-valuemin="0" aria-valuemax="100">
-                <span style="width: {{ $fleetStats['network_health'] !== null ? min(100, $fleetStats['network_health']) : 0 }}%"></span>
-            </div>
-        </div>
-        </div>
-    </details>
-
-    {{-- Live status strip --}}
-    <div class="pb-card isp-noc-live-strip overflow-hidden">
-        <div class="flex flex-col gap-3 border-b border-slate-200/80 px-4 py-3 dark:border-slate-700/80 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <div class="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-300">
-                    <span class="isp-noc-pulse h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                    Live polling — every minute
-                </span>
-                <span class="hidden sm:inline text-slate-400">|</span>
-                <span class="tabular-nums text-slate-500 dark:text-slate-400">Clock <span x-text="lastSyncLabel"></span></span>
-                <span class="hidden md:inline text-slate-400">·</span>
-                <span class="text-violet-600 dark:text-violet-300">{{ $fleetStats['degraded'] ?? 0 }} degraded</span>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <form method="POST" action="{{ route('isp.routers.bulk') }}" class="inline">
-                    @csrf
-                    <input type="hidden" name="action" value="poll">
-                    @foreach($routers as $r)
-                        <input type="hidden" name="ids[]" value="{{ $r->id }}">
-                    @endforeach
-                    <button type="submit" class="isp-noc-toolbar-btn isp-noc-toolbar-btn--primary" title="Queue an immediate poll for every router on this page">
-                        <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-                        Sync fleet now
-                    </button>
-                </form>
-                <button type="button" class="isp-noc-toolbar-btn" :class="refreshing && 'isp-noc-toolbar-btn--loading'" :disabled="refreshing" @click="syncFleet()" title="Reload this page">
-                    Reload view
-                </button>
-            </div>
-        </div>
-        <div class="grid gap-px bg-slate-200/80 dark:bg-slate-700/80 sm:grid-cols-3">
-            <div class="isp-noc-live-cell bg-[var(--pb-panel)] px-4 py-3 sm:px-5">
-                <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Reachability source</p>
-                <p class="mt-1 text-sm font-bold text-slate-900 dark:text-white">RouterOS API ping</p>
-                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Stored in router_metrics every minute</p>
-            </div>
-            <div class="isp-noc-live-cell bg-[var(--pb-panel)] px-4 py-3 sm:px-5">
-                <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Telemetry</p>
-                <p class="mt-1 text-sm font-bold text-slate-900 dark:text-white">{{ $fleetStats['with_telemetry'] ?? 0 }} / {{ $fleetStats['total'] }} reporting</p>
-                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Sparklines pulled from real polls</p>
-            </div>
-            <div class="isp-noc-live-cell bg-[var(--pb-panel)] px-4 py-3 sm:px-5">
-                <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Scope</p>
-                <p class="mt-1 text-sm font-bold text-slate-900 dark:text-white">MikroTik fleet</p>
-                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Hotspot · PPP · interfaces · CPU/RAM</p>
-            </div>
-        </div>
-    </div>
-
-    {{-- Topology + insights --}}
+    {{-- Shared fleet filter bar --}}
     @if($fleetStats['total'] > 0)
-    <div class="grid gap-4 lg:grid-cols-3">
-        <div class="isp-noc-topo pb-card p-5 lg:col-span-1">
-            <div class="flex items-start justify-between gap-2">
-                <div>
-                    <h2 class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Topology</h2>
-                    <p class="mt-1 text-sm font-bold text-slate-900 dark:text-white">Branch map (preview)</p>
-                </div>
-                <span class="rounded-md bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-300">Beta</span>
-            </div>
-            <div class="isp-noc-topo__canvas mt-4" aria-hidden="true">
-                <div class="isp-noc-topo__node isp-noc-topo__node--core">CORE</div>
-                <div class="isp-noc-topo__edge"></div>
-                <div class="isp-noc-topo__node isp-noc-topo__node--edge">EDGE</div>
-                <div class="isp-noc-topo__edge isp-noc-topo__edge--2"></div>
-                <div class="isp-noc-topo__node isp-noc-topo__node--cpe">CPE</div>
-            </div>
-            <p class="mt-4 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                Geographic / branch overlays and L2 path tracing will render here. For now this panel anchors the NOC layout.
-            </p>
-        </div>
-        <div class="space-y-3 lg:col-span-2">
-            <h2 class="px-0.5 text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Quick insights</h2>
-            <div class="grid gap-3 sm:grid-cols-2">
-                <div class="isp-noc-insight pb-card p-4">
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Highest traffic (preview)</p>
-                    @if($networkInsights['busiest'])
-                        <p class="mt-2 font-mono text-sm font-bold text-slate-900 dark:text-white">{{ $networkInsights['busiest']->name }}</p>
-                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Relative load index {{ $snapFor($networkInsights['busiest'])['traffic_score'] ?? '—' }}</p>
-                    @else
-                        <p class="mt-2 text-sm text-slate-500">—</p>
-                    @endif
-                </div>
-                <div class="isp-noc-insight pb-card p-4">
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Most subscribers</p>
-                    @if($networkInsights['most_subscribers'])
-                        <p class="mt-2 font-mono text-sm font-bold text-slate-900 dark:text-white">{{ $networkInsights['most_subscribers']->name }}</p>
-                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ number_format($networkInsights['most_subscribers']->customers_count) }} customers</p>
-                    @else
-                        <p class="mt-2 text-sm text-slate-500">—</p>
-                    @endif
-                </div>
-                <div class="isp-noc-insight pb-card p-4">
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Last standby router</p>
-                    @if($networkInsights['last_offline'])
-                        <p class="mt-2 font-mono text-sm font-bold text-rose-600 dark:text-rose-400">{{ $networkInsights['last_offline']->name }}</p>
-                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Inactive in billing · verify WAN</p>
-                    @else
-                        <p class="mt-2 text-sm text-emerald-600 dark:text-emerald-400">All routers marked active</p>
-                    @endif
-                </div>
-                <div class="isp-noc-insight pb-card p-4">
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Congestion</p>
-                    <p class="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $networkInsights['congestion_note'] }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    {{-- Filters --}}
-    @if($fleetStats['total'] > 0)
-    <div class="pb-card overflow-hidden p-0">
-        <div class="border-b border-slate-200/80 px-4 py-3 dark:border-slate-700/80 sm:px-5">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <h2 class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Fleet filters</h2>
-                <span class="hidden text-[10px] font-medium text-slate-400 md:inline">Search · status · branch · health · transport</span>
-            </div>
-        </div>
-        <div class="px-4 py-3 md:hidden">
-            <button type="button" class="pb-btn w-full justify-center" @click="filtersOpen = true">⚙ Filter</button>
-        </div>
-        <div class="isp-filter-modal" role="dialog" aria-modal="true" :class="{ 'is-open': filtersOpen }" @click.self="filtersOpen = false">
-        <form
-            action="{{ route('isp.routers.index') }}"
-            method="GET"
-            class="isp-noc-filter-form px-4 py-4 sm:px-5"
-            @submit="filtersOpen = false"
-            data-turbo-frame="pb-main"
-            x-data="pbFilterForm({ autoSearch: true })"
+        <x-filter-bar
+            :action="route('isp.routers.index')"
+            :reset-url="route('isp.routers.index')"
+            :export-formats="$exportFormats ?? []"
+            :chips="$filterChips ?? []"
         >
-            <div class="isp-filter-modal-heading md:hidden">
-                <h2 class="text-base font-semibold text-slate-900 dark:text-white">Fleet filters</h2>
-                <button type="button" class="pb-btn px-2 py-1" aria-label="Close filters" @click="filtersOpen = false">✕</button>
-            </div>
-            <div class="isp-noc-filter-grid">
-                <div class="relative">
-                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                    <input type="search" name="q" value="{{ request('q') }}" placeholder="Search name, IP, site…" class="isp-noc-filter-input pl-10" autocomplete="off" />
-                </div>
-                <select name="is_active" class="isp-noc-filter-select" aria-label="Operational status">
-                    <option value="">All statuses</option>
-                    <option value="1" @selected(request('is_active') === '1')>Active / in service</option>
-                    <option value="0" @selected(request('is_active') === '0')>Inactive / standby</option>
-                </select>
-                <input type="text" name="branch" value="{{ request('branch') }}" placeholder="Branch / site filter" class="isp-noc-filter-input" title="Matches location field" />
-                <select name="health" class="isp-noc-filter-select" aria-label="Reachability">
-                    <option value="">All reachability</option>
-                    <option value="ok" @selected(request('health') === 'ok')>Online · healthy latency</option>
-                    <option value="online" @selected(request('health') === 'online')>Any online</option>
-                    <option value="warn" @selected(request('health') === 'warn')>Degraded / rebooting</option>
-                    <option value="offline" @selected(request('health') === 'offline')>Offline</option>
-                    <option value="unknown" @selected(request('health') === 'unknown')>Awaiting first poll</option>
-                </select>
-                <select name="conn_type" class="isp-noc-filter-select" aria-label="Transport">
-                    <option value="">All transports</option>
-                    <option value="ssl" @selected(request('conn_type') === 'ssl')>HTTPS API</option>
-                    <option value="plain" @selected(request('conn_type') === 'plain')>HTTP API</option>
-                </select>
-                <select name="lifecycle" class="isp-noc-filter-select" aria-label="Lifecycle">
-                    <option value="">All lifecycle</option>
-                    @foreach (['live', 'stock', 'maintenance', 'retired'] as $opt)
-                        <option value="{{ $opt }}" @selected(request('lifecycle') === $opt)>{{ ucfirst($opt) }}</option>
-                    @endforeach
-                </select>
-                <select name="sort" class="isp-noc-filter-select" aria-label="Sort">
-                    <option value="latest" @selected(request('sort','latest') === 'latest')>Newest first</option>
-                    <option value="name" @selected(request('sort') === 'name')>Name</option>
-                    <option value="latency" @selected(request('sort') === 'latency')>Latency (low → high)</option>
-                    <option value="health" @selected(request('sort') === 'health')>Health (high → low)</option>
-                    <option value="customers" @selected(request('sort') === 'customers')>Most subscribers</option>
-                </select>
-                <select name="per_page" class="isp-noc-filter-select" aria-label="Per page">
-                    @foreach ([10, 15, 25, 50] as $size)
-                        <option value="{{ $size }}" @selected((int) request('per_page', 15) === $size)>{{ $size }} / page</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
-                <a href="{{ route('isp.routers.index') }}" data-turbo-frame="pb-main" class="isp-noc-toolbar-btn">Reset</a>
-                @if (count($filterChips ?? []) > 0)
-                    <x-filter-chips :chips="$filterChips" class="flex-1" />
-                @endif
-            </div>
-            <div class="mt-3 flex gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 md:hidden">
-                <button type="submit" class="pb-btn pb-btn-primary flex-1">Apply filters</button>
-                <button type="button" class="pb-btn" @click="filtersOpen = false">Close</button>
-            </div>
-        </form>
-        </div>
-    </div>
+            <x-slot:heading><h2 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Routers</h2></x-slot:heading>
+            <x-slot:filters>
+                <x-listing-filters.search name="q" placeholder="Search name, IP, site…" class="min-w-[220px] flex-1" />
+                <x-listing-filters.select name="is_active" label="Status" placeholder="All statuses" :options="['1' => 'Active / in service', '0' => 'Inactive / standby']" class="min-w-[150px]" />
+                <div class="min-w-[150px]"><label class="isp-form-label">Branch / site</label><input type="text" name="branch" value="{{ request('branch') }}" placeholder="Branch / site" class="isp-form-input"></div>
+                <x-listing-filters.select name="health" label="Reachability" placeholder="All" :options="['ok' => 'Online · healthy', 'online' => 'Any online', 'warn' => 'Degraded / rebooting', 'offline' => 'Offline', 'unknown' => 'Awaiting first poll']" class="min-w-[180px]" />
+                <x-listing-filters.select name="conn_type" label="Transport" placeholder="All" :options="['ssl' => 'HTTPS API', 'plain' => 'HTTP API']" class="min-w-[140px]" />
+                <x-listing-filters.select name="lifecycle" label="Lifecycle" placeholder="All" :options="array_combine(['live', 'stock', 'maintenance', 'retired'], ['Live', 'Stock', 'Maintenance', 'Retired'])" class="min-w-[150px]" />
+                <x-listing-filters.select name="sort" label="Sort" :placeholder="null" :options="['latest' => 'Newest first', 'name' => 'Name', 'latency' => 'Latency (low → high)', 'health' => 'Health (high → low)', 'customers' => 'Most subscribers']" class="min-w-[180px]" />
+                <x-listing-filters.per-page />
+            </x-slot:filters>
+        </x-filter-bar>
     @endif
-
-    @if($fleetStats['total'] === 0)
-        <div class="isp-noc-empty pb-card overflow-hidden">
-            <div class="isp-noc-empty__hero px-6 py-10 text-center sm:px-10 sm:py-12">
-                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-cyan-500/15 ring-1 ring-indigo-500/25">
-                    <svg class="h-8 w-8 text-indigo-600 dark:text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-                </div>
-                <h3 class="mt-6 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Provision your first MikroTik edge</h3>
-                <p class="mx-auto mt-2 max-w-lg text-sm text-slate-600 dark:text-slate-400">
-                    This console is built for live RouterOS fleets. Add a router to sync hotspot servers, IP pools, sessions, and subscriber attachment points.
-                </p>
-                <a href="{{ route('isp.routers.create') }}" class="pb-btn pb-btn-primary mt-8 inline-flex">Start connection wizard</a>
-            </div>
-            <div class="grid gap-px border-t border-slate-200/80 bg-slate-200/80 dark:border-slate-700/80 dark:bg-slate-700/80 sm:grid-cols-3">
-                <div class="bg-[var(--pb-panel)] px-5 py-4 text-left">
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-300">1 · Reachability</p>
-                    <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Validate API port, SSL, and firewall allow-list.</p>
-                </div>
-                <div class="bg-[var(--pb-panel)] px-5 py-4 text-left">
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-300">2 · Services</p>
-                    <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Import hotspot profiles and pools into billing.</p>
-                </div>
-                <div class="bg-[var(--pb-panel)] px-5 py-4 text-left">
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">3 · Subscribers</p>
-                    <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Attach customers to this edge for automation.</p>
-                </div>
-            </div>
-        </div>
-    @elseif($routers->isEmpty())
+    @if($routers->isEmpty() && $fleetStats['total'] > 0)
         <div class="pb-card p-8 text-center">
             <p class="text-sm font-semibold text-slate-900 dark:text-white">No routers match these filters</p>
             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Adjust search or status, or reset the fleet filters.</p>
             <a href="{{ route('isp.routers.index') }}" class="pb-btn pb-btn-primary mt-4 inline-flex text-sm">Reset filters</a>
+        </div>
+    @elseif($routers->isEmpty())
+        <div class="pb-card overflow-x-auto">
+            <table class="w-full min-w-[520px] text-left text-sm">
+                <thead>
+                    <tr class="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                        <th class="px-4 py-3">Router</th>
+                        <th class="px-4 py-3">IP address</th>
+                        <th class="px-4 py-3">Site</th>
+                        <th class="px-4 py-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500 dark:text-slate-400">No routers yet. Select “Create router” to add one.</td></tr>
+                </tbody>
+            </table>
         </div>
     @else
         {{-- Bulk action bar --}}

@@ -39,7 +39,7 @@
     </script>
 
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=roboto-condensed:300,400,500,600,700,800&display=swap" rel="stylesheet" />
 
     <x-vite-assets />
 
@@ -97,7 +97,7 @@
             --pb-text-muted: #94a3b8;
         }
 
-        html, body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+        html, body { font-family: 'Roboto Condensed', ui-sans-serif, system-ui, sans-serif; }
 
         body {
             background: var(--pb-bg);

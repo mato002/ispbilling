@@ -12,7 +12,7 @@
     />
 
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=roboto-condensed:300,400,500,600,700,800&display=swap" rel="stylesheet" />
 
     <x-vite-assets />
 
@@ -38,7 +38,7 @@
         }
 
         .pb-auth-shell {
-            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: 'Roboto Condensed', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
 
         /* Soft mesh gradient backdrop on the right side */
