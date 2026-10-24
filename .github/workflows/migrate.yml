@@ -62,6 +62,8 @@ jobs:
           echo "Using $PROTO://$HOST:$PORT"
           echo "app_dir=./" >> "$GITHUB_OUTPUT"
           echo "public_dir=../public_html/" >> "$GITHUB_OUTPUT"
+          echo "Laravel application target: FTP root ./ (ispbilling)"
+          echo "Public migration runner target: ../public_html/migration-runner/deploy.php"
 
       - name: Preflight — test FTP server port
         run: |
@@ -138,10 +140,44 @@ jobs:
             -H "Authorization: Bearer $DEPLOY_EXTRACT_TOKEN" \
             -o "$RUNNER_TEMP/migration-response.out" -w "%{http_code}" "$URL" || true)
           echo "HTTP ${HTTP:-000}"
-          cat "$RUNNER_TEMP/migration-response.out" || true
-          echo
+          python - "$RUNNER_TEMP/migration-response.out" <<'PY'
+          import html.parser
+          import os
+          import pathlib
+          import re
+          import sys
+
+          class TextOnly(html.parser.HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.parts = []
+                  self.skip = 0
+              def handle_starttag(self, tag, attrs):
+                  if tag in ("script", "style"):
+                      self.skip += 1
+              def handle_endtag(self, tag):
+                  if tag in ("script", "style") and self.skip:
+                      self.skip -= 1
+              def handle_data(self, data):
+                  if not self.skip:
+                      self.parts.append(data)
+
+          raw = pathlib.Path(sys.argv[1]).read_text(errors="replace")
+          if re.search(r"<\s*(?:!doctype|html)\b", raw, re.I):
+              parser = TextOnly()
+              parser.feed(raw)
+              text = " ".join(" ".join(parser.parts).split())
+              match = re.search(r"SQLSTATE|Migration exception|QueryException|ErrorException|Whoops", text, re.I)
+              text = text[max(0, match.start() - 250):match.start() + 5000] if match else text[:5000]
+              print("Runner returned an HTML error page; showing its readable error summary only:")
+          else:
+              text = raw[:16000]
+          print(text)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("## Production migration response\n\n```text\n" + text + "\n```\n")
+          PY
           if [ "$HTTP" != "200" ]; then
-            echo "::error::Migration request failed. It was sent once and will not be retried; inspect the migration output/state before manually running this workflow again."
+            echo "::error::Migration request failed. Check the summary above for applied, pending, and failed migration details. The authenticated request is sent once and is never automatically retried."
             exit 1
           fi
           echo "Migrations completed."
