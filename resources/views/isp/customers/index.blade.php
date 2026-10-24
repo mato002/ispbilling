@@ -1,39 +1,18 @@
 @extends('layouts.admin')
 
 @section('title', 'Subscriber operations')
+@section('compact_header', true)
 
 @php
     $stats = $stats ?? [];
-    $spark = static function (int|float $val): array {
-        $v = max(1, (int) round($val));
-        return collect(range(0, 6))
-            ->map(fn ($i) => max(1, (int) round($v * (0.45 + $i * 0.09))))
-            ->all();
-    };
-    $qParams = request()->query();
 @endphp
 
 @section('header')
-    <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div class="min-w-0">
-            <div class="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
-                <span class="pb-pulse-dot"></span>
-                Subscriber command center
-            </div>
-            <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
-                Customers &amp; subscribers
-            </h1>
-            <p class="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                <span class="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-slate-800 dark:bg-slate-800 dark:text-slate-200">{{ number_format($stats['total'] ?? 0) }}</span>
-                <span class="text-slate-500 dark:text-slate-400"> subscribers in tenant scope</span>
-            </p>
-        </div>
-    </div>
 @endsection
 
 @section('content')
 <div
-    class="space-y-6"
+    class="space-y-3"
     x-data="{
         drawerOpen: false,
         selected: null,
@@ -55,7 +34,7 @@
     @keydown.escape.window="closeDrawer(); quickOpen = false"
 >
     {{-- ========== OPERATIONAL TOOLBAR ========== --}}
-    <div class="pb-card relative overflow-visible p-4 sm:p-5">
+    <div class="pb-card relative overflow-visible p-3 sm:p-4">
         <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
             <div class="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-gradient-to-br from-indigo-500/15 to-cyan-400/10 blur-2xl"></div>
         </div>
@@ -63,11 +42,11 @@
             method="GET"
             action="{{ route('isp.customers.index') }}"
             id="customer-search-form"
-            class="relative flex flex-col gap-4 xl:flex-row xl:items-center"
+            class="relative flex flex-col gap-2 lg:flex-row lg:items-center"
             data-turbo-frame="pb-main"
             x-data="pbFilterForm({ autoSearch: true })"
         >
-            @foreach(request()->except(['search','page','export']) as $k => $v)
+            @foreach(request()->except(['search','status','page','export']) as $k => $v)
                 @if(is_array($v))
                     @foreach($v as $vv)
                         <input type="hidden" name="{{ $k }}[]" value="{{ $vv }}">
@@ -77,8 +56,9 @@
                 @endif
             @endforeach
 
-            <div class="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
-                <div class="relative min-w-0 flex-1">
+            <div class="customer-toolbar-primary flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+                <h1 class="shrink-0 text-lg font-bold tracking-tight text-slate-900 dark:text-white">Customers</h1>
+                <div class="customer-search-box relative min-w-0 flex-1">
                     <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
                     </span>
@@ -87,9 +67,15 @@
                         name="search"
                         value="{{ request('search') }}"
                         placeholder="Search name, phone, email, username, router, invoice #, IP, MAC…"
-                        class="w-full rounded-xl border border-slate-200 bg-white/90 py-2.5 pl-10 pr-4 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100"
+                        class="w-full rounded-xl border border-slate-200 bg-white/90 py-2 pl-10 pr-3 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100"
                     >
                 </div>
+                <select name="status" aria-label="Quick status filter" class="rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                    <option value="">All status</option>
+                    @foreach(['active','suspended','expired','inactive','pending_installation'] as $st)
+                        <option value="{{ $st }}" @selected(request('status') === $st)>{{ $st === 'pending_installation' ? 'Pending' : ucfirst($st) }}</option>
+                    @endforeach
+                </select>
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" @click="toggleCompact()" class="pb-btn py-2 text-xs" :title="viewCompact ? 'Comfortable density' : 'Compact density'">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -102,7 +88,7 @@
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 xl:border-0 xl:pt-0">
+            <div class="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-2 dark:border-slate-800 lg:border-0 lg:pt-0">
                 <div class="relative">
                     <button type="button" @click="quickOpen = !quickOpen" class="pb-btn py-2 text-xs">
                         Quick actions
@@ -131,30 +117,20 @@
     </div>
 
     {{-- ========== VISIBLE FILTERS ========== --}}
-    <section class="pb-card p-3 sm:p-4">
-        <div class="mb-2 flex items-center justify-between gap-3">
-            <h2 class="text-sm font-bold text-slate-900 dark:text-white">Filter subscribers</h2>
-            <a href="{{ route('isp.customers.index') }}" data-turbo-frame="pb-main" class="shrink-0 text-xs font-semibold text-indigo-600 hover:text-indigo-700">Reset all</a>
-        </div>
+    @php $advancedFilterCount = collect(request()->only(['connection_type','router_id','plan_id','location','payment_status','online_only','expiring_only','created_from','created_to']))->filter(fn ($value) => filled($value))->count(); @endphp
+    <details class="pb-card p-3" @if($advancedFilterCount > 0) open @endif>
+        <summary class="cursor-pointer text-sm font-semibold text-slate-800 dark:text-slate-100">Filters <span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $advancedFilterCount }}</span></summary>
             <form
                 method="GET"
                 action="{{ route('isp.customers.index') }}"
-                class="flex max-w-full items-end gap-2 overflow-x-auto pb-1"
+                class="customer-advanced-filters mt-3"
                 data-turbo-frame="pb-main"
                 x-data="pbFilterForm({ autoSearch: true })"
             >
                 @if(request('search'))
                     <input type="hidden" name="search" value="{{ request('search') }}">
                 @endif
-                <div class="w-28 shrink-0">
-                    <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</label>
-                    <select name="status" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                        <option value="">All</option>
-                        @foreach(['active','suspended','expired','inactive','pending_installation'] as $st)
-                            <option value="{{ $st }}" {{ request('status') === $st ? 'selected' : '' }}>{{ $st === 'pending_installation' ? 'Pending installation' : ucfirst($st) }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @if(request('status'))<input type="hidden" name="status" value="{{ request('status') }}">@endif
                 <div class="w-32 shrink-0">
                     <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Connection</label>
                     <select name="connection_type" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
@@ -182,7 +158,7 @@
                         <option value="clear" {{ request('payment_status') === 'clear' ? 'selected' : '' }}>No pending/overdue</option>
                     </select>
                 </div>
-                <div class="flex shrink-0 flex-col justify-center gap-1 rounded-xl border border-slate-100 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-800/40">
+                <div class="customer-filter-toggles flex shrink-0 flex-col justify-center gap-1 rounded-xl border border-slate-100 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-800/40">
                     <label class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-700 dark:text-slate-200">
                         <input type="checkbox" name="online_only" value="1" {{ request('online_only') ? 'checked' : '' }} class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800">
                         Online now (active session)
@@ -192,7 +168,7 @@
                         Subscription expiring ≤ 7 days
                     </label>
                 </div>
-                <div class="grid w-[264px] shrink-0 grid-cols-2 gap-2">
+                <div class="customer-filter-dates grid w-[264px] shrink-0 grid-cols-2 gap-2">
                     <div>
                         <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Created from</label>
                         <input type="date" name="created_from" value="{{ request('created_from') }}" class="w-full rounded-xl border border-slate-200 bg-white py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
@@ -210,42 +186,39 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="shrink-0">
+                <div class="customer-filter-reset shrink-0">
                     <a href="{{ route('isp.customers.index') }}" data-turbo-frame="pb-main" class="inline-flex h-10 items-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Reset filters</a>
                 </div>
             </form>
-    </section>
+    </details>
 
 
     {{-- ========== KPI STRIP ========== --}}
-    <section class="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
+    <details class="pb-card px-3 py-2">
+        <summary class="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">Show metrics</summary>
+        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
         @foreach([
-            ['label' => 'Total', 'val' => $stats['total'] ?? 0, 'hint' => 'All subscribers', 'tone' => 'indigo', 'spark' => '#6366f1'],
-            ['label' => 'Active', 'val' => $stats['active'] ?? 0, 'hint' => 'Status active', 'tone' => 'emerald', 'spark' => '#10b981'],
-            ['label' => 'Suspended', 'val' => $stats['suspended'] ?? 0, 'hint' => 'Needs action', 'tone' => 'amber', 'spark' => '#f59e0b'],
-            ['label' => 'Hotspot', 'val' => $stats['hotspot'] ?? 0, 'hint' => 'Wi‑Fi users', 'tone' => 'cyan', 'spark' => '#06b6d4'],
-            ['label' => 'PPPoE', 'val' => $stats['pppoe'] ?? 0, 'hint' => 'Fixed / PPPoE', 'tone' => 'sky', 'spark' => '#0ea5e9'],
-            ['label' => 'Expiring', 'val' => $stats['expiring_soon'] ?? 0, 'hint' => '≤ 7 days', 'tone' => 'violet', 'spark' => '#8b5cf6'],
-            ['label' => 'Unpaid', 'val' => $stats['unpaid'] ?? 0, 'hint' => 'Pending / overdue', 'tone' => 'rose', 'spark' => '#f43f5e'],
-            ['label' => 'Online', 'val' => $stats['online_sessions'] ?? 0, 'hint' => 'Live sessions', 'tone' => 'teal', 'spark' => '#14b8a6'],
+            ['label' => 'Total', 'val' => $stats['total'] ?? 0],
+            ['label' => 'Active', 'val' => $stats['active'] ?? 0],
+            ['label' => 'Suspended', 'val' => $stats['suspended'] ?? 0],
+            ['label' => 'Hotspot', 'val' => $stats['hotspot'] ?? 0],
+            ['label' => 'PPPoE', 'val' => $stats['pppoe'] ?? 0],
+            ['label' => 'Expiring', 'val' => $stats['expiring_soon'] ?? 0],
+            ['label' => 'Unpaid', 'val' => $stats['unpaid'] ?? 0],
+            ['label' => 'Online', 'val' => $stats['online_sessions'] ?? 0],
         ] as $kpi)
-            <div class="pb-card pb-card-hover group relative overflow-hidden p-3">
-                <div class="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full opacity-40 blur-xl transition group-hover:opacity-70"
-                     style="background: linear-gradient(135deg, {{ $kpi['spark'] }}, transparent)"></div>
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ $kpi['label'] }}</p>
-                <div class="mt-1 flex items-end justify-between gap-2">
-                    <p class="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{{ number_format($kpi['val']) }}</p>
-                    <x-dashboard.sparkline :data="$spark($kpi['val'])" :height="32" :width="72" :stroke="$kpi['spark']" :fill="$kpi['spark'].'22'" />
-                </div>
-                <p class="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{{ $kpi['hint'] }}</p>
+            <div class="rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700">
+                <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500">{{ $kpi['label'] }}</span>
+                <span class="ml-1 font-bold tabular-nums text-slate-900 dark:text-white">{{ number_format($kpi['val']) }}</span>
             </div>
         @endforeach
-    </section>
+        </div>
+    </details>
 
     {{-- ========== LIVE ACTIVITY RAIL ========== --}}
     @if(isset($recentActivity) && $recentActivity->isNotEmpty())
-        <div class="pb-card flex flex-wrap items-center gap-3 px-4 py-3">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Recent payments</span>
+        <details class="pb-card px-3 py-2">
+            <summary class="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">Recent payments</summary>
             <div class="flex flex-wrap gap-2">
                 @foreach($recentActivity as $pay)
                     <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
@@ -256,7 +229,7 @@
                     </span>
                 @endforeach
             </div>
-        </div>
+        </details>
     @endif
 
     {{-- ========== RESULTS ========== --}}
@@ -268,9 +241,9 @@
             <h3 class="text-lg font-bold text-slate-900 dark:text-white">No subscribers match</h3>
             <p class="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
                 @if(request()->anyFilled(['search','status','connection_type','router_id','plan_id','location','payment_status','online_only','expiring_only','created_from','created_to']))
-                    Adjust filters or search — or onboard a new customer to grow your base.
+                    No customers match your search or filters.
                 @else
-                    Start by importing or creating your first subscriber. This view will light up with session telemetry and billing risk as data flows in.
+                    No customers yet.
                 @endif
             </p>
             <div class="mt-6 flex flex-wrap justify-center gap-3">

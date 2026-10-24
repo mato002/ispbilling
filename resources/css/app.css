@@ -49,6 +49,60 @@
     }
 }
 
+.customer-advanced-filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+}
+
+@media (max-width: 640px) {
+    .customer-toolbar-primary {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) 7rem;
+        align-items: center;
+    }
+
+    .customer-toolbar-primary h1,
+    .customer-toolbar-primary .customer-search-box,
+    .customer-toolbar-primary > .flex {
+        grid-column: 1 / -1;
+    }
+
+    .customer-toolbar-primary > select {
+        width: 100%;
+    }
+
+    .customer-toolbar-primary > .flex {
+        justify-content: flex-start;
+    }
+
+    .customer-advanced-filters {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: visible;
+    }
+
+    .customer-advanced-filters > div {
+        width: auto !important;
+        min-width: 0;
+    }
+
+    .customer-advanced-filters select,
+    .customer-advanced-filters input:not([type="hidden"]) {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .customer-filter-toggles,
+    .customer-filter-dates,
+    .customer-filter-reset {
+        grid-column: 1 / -1;
+    }
+}
+
 /* Toast Notifications */
 .toast-container {
     position: fixed;

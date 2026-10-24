@@ -472,18 +472,20 @@
 
                     <x-system-announcements-banner :announcements="$systemAnnouncements ?? collect()" />
 
-                    @hasSection('header')
-                        <div class="pb-fade-up mb-6 pb-card p-4 sm:p-5">
-                            @yield('header')
-                        </div>
-                    @elseif(request()->routeIs('isp.*'))
-                        <div class="pb-card pb-fade-up p-4 sm:p-5 mb-6">
-                            <x-isp-page-header
-                                :title="trim((string) $__env->yieldContent('title')) ?: 'ISP Operations'"
-                                :description="'Unified PrimeBilling ISP operating surface.'"
-                            />
-                        </div>
-                    @endif
+                    @unless($__env->hasSection('compact_header'))
+                        @hasSection('header')
+                            <div class="pb-fade-up mb-3 pb-card p-3 sm:p-4">
+                                @yield('header')
+                            </div>
+                        @elseif(request()->routeIs('isp.*'))
+                            <div class="pb-card pb-fade-up p-3 sm:p-4 mb-3">
+                                <x-isp-page-header
+                                    :title="trim((string) $__env->yieldContent('title')) ?: 'ISP Operations'"
+                                    :description="'Unified PrimeBilling ISP operating surface.'"
+                                />
+                            </div>
+                        @endif
+                    @endunless
 
                     @yield('content')
                 </div>

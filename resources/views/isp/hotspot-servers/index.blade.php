@@ -15,11 +15,7 @@
 @endsection
 
 @section('content')
-    <div class="space-y-6">
-        <div class="pb-card p-4 sm:p-5 text-sm text-slate-600 dark:text-slate-300">
-            <p class="font-semibold text-slate-900 dark:text-white">Quick setup</p>
-            <p class="mt-1">Add a router, then sync to import hotspot server names and interfaces. Activate the servers you expose to customers.</p>
-        </div>
+    <div class="space-y-3">
 
         <x-resource-index
             :filter-action="route('isp.hotspot-servers.index')"

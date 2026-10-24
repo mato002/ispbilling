@@ -11,15 +11,15 @@
     'chips' => [],
 ])
 
-<div class="pb-card p-4 sm:p-5" {{ $attributes->except(['action', 'method', 'resetUrl', 'exportUrl', 'exportLabel', 'toolbar', 'autoSearch', 'chips']) }}>
+<div class="pb-card p-3 sm:p-4" {{ $attributes->except(['action', 'method', 'resetUrl', 'exportUrl', 'exportLabel', 'toolbar', 'autoSearch', 'chips']) }}>
     <form
         action="{{ $action }}"
         method="{{ $method }}"
-        class="flex flex-col gap-4"
+        class="flex flex-col gap-2"
         data-turbo-frame="pb-main"
         x-data="pbFilterForm({ autoSearch: @json($autoSearch) })"
     >
-        <div class="isp-filter-bar flex flex-wrap items-end gap-3">
+        <div class="isp-filter-bar flex flex-wrap items-end gap-2">
             @isset($filters)
                 {{ $filters }}
             @else

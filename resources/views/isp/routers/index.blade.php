@@ -47,7 +47,7 @@
 @endphp
 
 <div
-    class="isp-noc-root space-y-6"
+    class="isp-noc-root space-y-3"
     x-data="{
         detailOpen: false,
         detail: null,
@@ -71,7 +71,9 @@
     @keydown.escape.window="closeDetail()"
 >
     {{-- Fleet KPI strip --}}
-    <div class="isp-noc-kpi-grid">
+    <details class="pb-card px-3 py-2">
+        <summary class="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">Fleet metrics</summary>
+        <div class="isp-noc-kpi-grid mt-2">
         <div class="isp-noc-kpi pb-card p-4">
             <p class="isp-noc-kpi__label">Total routers</p>
             <p class="isp-noc-kpi__value">{{ number_format($fleetStats['total']) }}</p>
@@ -116,7 +118,8 @@
                 <span style="width: {{ $fleetStats['network_health'] !== null ? min(100, $fleetStats['network_health']) : 0 }}%"></span>
             </div>
         </div>
-    </div>
+        </div>
+    </details>
 
     {{-- Live status strip --}}
     <div class="pb-card isp-noc-live-strip overflow-hidden">

@@ -21,7 +21,7 @@
     $exportFormats = $exportFormats ?? [];
 @endphp
 
-<div data-listing-root {{ $attributes->merge(['class' => 'space-y-6']) }}>
+<div data-listing-root {{ $attributes->merge(['class' => 'space-y-3']) }}>
     @if ($showFlash && session('success'))
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
             {{ session('success') }}
