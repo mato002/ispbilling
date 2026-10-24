@@ -8,9 +8,15 @@
     </x-slot>
 
     <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-        <div class="p-6">
-            <form method="GET" action="{{ route('admin.reports.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6" x-data="{ filtersOpen: false }" @keydown.escape.window="filtersOpen = false">
+        <div class="p-4 sm:p-6">
+            <button type="button" class="pb-btn mb-3 w-full justify-center md:hidden" @click="filtersOpen = true">⚙ Filter reports</button>
+            <div class="isp-filter-modal" role="dialog" aria-modal="true" :class="{ 'is-open': filtersOpen }" @click.self="filtersOpen = false">
+            <form method="GET" action="{{ route('admin.reports.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4" @submit="filtersOpen = false">
+                <div class="isp-filter-modal-heading md:hidden">
+                    <h2 class="text-base font-semibold text-slate-900 dark:text-white">Report filters</h2>
+                    <button type="button" class="pb-btn px-2 py-1" aria-label="Close filters" @click="filtersOpen = false">✕</button>
+                </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Report Type</label>
                     <select name="type" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
@@ -39,12 +45,17 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="md:col-span-4">
+                <div class="hidden md:col-span-4 md:block">
                     <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
                         Generate Report
                     </button>
                 </div>
+                <div class="md:hidden flex gap-2">
+                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex-1">Generate Report</button>
+                    <button type="button" class="pb-btn" @click="filtersOpen = false">Close</button>
+                </div>
             </form>
+            </div>
         </div>
     </div>
 

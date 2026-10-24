@@ -78,24 +78,24 @@
         @endif
 
         <!-- Available Plans -->
-        <div class="bg-white rounded-lg shadow-xl p-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6">Available Plans</h2>
+        <div class="bg-white rounded-lg shadow-xl p-3 sm:p-6">
+            <h2 class="text-lg sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-6">Available Plans</h2>
             
             @if($availablePlans->count() > 0)
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 lg:gap-6">
                     @foreach($availablePlans as $plan)
-                        <div class="border-2 border-gray-200 rounded-lg p-4 sm:p-6 hover:border-blue-500 transition-colors {{ request('plan') == $plan->id ? 'border-blue-500 bg-blue-50' : '' }}">
-                            <div class="text-center mb-4">
-                                <h3 class="text-lg sm:text-xl font-bold text-gray-800 mb-2">{{ $plan->name }}</h3>
+                        <div class="border-2 border-gray-200 rounded-lg p-3 sm:p-6 hover:border-blue-500 transition-colors {{ request('plan') == $plan->id ? 'border-blue-500 bg-blue-50' : '' }}">
+                            <div class="text-center mb-3 sm:mb-4">
+                                <h3 class="text-sm leading-tight sm:text-xl font-bold text-gray-800 mb-2">{{ $plan->name }}</h3>
                                 @if($plan->description)
                                     <p class="text-xs sm:text-sm text-gray-600 mb-4">{{ $plan->description }}</p>
                                 @endif
                             </div>
 
-                            <div class="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
+                            <div class="space-y-2 sm:space-y-3 mb-3 sm:mb-6 text-xs sm:text-base">
                                 <div class="flex justify-between items-center">
-                                    <span class="text-gray-600 text-sm">Price:</span>
-                                    <span class="text-lg sm:text-2xl font-bold text-gray-800">KES {{ number_format($plan->price, 2) }}</span>
+                                    <span class="text-gray-600 text-xs sm:text-sm">Price:</span>
+                                    <span class="text-sm sm:text-2xl font-bold text-gray-800">KES {{ number_format($plan->price, 2) }}</span>
                                 </div>
                                 
                                 <div class="flex justify-between items-center">
@@ -105,14 +105,14 @@
 
                                 @if($plan->download_speed_kbps)
                                     <div class="flex justify-between items-center">
-                                        <span class="text-gray-600 text-sm">Download:</span>
+                                            <span class="text-gray-600 text-xs sm:text-sm">Download:</span>
                                         <span class="font-semibold text-gray-800 text-sm sm:text-base">{{ number_format($plan->download_speed_kbps / 1024, 1) }} Mbps</span>
                                     </div>
                                 @endif
 
                                 @if($plan->upload_speed_kbps)
                                     <div class="flex justify-between items-center">
-                                        <span class="text-gray-600 text-sm">Upload:</span>
+                                            <span class="text-gray-600 text-xs sm:text-sm">Upload:</span>
                                         <span class="font-semibold text-gray-800 text-sm sm:text-base">{{ number_format($plan->upload_speed_kbps / 1024, 1) }} Mbps</span>
                                     </div>
                                 @endif
@@ -161,7 +161,7 @@
                                         <input type="hidden" name="phone_number" value="{{ $customer->phone_number }}">
 
                                         <button type="submit" 
-                                                class="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105">
+                                                class="w-full px-2 sm:px-6 py-2 sm:py-3 text-xs sm:text-base bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105">
                                             Pay KES {{ number_format($selectedInvoice->total_amount, 2) }}
                                         </button>
                                     </form>
@@ -174,7 +174,7 @@
                                     <input type="hidden" name="plan_id" value="{{ $plan->id }}">
 
                                     <button type="submit" 
-                                            class="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105">
+                                            class="w-full px-2 sm:px-6 py-2 sm:py-3 text-xs sm:text-base bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105">
                                         Select Plan - KES {{ number_format($plan->price, 2) }}
                                     </button>
                                 </form>

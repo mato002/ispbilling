@@ -3,21 +3,21 @@
 @section('title', 'Available Packages')
 
 @section('content')
-<div class="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen bg-gray-50 py-6 px-3 sm:py-12 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto">
         <!-- Header -->
-        <div class="text-center mb-12">
+        <div class="text-center mb-6 sm:mb-12">
             @if($portalSettings?->logo)
                 <div class="mb-6">
                     <img src="{{ asset('storage/' . $portalSettings->logo) }}" alt="{{ $isp->name }}" class="h-16 mx-auto">
                 </div>
             @endif
             
-            <h1 class="text-4xl font-bold text-gray-900 mb-4">
+            <h1 class="text-2xl sm:text-4xl font-bold text-gray-900 mb-2 sm:mb-4">
                 {{ $portalSettings?->title ?? 'Available Internet Packages' }}
             </h1>
             
-            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p class="text-sm sm:text-xl text-gray-600 max-w-3xl mx-auto">
                 {{ $portalSettings?->description ?? 'Choose the perfect internet package for your needs. All packages include unlimited data and high-speed connectivity.' }}
             </p>
         </div>
@@ -32,31 +32,31 @@
             </div>
         @else
             <!-- Packages Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 lg:gap-8">
                 @foreach($plans as $plan)
-                    <div class="bg-white rounded-2xl shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-105 hover:shadow-xl">
+                    <div class="bg-white rounded-2xl shadow-lg overflow-hidden transform transition-all duration-300 lg:hover:scale-105 hover:shadow-xl">
                         <!-- Package Header -->
-                        <div class="bg-gradient-to-r {{ $plan->is_popular ? 'from-blue-500 to-purple-600' : 'from-gray-600 to-gray-700' }} p-6 text-white">
+                        <div class="bg-gradient-to-r {{ $plan->is_popular ? 'from-blue-500 to-purple-600' : 'from-gray-600 to-gray-700' }} p-3 sm:p-6 text-white">
                             @if($plan->is_popular)
                                 <div class="flex justify-between items-start mb-4">
                                     <span class="bg-white text-blue-600 text-xs font-bold px-3 py-1 rounded-full">MOST POPULAR</span>
                                 </div>
                             @endif
                             
-                            <h3 class="text-2xl font-bold mb-2">{{ $plan->name }}</h3>
+                            <h3 class="text-sm leading-tight sm:text-2xl font-bold mb-2">{{ $plan->name }}</h3>
                             <div class="flex items-baseline">
-                                <span class="text-4xl font-bold">${{ number_format($plan->price, 2) }}</span>
-                                <span class="ml-2 text-sm opacity-90">/ {{ $plan->billing_cycle }}</span>
+                                <span class="text-xl sm:text-4xl font-bold">${{ number_format($plan->price, 2) }}</span>
+                                <span class="ml-1 sm:ml-2 text-[10px] sm:text-sm opacity-90">/ {{ $plan->billing_cycle }}</span>
                             </div>
                         </div>
 
                         <!-- Package Features -->
-                        <div class="p-6">
-                            <div class="space-y-4">
+                        <div class="p-3 sm:p-6">
+                            <div class="space-y-3 sm:space-y-4 text-xs sm:text-base">
                                 <!-- Speed -->
                                 @if($plan->download_speed || $plan->upload_speed)
                                     <div class="flex items-center text-gray-700">
-                                        <x-font-awesome-icon name="bolt" class="mr-3 h-5 w-5 text-green-500" />
+                                        <x-font-awesome-icon name="bolt" class="mr-2 sm:mr-3 h-4 w-4 sm:h-5 sm:w-5 shrink-0 text-green-500" />
                                         <div>
                                             <span class="font-medium">{{ $plan->download_speed }}{{ $plan->download_speed_unit ?? 'Mbps' }}</span>
                                             @if($plan->upload_speed)
@@ -70,7 +70,7 @@
                                 <!-- Data Limit -->
                                 @if($plan->data_limit)
                                     <div class="flex items-center text-gray-700">
-                                        <x-font-awesome-icon name="chart-line" class="mr-3 h-5 w-5 text-blue-500" />
+                                        <x-font-awesome-icon name="chart-line" class="mr-2 sm:mr-3 h-4 w-4 sm:h-5 sm:w-5 shrink-0 text-blue-500" />
                                         <div>
                                             <span class="font-medium">{{ $plan->data_limit }}{{ $plan->data_limit_unit ?? 'GB' }}</span>
                                             <span class="text-sm text-gray-500 block">Monthly Data Limit</span>
@@ -78,7 +78,7 @@
                                     </div>
                                 @else
                                     <div class="flex items-center text-gray-700">
-                                        <x-font-awesome-icon name="circle-check" class="mr-3 h-5 w-5 text-blue-500" />
+                                        <x-font-awesome-icon name="circle-check" class="mr-2 sm:mr-3 h-4 w-4 sm:h-5 sm:w-5 shrink-0 text-blue-500" />
                                         <div>
                                             <span class="font-medium">Unlimited Data</span>
                                             <span class="text-sm text-gray-500 block">No data restrictions</span>
@@ -89,7 +89,7 @@
                                 <!-- Duration -->
                                 @if($plan->duration)
                                     <div class="flex items-center text-gray-700">
-                                        <x-font-awesome-icon name="clock" class="mr-3 h-5 w-5 text-purple-500" />
+                                        <x-font-awesome-icon name="clock" class="mr-2 sm:mr-3 h-4 w-4 sm:h-5 sm:w-5 shrink-0 text-purple-500" />
                                         <div>
                                             <span class="font-medium">{{ $plan->duration }} {{ $plan->duration_unit ?? 'days' }}</span>
                                             <span class="text-sm text-gray-500 block">Package Duration</span>
@@ -106,9 +106,9 @@
                             </div>
 
                             <!-- Action Button -->
-                            <div class="mt-6">
+                            <div class="mt-3 sm:mt-6">
                                 <a href="{{ route('hotspot.buy-package', $plan->id) }}{{ $router ? '?router_ip=' . $router->ip_address : '' }}" 
-                                   class="w-full bg-gradient-to-r {{ $plan->is_popular ? 'from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700' : 'from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800' }} text-white font-medium py-3 px-4 rounded-lg text-center transition-all duration-200 transform hover:scale-105">
+                                   class="w-full bg-gradient-to-r {{ $plan->is_popular ? 'from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700' : 'from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800' }} text-white text-xs sm:text-base font-medium py-2 sm:py-3 px-2 sm:px-4 rounded-lg text-center transition-all duration-200 transform lg:hover:scale-105">
                                     Get Started
                                 </a>
                             </div>

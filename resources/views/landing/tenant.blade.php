@@ -87,25 +87,25 @@
         </div>
 
         @if($landingPlans->isNotEmpty())
-            <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3 pb-reveal">
+            <div class="mt-8 sm:mt-12 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3 pb-reveal">
                 @foreach ($landingPlans as $plan)
-                    <article @class(['pb-card p-6 pb-card-lift', 'pb-compare-popular' => $loop->first])>
+                    <article @class(['pb-card p-3 sm:p-6 pb-card-lift', 'pb-compare-popular' => $loop->first])>
                         @if($loop->first)<span class="pb-compare-badge">Popular</span>@endif
-                        <h3 class="text-xl font-bold text-slate-900">{{ $plan->name }}</h3>
+                        <h3 class="text-sm leading-tight sm:text-xl font-bold text-slate-900">{{ $plan->name }}</h3>
                         @if($plan->description)
                             <p class="mt-2 text-sm text-slate-600">{{ \Illuminate\Support\Str::limit($plan->description, 120) }}</p>
                         @endif
-                        <p class="mt-4 text-3xl font-extrabold text-slate-900">
+                        <p class="mt-3 sm:mt-4 text-lg sm:text-3xl font-extrabold text-slate-900">
                             {{ $landingIsp->currency }} {{ number_format((float) $plan->price, 0) }}
                             <span class="text-sm font-normal text-slate-500">/ {{ $plan->duration_days }} days</span>
                         </p>
-                        <ul class="mt-4 space-y-2 text-sm text-slate-600">
+                        <ul class="mt-3 sm:mt-4 space-y-1 sm:space-y-2 text-[11px] sm:text-sm text-slate-600">
                             @if($plan->access_type)<li class="flex gap-2"><span class="text-blue-600">✓</span> {{ strtoupper($plan->access_type) }} access</li>@endif
                             @if($plan->download_speed_kbps)<li class="flex gap-2"><span class="text-blue-600">✓</span> Speed: {{ $plan->formatted_speed }}</li>@endif
                             @if($plan->billing_type)<li class="flex gap-2"><span class="text-blue-600">✓</span> {{ $plan->billing_type }} billing</li>@endif
                         </ul>
                         @guest
-                            <a href="{{ route('customer.register') }}" class="pb-btn-primary mt-6 w-full">Get started</a>
+                            <a href="{{ route('customer.register') }}" class="pb-btn-primary mt-3 sm:mt-6 w-full px-2 py-2 sm:px-6 sm:py-3 text-xs sm:text-sm">Get started</a>
                         @endguest
                     </article>
                 @endforeach

@@ -5,6 +5,7 @@
 
 @php
     $stats = $stats ?? [];
+    $advancedFilterCount = collect(request()->only(['connection_type','router_id','plan_id','location','payment_status','online_only','expiring_only','created_from','created_to']))->filter(fn ($value) => filled($value))->count();
 @endphp
 
 @section('header')
@@ -12,9 +13,10 @@
 
 @section('content')
 <div
-    class="space-y-3"
+    class="customer-list space-y-3"
     x-data="{
         drawerOpen: false,
+        filtersOpen: false,
         selected: null,
         quickOpen: false,
         viewCompact: localStorage.getItem('pb.customers.compact') === '1',
@@ -28,10 +30,11 @@
             localStorage.setItem('pb.customers.autorefresh', this.autoRefresh ? '1' : '0');
         },
         openDrawer(payload) { this.selected = payload; this.drawerOpen = true; document.body.classList.add('overflow-hidden'); },
-        closeDrawer() { this.drawerOpen = false; this.selected = null; document.body.classList.remove('overflow-hidden'); },
+        closeDrawer() { this.drawerOpen = false; this.selected = null; if (!this.filtersOpen) document.body.classList.remove('overflow-hidden'); },
     }"
     x-init="if (autoRefresh) { setInterval(() => { if (!document.hidden) window.location.reload(); }, 120000); }"
-    @keydown.escape.window="closeDrawer(); quickOpen = false"
+    @keydown.escape.window="closeDrawer(); quickOpen = false; filtersOpen = false; document.body.classList.remove('overflow-hidden')"
+    x-effect="document.body.classList.toggle('overflow-hidden', drawerOpen || filtersOpen)"
 >
     {{-- ========== OPERATIONAL TOOLBAR ========== --}}
     <div class="pb-card relative overflow-visible p-3 sm:p-4">
@@ -57,7 +60,7 @@
             @endforeach
 
             <div class="customer-toolbar-primary flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-                <h1 class="shrink-0 text-lg font-bold tracking-tight text-slate-900 dark:text-white">Customers</h1>
+                <h1 class="shrink-0 text-lg font-bold tracking-tight text-slate-900 dark:text-white">Customers <span class="text-slate-500">({{ number_format($stats['total'] ?? 0) }})</span></h1>
                 <div class="customer-search-box relative min-w-0 flex-1">
                     <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -76,7 +79,7 @@
                         <option value="{{ $st }}" @selected(request('status') === $st)>{{ $st === 'pending_installation' ? 'Pending' : ucfirst($st) }}</option>
                     @endforeach
                 </select>
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="customer-desktop-controls flex flex-wrap items-center gap-2">
                     <button type="button" @click="toggleCompact()" class="pb-btn py-2 text-xs" :title="viewCompact ? 'Comfortable density' : 'Compact density'">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
                         <span x-text="viewCompact ? 'Comfortable' : 'Compact'"></span>
@@ -88,7 +91,7 @@
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-2 dark:border-slate-800 lg:border-0 lg:pt-0">
+            <div class="customer-desktop-actions flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-2 dark:border-slate-800 lg:border-0 lg:pt-0">
                 <div class="relative">
                     <button type="button" @click="quickOpen = !quickOpen" class="pb-btn py-2 text-xs">
                         Quick actions
@@ -117,13 +120,23 @@
     </div>
 
     {{-- ========== VISIBLE FILTERS ========== --}}
-    @php $advancedFilterCount = collect(request()->only(['connection_type','router_id','plan_id','location','payment_status','online_only','expiring_only','created_from','created_to']))->filter(fn ($value) => filled($value))->count(); @endphp
-    <details class="pb-card p-3" @if($advancedFilterCount > 0) open @endif>
-        <summary class="cursor-pointer text-sm font-semibold text-slate-800 dark:text-slate-100">Filters <span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $advancedFilterCount }}</span></summary>
+    <section class="customer-filter-panel pb-card p-3">
+        <div class="customer-filter-desktop-heading text-sm font-semibold text-slate-800 dark:text-slate-100">Filters <span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $advancedFilterCount }}</span></div>
+        <button type="button" class="customer-filter-open hidden w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" @click="filtersOpen = true">
+            <span>⚙ Filter</span>
+            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $advancedFilterCount }}</span>
+        </button>
+        <div class="customer-filter-content" role="dialog" aria-modal="true" :class="{ 'is-open': filtersOpen }" @click.self="filtersOpen = false">
+          <div class="customer-filter-modal-card">
+            <div class="customer-filter-modal-heading">
+                <span class="text-base font-semibold text-slate-900 dark:text-white">Filters</span>
+                <button type="button" class="pb-btn px-2 py-1" aria-label="Close filters" @click="filtersOpen = false">✕</button>
+            </div>
             <form
                 method="GET"
                 action="{{ route('isp.customers.index') }}"
                 class="customer-advanced-filters mt-3"
+                @submit="filtersOpen = false"
                 data-turbo-frame="pb-main"
                 x-data="pbFilterForm({ autoSearch: true })"
             >
@@ -190,11 +203,13 @@
                     <a href="{{ route('isp.customers.index') }}" data-turbo-frame="pb-main" class="inline-flex h-10 items-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Reset filters</a>
                 </div>
             </form>
-    </details>
+          </div>
+        </div>
+    </section>
 
 
     {{-- ========== KPI STRIP ========== --}}
-    <details class="pb-card px-3 py-2">
+    <details class="customer-metrics pb-card px-3 py-2">
         <summary class="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">Show metrics</summary>
         <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
         @foreach([
@@ -217,7 +232,7 @@
 
     {{-- ========== LIVE ACTIVITY RAIL ========== --}}
     @if(isset($recentActivity) && $recentActivity->isNotEmpty())
-        <details class="pb-card px-3 py-2">
+        <details class="customer-recent-payments pb-card px-3 py-2">
             <summary class="cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">Recent payments</summary>
             <div class="flex flex-wrap gap-2">
                 @foreach($recentActivity as $pay)
@@ -231,6 +246,10 @@
             </div>
         </details>
     @endif
+
+    <div class="customer-mobile-add fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 p-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,.12)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+        <a href="{{ route('isp.customers.create') }}" class="pb-btn-primary w-full justify-center py-3">+ Add customer</a>
+    </div>
 
     {{-- ========== RESULTS ========== --}}
     @if($customers->isEmpty())
@@ -254,7 +273,7 @@
             </div>
         </div>
     @else
-        <div :class="viewCompact ? 'pb-customers-table--compact' : ''">
+        <div class="customer-table-wrap" :class="viewCompact ? 'pb-customers-table--compact' : ''">
             <x-data-table>
                 <thead>
                     <tr>
@@ -324,7 +343,7 @@
                             ];
                             $util = $online ? 25 + ($customer->id % 50) : 90;
                         @endphp
-                        <x-listing-table.row class="align-middle" :href="route('isp.customers.show', $customer)">
+                        <x-listing-table.row class="align-middle" :href="route('isp.customers.show', $customer)" @click="if (window.matchMedia('(max-width: 900px)').matches && !$event.target.closest('a,button,form')) { $event.preventDefault(); openDrawer(@js($payload)); }">
                             <td>
                                 <button type="button" @click.stop="openDrawer(@js($payload))" class="group flex max-w-[220px] items-start gap-2 text-left sm:max-w-none">
                                     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-xs font-bold text-white shadow-md shadow-indigo-500/20">
@@ -387,7 +406,8 @@
                             <td class="max-w-[220px]">
                                 <div class="truncate font-medium text-slate-800 dark:text-slate-100">{{ $customer->router?->name ?? 'No router' }}</div>
                                 <div class="truncate font-mono text-slate-500">{{ $customer->router?->ip_address ?? '—' }}</div>
-                                <div class="truncate font-mono text-slate-500" title="{{ $ip }} · {{ $mac }}">{{ $ip }} · {{ $mac }}</div>
+                                <div class="customer-network-address truncate font-mono text-slate-500" title="{{ $ip }}">IP {{ $ip }}</div>
+                                <div class="truncate font-mono text-slate-500" title="{{ $mac }}">MAC {{ $mac }}</div>
                             </td>
                             <td>
                                 <div class="flex items-center gap-2">
@@ -412,6 +432,8 @@
                             </td>
                             <td class="text-right whitespace-nowrap">
                                 <div class="relative inline-flex items-center gap-1" data-no-row-nav x-data="{ open: false }" @click.outside="open = false">
+                                    <a href="tel:{{ preg_replace('/[^0-9+]/', '', $customer->phone_number) }}" class="customer-mobile-quick-action pb-btn py-1.5 text-xs">Call</a>
+                                    <a href="sms:{{ preg_replace('/[^0-9+]/', '', $customer->phone_number) }}" class="customer-mobile-quick-action pb-btn py-1.5 text-xs">Text</a>
                                     <button type="button" @click="open = !open" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-500/40" title="Actions">
                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                                     </button>
@@ -426,6 +448,10 @@
                                         <form method="POST" action="{{ route('isp.user-connections.disconnect', $customer) }}" class="border-t border-slate-100 dark:border-slate-800" onsubmit="confirmFormSubmit(event, {title: 'Disconnect?', text: 'Terminate active sessions for this subscriber?', icon: 'warning'}); return false;">
                                             @csrf
                                             <button type="submit" class="block w-full px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10">Disconnect user</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('isp.user-connections.reconnect', $customer) }}" onsubmit="confirmFormSubmit(event, {title: 'Reconnect subscriber?', text: 'Reprovision access for {{ $customer->full_name }}?', icon: 'question'}); return false;">
+                                            @csrf
+                                            <button type="submit" class="block w-full px-3 py-2 text-left text-sm text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/10">Reconnect</button>
                                         </form>
                                         @if($customer->status === 'active')
                                             <form method="POST" action="{{ route('isp.customers.suspend', $customer) }}" onsubmit="confirmFormSubmit(event, {title: 'Suspend subscriber', text: 'Suspend {{ $customer->full_name }}?', icon: 'warning'}); return false;">

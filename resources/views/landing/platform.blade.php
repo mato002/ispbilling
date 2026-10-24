@@ -105,7 +105,7 @@
             <p class="mt-4 text-slate-600">When payments, router access, invoices, and support live in different places, every growth step creates more manual work.</p>
         </div>
 
-        <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="mt-8 sm:mt-12 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
             @foreach ([
                 ['bolt', 'Manual reconnections', 'Teams spend hours checking payments and toggling users by hand after every M-Pesa confirmation.'],
                 ['file-invoice-dollar', 'Disconnected billing', 'Spreadsheets and payment statements never show the full subscriber state in real time.'],
@@ -114,12 +114,12 @@
                 ['headset', 'Support overload', 'WhatsApp threads replace ticketing — issues get lost and repeat calls pile up.'],
                 ['box-open', 'Field gear gaps', 'CPE and inventory live in notebooks while technicians install blind.'],
             ] as [$icon, $title, $desc])
-                <article class="pb-card pb-card-lift p-6 pb-reveal">
-                    <div class="pb-icon-wrap mb-4">
+                <article class="pb-card pb-card-lift p-3 sm:p-6 pb-reveal">
+                    <div class="pb-icon-wrap mb-2 sm:mb-4">
                         <x-font-awesome-icon :name="$icon" class="h-5 w-5" />
                     </div>
                     <h3 class="font-bold text-slate-900">{{ $title }}</h3>
-                    <p class="mt-2 text-sm leading-relaxed text-slate-600">{{ $desc }}</p>
+                    <p class="mt-1 sm:mt-2 text-xs sm:text-sm leading-relaxed text-slate-600">{{ $desc }}</p>
                 </article>
             @endforeach
         </div>
@@ -134,16 +134,16 @@
             <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">One control layer for ISP operations</h2>
         </div>
 
-        <div class="mt-14 grid gap-6 md:grid-cols-3 pb-reveal">
+        <div class="mt-8 sm:mt-14 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3 pb-reveal">
             @foreach ([
                 ['01', 'money-bill-wave', 'Collect', 'STK Push, Paybill confirmations, invoices, and reminders stay tied to each subscriber lifecycle.'],
                 ['02', 'broadcast-tower', 'Provision', 'MikroTik API syncs PPPoE, hotspot, bandwidth profiles, and IP pools from payment state.'],
                 ['03', 'gears', 'Operate', 'Support tickets, SMS campaigns, inventory, outages, and reports from one live dashboard.'],
             ] as [$step, $icon, $title, $desc])
-                <div class="relative pb-card p-6">
+                <div class="relative pb-card p-3 sm:p-6">
                     <div class="flex items-center justify-between"><span class="text-4xl font-black text-blue-100">{{ $step }}</span><span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700"><x-font-awesome-icon :name="$icon" class="h-5 w-5" /></span></div>
-                    <h3 class="mt-3 text-xl font-bold text-slate-900">{{ $title }}</h3>
-                    <p class="mt-3 text-sm leading-relaxed text-slate-600">{{ $desc }}</p>
+                    <h3 class="mt-2 sm:mt-3 text-base sm:text-xl font-bold text-slate-900">{{ $title }}</h3>
+                    <p class="mt-2 sm:mt-3 text-xs sm:text-sm leading-relaxed text-slate-600">{{ $desc }}</p>
                 </div>
             @endforeach
         </div>
@@ -248,16 +248,16 @@
 <section class="px-4 py-20 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-7xl pb-reveal">
         <h2 class="text-center text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Built for how local networks actually grow</h2>
-        <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="mt-8 sm:mt-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             @foreach ([
                 ['Fiber ISPs', 'PPPoE subscriptions, billing cycles, renewals, and customer records.'],
                 ['Hotspot providers', 'Vouchers, captive portals, micropayments, and session controls.'],
                 ['Rural WISPs', 'Lean operations, router automation, and SMS payment reminders.'],
                 ['Managed Wi‑Fi', 'Hotels, apartments, schools, campuses, and shared spaces.'],
             ] as [$title, $desc])
-                <article class="pb-card pb-card-lift p-5">
-                    <h3 class="font-bold text-slate-900">{{ $title }}</h3>
-                    <p class="mt-2 text-sm text-slate-600">{{ $desc }}</p>
+                <article class="pb-card pb-card-lift p-3 sm:p-5">
+                    <h3 class="text-sm sm:text-base font-bold text-slate-900">{{ $title }}</h3>
+                    <p class="mt-1 sm:mt-2 text-xs sm:text-sm text-slate-600">{{ $desc }}</p>
                 </article>
             @endforeach
         </div>
@@ -272,7 +272,7 @@
             <p class="mt-4 text-slate-600">Most ISPs go live within 24 hours once router access and payment details are ready.</p>
         </div>
 
-        <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5 pb-reveal">
+        <div class="mt-8 sm:mt-12 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-5 pb-reveal">
             @foreach ([
                 ['Add your MikroTik router', 'Connect RouterOS via API — hotspot, PPPoE, and queues sync automatically.'],
                 ['Create service plans', 'Set packages with speeds, durations, and pricing for PPPoE or hotspot.'],
@@ -280,9 +280,9 @@
                 ['Connect M-Pesa', 'Configure Paybill or STK Push — payments reconcile and renewals run themselves.'],
                 ['Launch & monitor', 'Run billing, support, and network access from one dashboard.'],
             ] as $i => [$title, $desc])
-                <div class="pb-card p-5">
-                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{{ $i + 1 }}</span>
-                    <h3 class="mt-3 text-sm font-bold text-slate-900">{{ $title }}</h3>
+                <div class="pb-card p-3 sm:p-5">
+                    <span class="inline-flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-blue-600 text-xs sm:text-sm font-bold text-white">{{ $i + 1 }}</span>
+                    <h3 class="mt-2 sm:mt-3 text-xs sm:text-sm font-bold text-slate-900">{{ $title }}</h3>
                     <p class="mt-2 text-xs leading-relaxed text-slate-600">{{ $desc }}</p>
                 </div>
             @endforeach

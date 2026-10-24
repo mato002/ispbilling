@@ -52,6 +52,7 @@
         detailOpen: false,
         detail: null,
         refreshing: false,
+        filtersOpen: false,
         selected: [],
         lastSyncLabel: @js(now()->format('H:i:s')),
         openDetail(payload) { this.detail = payload; this.detailOpen = true; document.body.classList.add('overflow-hidden'); },
@@ -68,7 +69,7 @@
             }, 1000);
         }
     }"
-    @keydown.escape.window="closeDetail()"
+    @keydown.escape.window="closeDetail(); filtersOpen = false"
 >
     {{-- Fleet KPI strip --}}
     <details class="pb-card px-3 py-2">
@@ -237,16 +238,25 @@
         <div class="border-b border-slate-200/80 px-4 py-3 dark:border-slate-700/80 sm:px-5">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <h2 class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Fleet filters</h2>
-                <span class="text-[10px] font-medium text-slate-400">Search · status · branch · health · transport</span>
+                <span class="hidden text-[10px] font-medium text-slate-400 md:inline">Search · status · branch · health · transport</span>
             </div>
         </div>
+        <div class="px-4 py-3 md:hidden">
+            <button type="button" class="pb-btn w-full justify-center" @click="filtersOpen = true">⚙ Filter</button>
+        </div>
+        <div class="isp-filter-modal" role="dialog" aria-modal="true" :class="{ 'is-open': filtersOpen }" @click.self="filtersOpen = false">
         <form
             action="{{ route('isp.routers.index') }}"
             method="GET"
             class="isp-noc-filter-form px-4 py-4 sm:px-5"
+            @submit="filtersOpen = false"
             data-turbo-frame="pb-main"
             x-data="pbFilterForm({ autoSearch: true })"
         >
+            <div class="isp-filter-modal-heading md:hidden">
+                <h2 class="text-base font-semibold text-slate-900 dark:text-white">Fleet filters</h2>
+                <button type="button" class="pb-btn px-2 py-1" aria-label="Close filters" @click="filtersOpen = false">✕</button>
+            </div>
             <div class="isp-noc-filter-grid">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -296,7 +306,12 @@
                     <x-filter-chips :chips="$filterChips" class="flex-1" />
                 @endif
             </div>
+            <div class="mt-3 flex gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 md:hidden">
+                <button type="submit" class="pb-btn pb-btn-primary flex-1">Apply filters</button>
+                <button type="button" class="pb-btn" @click="filtersOpen = false">Close</button>
+            </div>
         </form>
+        </div>
     </div>
     @endif
 
