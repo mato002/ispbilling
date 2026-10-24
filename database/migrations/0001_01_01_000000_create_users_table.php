@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         if (! Schema::hasTable('users')) {
+            if (! Schema::hasTable('users')) {
             Schema::create('users', function (Blueprint $table) {
                 $table->id();
                 $table->string('name');
@@ -21,17 +22,21 @@ return new class extends Migration
                 $table->rememberToken();
                 $table->timestamps();
             });
+            }
         }
 
         if (! Schema::hasTable('password_reset_tokens')) {
+            if (! Schema::hasTable('password_reset_tokens')) {
             Schema::create('password_reset_tokens', function (Blueprint $table) {
                 $table->string('email', 191)->primary();
                 $table->string('token');
                 $table->timestamp('created_at')->nullable();
             });
+            }
         }
 
         if (! Schema::hasTable('sessions')) {
+            if (! Schema::hasTable('sessions')) {
             Schema::create('sessions', function (Blueprint $table) {
                 // Keep this primary key within the limit on older shared hosts.
                 $table->string('id', 191)->primary();
@@ -41,6 +46,7 @@ return new class extends Migration
                 $table->longText('payload');
                 $table->integer('last_activity')->index();
             });
+            }
         }
     }
 

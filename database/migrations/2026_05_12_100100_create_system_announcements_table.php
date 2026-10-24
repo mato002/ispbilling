@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('system_announcements')) {
         Schema::create('system_announcements', function (Blueprint $table) {
             $table->id();
             $table->string('title');
@@ -21,6 +22,7 @@ return new class extends Migration
 
             $table->index(['is_active', 'starts_at', 'ends_at']);
         });
+        }
     }
 
     public function down(): void

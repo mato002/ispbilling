@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('isp_payment_methods')) {
         Schema::create('isp_payment_methods', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained('i_s_p_s')->onDelete('cascade');
@@ -23,6 +24,7 @@ return new class extends Migration
             $table->index(['isp_id', 'provider']);
             $table->index('active');
         });
+        }
     }
 
     /**

@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('router_metrics')) {
         Schema::create('router_metrics', function (Blueprint $table) {
             $table->id();
             $table->foreignId('router_id')->constrained('routers')->cascadeOnDelete();
@@ -30,6 +31,7 @@ return new class extends Migration
 
             $table->index(['router_id', 'recorded_at']);
         });
+        }
     }
 
     public function down(): void

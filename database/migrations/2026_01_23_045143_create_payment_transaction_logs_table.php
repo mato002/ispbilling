@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('payment_transaction_logs')) {
         Schema::create('payment_transaction_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('payment_id')->nullable()->constrained('payments')->onDelete('set null');
@@ -33,6 +34,7 @@ return new class extends Migration
             $table->index('transaction_id');
             $table->index('payment_reference');
         });
+        }
     }
 
     /**

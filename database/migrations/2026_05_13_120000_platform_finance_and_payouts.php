@@ -9,12 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         if (! Schema::hasTable('platform_settings')) {
+            if (! Schema::hasTable('platform_settings')) {
             Schema::create('platform_settings', function (Blueprint $table) {
                 $table->id();
                 $table->string('key')->unique();
                 $table->text('value')->nullable();
                 $table->timestamps();
             });
+            }
         }
 
         if (! Schema::hasColumn('payments', 'platform_fee_amount')) {
@@ -29,6 +31,7 @@ return new class extends Migration
         }
 
         if (! Schema::hasTable('isp_payouts')) {
+            if (! Schema::hasTable('isp_payouts')) {
             Schema::create('isp_payouts', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -45,6 +48,7 @@ return new class extends Migration
 
                 $table->index(['isp_id', 'status']);
             });
+            }
         }
     }
 

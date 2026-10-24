@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('platform_saas_payment_attempts')) {
         Schema::create('platform_saas_payment_attempts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -23,6 +24,7 @@ return new class extends Migration
             $table->timestamps();
             $table->index(['isp_id', 'status']);
         });
+        }
     }
 
     public function down(): void

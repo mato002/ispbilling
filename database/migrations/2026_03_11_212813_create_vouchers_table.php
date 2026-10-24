@@ -15,6 +15,7 @@ return new class extends Migration
             return;
         }
 
+        if (! Schema::hasTable('vouchers')) {
         Schema::create('vouchers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained('i_s_p_s')->onDelete('cascade');
@@ -38,6 +39,7 @@ return new class extends Migration
             $table->index(['code']);
             $table->index(['expires_at']);
         });
+        }
     }
 
     /**

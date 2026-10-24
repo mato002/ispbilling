@@ -15,6 +15,7 @@ return new class extends Migration
             return;
         }
 
+        if (! Schema::hasTable('hotspot_servers')) {
         Schema::create('hotspot_servers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained()->onDelete('cascade');
@@ -55,6 +56,7 @@ return new class extends Migration
             $table->index(['router_id', 'is_active']);
             $table->unique(['router_id', 'name'], 'unique_router_hotspot');
         });
+        }
     }
 
     /**

@@ -10,6 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         if (! Schema::hasTable('platform_saas_plans')) {
+            if (! Schema::hasTable('platform_saas_plans')) {
             Schema::create('platform_saas_plans', function (Blueprint $table) {
                 $table->id();
                 $table->string('name');
@@ -24,9 +25,11 @@ return new class extends Migration
                 $table->boolean('is_active')->default(true);
                 $table->timestamps();
             });
+            }
         }
 
         if (! Schema::hasTable('platform_saas_invoices')) {
+            if (! Schema::hasTable('platform_saas_invoices')) {
             Schema::create('platform_saas_invoices', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -46,6 +49,7 @@ return new class extends Migration
                 $table->index(['isp_id', 'status']);
                 $table->index('due_date');
             });
+            }
         }
 
         if (! Schema::hasColumn('i_s_p_s', 'platform_saas_plan_id')) {

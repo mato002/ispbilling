@@ -9,14 +9,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('subscriptions', function (Blueprint $table) {
-            $table->unsignedBigInteger('data_used_mb')->default(0)->after('auto_renew');
-            $table->timestamp('data_exhausted_at')->nullable()->after('data_used_mb');
-            $table->string('static_ip', 45)->nullable()->after('data_exhausted_at');
-            $table->boolean('static_ip_active')->default(false)->after('static_ip');
-            $table->string('service_status', 32)->nullable()->after('static_ip_active');
-            $table->foreignId('parent_subscription_id')->nullable()->after('service_status')
-                ->constrained('subscriptions')->nullOnDelete();
+            if (! Schema::hasColumn('subscriptions', 'data_used_mb')) $table->unsignedBigInteger('data_used_mb')->default(0);
+            if (! Schema::hasColumn('subscriptions', 'data_exhausted_at')) $table->timestamp('data_exhausted_at')->nullable();
+            if (! Schema::hasColumn('subscriptions', 'static_ip')) $table->string('static_ip', 45)->nullable();
+            if (! Schema::hasColumn('subscriptions', 'static_ip_active')) $table->boolean('static_ip_active')->default(false);
+            if (! Schema::hasColumn('subscriptions', 'service_status')) $table->string('service_status', 32)->nullable();
+            if (! Schema::hasColumn('subscriptions', 'parent_subscription_id')) $table->foreignId('parent_subscription_id')->nullable();
         });
+
+        $hasForeignKey = collect(Schema::getForeignKeys('subscriptions'))
+            ->contains(fn (array $key): bool => ($key['columns'] ?? []) === ['parent_subscription_id']);
+        if (Schema::hasColumn('subscriptions', 'parent_subscription_id') && ! $hasForeignKey) {
+            Schema::table('subscriptions', fn (Blueprint $table) => $table->foreign('parent_subscription_id')->references('id')->on('subscriptions')->nullOnDelete());
+        }
     }
 
     public function down(): void

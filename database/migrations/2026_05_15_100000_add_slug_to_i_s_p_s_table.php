@@ -9,8 +9,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('i_s_p_s', function (Blueprint $table) {
-            $table->string('slug', 64)->nullable()->unique()->after('name');
+            if (! Schema::hasColumn('i_s_p_s', 'slug')) {
+                $table->string('slug', 64)->nullable()->after('name');
+            }
         });
+
+        $hasUnique = collect(Schema::getIndexes('i_s_p_s'))
+            ->contains(fn (array $index): bool => ($index['columns'] ?? []) === ['slug'] && ($index['unique'] ?? false));
+        if (! $hasUnique) {
+            Schema::table('i_s_p_s', fn (Blueprint $table) => $table->unique('slug'));
+        }
 
         $rows = \Illuminate\Support\Facades\DB::table('i_s_p_s')->select('id', 'name')->orderBy('id')->get();
         foreach ($rows as $row) {

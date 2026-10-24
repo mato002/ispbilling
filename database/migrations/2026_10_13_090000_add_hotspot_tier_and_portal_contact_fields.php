@@ -9,15 +9,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('plans', function (Blueprint $table) {
-            $table->unsignedInteger('time_limit_minutes')->nullable()->after('time_limit_hours');
-            $table->boolean('is_popular')->default(false)->after('customer_visible');
-            $table->boolean('is_best_value')->default(false)->after('is_popular');
+            if (! Schema::hasColumn('plans', 'time_limit_minutes')) $table->unsignedInteger('time_limit_minutes')->nullable();
+            if (! Schema::hasColumn('plans', 'is_popular')) $table->boolean('is_popular')->default(false);
+            if (! Schema::hasColumn('plans', 'is_best_value')) $table->boolean('is_best_value')->default(false);
         });
 
         Schema::table('portal_settings', function (Blueprint $table) {
-            $table->string('mpesa_till_number', 20)->nullable()->after('payment_button_text');
-            $table->string('support_phone', 30)->nullable()->after('mpesa_till_number');
-            $table->string('support_whatsapp', 30)->nullable()->after('support_phone');
+            if (! Schema::hasColumn('portal_settings', 'mpesa_till_number')) $table->string('mpesa_till_number', 20)->nullable();
+            if (! Schema::hasColumn('portal_settings', 'support_phone')) $table->string('support_phone', 30)->nullable();
+            if (! Schema::hasColumn('portal_settings', 'support_whatsapp')) $table->string('support_whatsapp', 30)->nullable();
         });
     }
 

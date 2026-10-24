@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('i_s_p_s')) {
         Schema::create('i_s_p_s', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -25,6 +26,7 @@ return new class extends Migration
             $table->json('settings')->nullable(); // MPesa, Selcom credentials, etc.
             $table->timestamps();
         });
+        }
     }
 
     /**

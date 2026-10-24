@@ -14,6 +14,7 @@ return new class extends Migration
         }
 
         if (! Schema::hasTable('inventory_technician_assignments')) {
+            if (! Schema::hasTable('inventory_technician_assignments')) {
             Schema::create('inventory_technician_assignments', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -29,6 +30,7 @@ return new class extends Migration
                 $table->index(['isp_id', 'technician_user_id', 'is_active'], 'inv_tech_isp_user_active_idx');
                 $table->index(['inventory_item_id', 'is_active'], 'inv_tech_item_active_idx');
             });
+            }
         }
 
         if (Schema::hasTable('inventory_transactions')) {

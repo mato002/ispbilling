@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('subscriptions')) {
         Schema::create('subscriptions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
@@ -25,6 +26,7 @@ return new class extends Migration
             $table->index(['customer_id', 'status']);
             $table->index('end_date');
         });
+        }
     }
 
     /**

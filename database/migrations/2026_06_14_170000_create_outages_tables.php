@@ -9,6 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         if (! Schema::hasTable('outages')) {
+            if (! Schema::hasTable('outages')) {
             Schema::create('outages', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -24,9 +25,11 @@ return new class extends Migration
                 $table->index(['isp_id', 'status']);
                 $table->index(['router_id', 'status']);
             });
+            }
         }
 
         if (! Schema::hasTable('outage_compensation_logs')) {
+            if (! Schema::hasTable('outage_compensation_logs')) {
             Schema::create('outage_compensation_logs', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('outage_id')->constrained('outages')->cascadeOnDelete();
@@ -46,6 +49,7 @@ return new class extends Migration
                 $table->index(['outage_id', 'customer_id']);
                 $table->index(['isp_id', 'created_at']);
             });
+            }
         }
     }
 

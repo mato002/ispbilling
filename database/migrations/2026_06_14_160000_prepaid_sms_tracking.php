@@ -26,6 +26,7 @@ return new class extends Migration
         }
 
         if (! Schema::hasTable('sms_platform_ledgers')) {
+            if (! Schema::hasTable('sms_platform_ledgers')) {
             Schema::create('sms_platform_ledgers', function (Blueprint $table) {
                 $table->uuid('id')->primary();
                 $table->foreignId('tenant_id')
@@ -40,9 +41,11 @@ return new class extends Migration
                 $table->index(['tenant_id', 'created_at']);
                 $table->index(['tenant_id', 'type']);
             });
+            }
         }
 
         if (! Schema::hasTable('sms_message_queues')) {
+            if (! Schema::hasTable('sms_message_queues')) {
             Schema::create('sms_message_queues', function (Blueprint $table) {
                 $table->uuid('id')->primary();
                 $table->foreignId('tenant_id')
@@ -63,6 +66,7 @@ return new class extends Migration
                 $table->index(['status', 'priority']);
                 $table->index(['customer_id', 'created_at']);
             });
+            }
         }
     }
 

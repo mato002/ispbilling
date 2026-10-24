@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('customer_devices')) {
         Schema::create('customer_devices', function (Blueprint $table) {
             $table->id();
             $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
@@ -27,6 +28,7 @@ return new class extends Migration
             $table->index(['customer_id', 'is_active']);
             $table->index('mac_address');
         });
+        }
     }
 
     /**

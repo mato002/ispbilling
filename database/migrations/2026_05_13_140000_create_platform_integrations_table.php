@@ -22,6 +22,7 @@ return new class extends Migration
             return;
         }
 
+        if (! Schema::hasTable('platform_integrations')) {
         Schema::create('platform_integrations', function (Blueprint $table) {
             $table->id();
             $table->string('slug')->unique();
@@ -30,6 +31,7 @@ return new class extends Migration
             $table->text('credentials_vault')->nullable();
             $table->timestamps();
         });
+        }
     }
 
     public function down(): void

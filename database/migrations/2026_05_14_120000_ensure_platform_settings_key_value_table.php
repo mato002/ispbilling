@@ -15,12 +15,14 @@ return new class extends Migration
     public function up(): void
     {
         if (! Schema::hasTable('platform_settings')) {
+            if (! Schema::hasTable('platform_settings')) {
             Schema::create('platform_settings', function (Blueprint $table) {
                 $table->id();
                 $table->string('key')->unique();
                 $table->text('value')->nullable();
                 $table->timestamps();
             });
+            }
         }
 
         if (! Schema::hasTable('platform_settings') || ! Schema::hasColumn('platform_settings', 'key')) {

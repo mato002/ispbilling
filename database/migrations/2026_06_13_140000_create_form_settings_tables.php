@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('form_settings')) {
         Schema::create('form_settings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->nullable()->constrained('i_s_p_s')->cascadeOnDelete();
@@ -17,7 +18,9 @@ return new class extends Migration
 
             $table->unique(['isp_id', 'form_key'], 'form_settings_isp_form_unique');
         });
+        }
 
+        if (! Schema::hasTable('form_field_settings')) {
         Schema::create('form_field_settings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('form_setting_id')->constrained()->cascadeOnDelete();
@@ -31,6 +34,7 @@ return new class extends Migration
 
             $table->unique(['form_setting_id', 'field_key'], 'form_field_settings_form_field_unique');
         });
+        }
     }
 
     public function down(): void

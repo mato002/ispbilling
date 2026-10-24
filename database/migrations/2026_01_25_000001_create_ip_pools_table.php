@@ -15,6 +15,7 @@ return new class extends Migration
             return;
         }
 
+        if (! Schema::hasTable('ip_pools')) {
         Schema::create('ip_pools', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained('i_s_p_s')->onDelete('cascade');
@@ -50,6 +51,7 @@ return new class extends Migration
             $table->index(['router_id', 'is_active']);
             $table->unique(['isp_id', 'name'], 'unique_isp_pool_name');
         });
+        }
     }
 
     /**

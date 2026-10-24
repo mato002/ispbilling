@@ -15,6 +15,7 @@ return new class extends Migration
             return;
         }
 
+        if (! Schema::hasTable('bandwidth_profiles')) {
         Schema::create('bandwidth_profiles', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('isp_id');
@@ -64,6 +65,7 @@ return new class extends Migration
             $table->index(['isp_id', 'is_active']);
             $table->unique(['isp_id', 'name'], 'unique_isp_profile_name');
         });
+        }
 
         // Add foreign keys after table creation
         Schema::table('bandwidth_profiles', function (Blueprint $table) {

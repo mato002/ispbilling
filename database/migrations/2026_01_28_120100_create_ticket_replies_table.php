@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('ticket_replies')) {
         Schema::create('ticket_replies', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ticket_id')->constrained('tickets')->onDelete('cascade');
@@ -21,6 +22,7 @@ return new class extends Migration
 
             $table->index(['ticket_id', 'user_id', 'customer_id']);
         });
+        }
     }
 
     /**

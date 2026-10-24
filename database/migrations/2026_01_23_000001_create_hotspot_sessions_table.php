@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('hotspot_sessions')) {
         Schema::create('hotspot_sessions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained('i_s_p_s')->onDelete('cascade');
@@ -34,6 +35,7 @@ return new class extends Migration
             $table->index(['customer_id', 'status']);
             $table->index('started_at');
         });
+        }
     }
 
     /**

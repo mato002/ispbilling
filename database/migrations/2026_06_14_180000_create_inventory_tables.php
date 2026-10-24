@@ -9,6 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         if (! Schema::hasTable('inventory_purchases')) {
+            if (! Schema::hasTable('inventory_purchases')) {
             Schema::create('inventory_purchases', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -22,9 +23,11 @@ return new class extends Migration
 
                 $table->index(['isp_id', 'purchase_date']);
             });
+            }
         }
 
         if (! Schema::hasTable('inventory_category_thresholds')) {
+            if (! Schema::hasTable('inventory_category_thresholds')) {
             Schema::create('inventory_category_thresholds', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -34,9 +37,11 @@ return new class extends Migration
 
                 $table->unique(['isp_id', 'category']);
             });
+            }
         }
 
         if (! Schema::hasTable('inventory_items')) {
+            if (! Schema::hasTable('inventory_items')) {
             Schema::create('inventory_items', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -59,9 +64,11 @@ return new class extends Migration
                 $table->index(['isp_id', 'status']);
                 $table->index(['isp_id', 'category', 'status']);
             });
+            }
         }
 
         if (! Schema::hasTable('inventory_assignments')) {
+            if (! Schema::hasTable('inventory_assignments')) {
             Schema::create('inventory_assignments', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -85,9 +92,11 @@ return new class extends Migration
                 $table->index(['inventory_item_id', 'is_active']);
                 $table->index(['customer_id', 'is_active']);
             });
+            }
         }
 
         if (! Schema::hasTable('inventory_transactions')) {
+            if (! Schema::hasTable('inventory_transactions')) {
             Schema::create('inventory_transactions', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -103,6 +112,7 @@ return new class extends Migration
                 $table->index(['isp_id', 'created_at']);
                 $table->index(['inventory_item_id', 'created_at']);
             });
+            }
         }
     }
 

@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('platform_saas_subscriptions')) {
         Schema::create('platform_saas_subscriptions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->unique()->constrained('i_s_p_s')->cascadeOnDelete();
@@ -19,14 +20,21 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
         });
+        }
 
         Schema::table('i_s_p_s', function (Blueprint $table) {
-            $table->unsignedTinyInteger('saas_onboarding_step')->default(1)->after('saas_onboarding_completed_at');
-            $table->foreignId('saas_pending_platform_plan_id')->nullable()->after('saas_onboarding_step')->constrained('platform_saas_plans')->nullOnDelete();
-            $table->string('support_phone', 32)->nullable()->after('phone');
-            $table->timestamp('saas_payment_verified_at')->nullable()->after('saas_billing_phone');
-            $table->timestamp('saas_c2b_registered_at')->nullable()->after('saas_payment_verified_at');
+            if (! Schema::hasColumn('i_s_p_s', 'saas_onboarding_step')) $table->unsignedTinyInteger('saas_onboarding_step')->default(1);
+            if (! Schema::hasColumn('i_s_p_s', 'saas_pending_platform_plan_id')) $table->foreignId('saas_pending_platform_plan_id')->nullable();
+            if (! Schema::hasColumn('i_s_p_s', 'support_phone')) $table->string('support_phone', 32)->nullable();
+            if (! Schema::hasColumn('i_s_p_s', 'saas_payment_verified_at')) $table->timestamp('saas_payment_verified_at')->nullable();
+            if (! Schema::hasColumn('i_s_p_s', 'saas_c2b_registered_at')) $table->timestamp('saas_c2b_registered_at')->nullable();
         });
+
+        $hasForeignKey = collect(Schema::getForeignKeys('i_s_p_s'))
+            ->contains(fn (array $key): bool => ($key['columns'] ?? []) === ['saas_pending_platform_plan_id']);
+        if (Schema::hasColumn('i_s_p_s', 'saas_pending_platform_plan_id') && ! $hasForeignKey) {
+            Schema::table('i_s_p_s', fn (Blueprint $table) => $table->foreign('saas_pending_platform_plan_id')->references('id')->on('platform_saas_plans')->nullOnDelete());
+        }
     }
 
     public function down(): void

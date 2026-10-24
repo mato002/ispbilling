@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('invoice_adjustments')) {
         Schema::create('invoice_adjustments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('invoice_id')->nullable()->constrained('invoices')->nullOnDelete();
@@ -20,6 +21,7 @@ return new class extends Migration
             $table->timestamps();
             $table->index(['invoice_id', 'created_at']);
         });
+        }
     }
 
     public function down(): void

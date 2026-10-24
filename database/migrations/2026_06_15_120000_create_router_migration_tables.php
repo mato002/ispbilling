@@ -9,6 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         if (! Schema::hasTable('router_migration_batches')) {
+            if (! Schema::hasTable('router_migration_batches')) {
             Schema::create('router_migration_batches', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -27,9 +28,11 @@ return new class extends Migration
 
                 $table->index(['isp_id', 'status']);
             });
+            }
         }
 
         if (! Schema::hasTable('router_migration_logs')) {
+            if (! Schema::hasTable('router_migration_logs')) {
             Schema::create('router_migration_logs', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('batch_id')->constrained('router_migration_batches')->cascadeOnDelete();
@@ -43,6 +46,7 @@ return new class extends Migration
                 $table->index(['batch_id', 'customer_id', 'action']);
                 $table->index(['batch_id', 'created_at']);
             });
+            }
         }
     }
 

@@ -9,7 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customers', function (Blueprint $table) {
-            $table->json('custom_attributes')->nullable()->after('notes');
+            if (! Schema::hasColumn('customers', 'custom_attributes')) {
+                $table->json('custom_attributes')->nullable()->after('notes');
+            }
         });
     }
 

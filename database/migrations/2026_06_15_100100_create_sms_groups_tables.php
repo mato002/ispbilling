@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('sms_groups')) {
         Schema::create('sms_groups', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -17,7 +18,9 @@ return new class extends Migration
 
             $table->unique(['isp_id', 'name']);
         });
+        }
 
+        if (! Schema::hasTable('sms_group_customer')) {
         Schema::create('sms_group_customer', function (Blueprint $table) {
             $table->id();
             $table->foreignId('sms_group_id')->constrained('sms_groups')->cascadeOnDelete();
@@ -27,6 +30,7 @@ return new class extends Migration
             $table->unique(['sms_group_id', 'customer_id']);
             $table->index('customer_id');
         });
+        }
     }
 
     public function down(): void

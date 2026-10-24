@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('data_usages')) {
         Schema::create('data_usages', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -37,6 +38,7 @@ return new class extends Migration
             $table->unique('hotspot_session_id');
             $table->index('source');
         });
+        }
     }
 
     public function down(): void

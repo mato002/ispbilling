@@ -29,6 +29,7 @@ return new class extends Migration
         }
 
         if (! Schema::hasTable('global_promo_codes')) {
+            if (! Schema::hasTable('global_promo_codes')) {
             Schema::create('global_promo_codes', function (Blueprint $table) {
                 $table->id();
                 $table->string('code', 64)->unique();
@@ -43,6 +44,7 @@ return new class extends Migration
                 $table->json('metadata')->nullable();
                 $table->timestamps();
             });
+            }
         }
 
         if (Schema::hasTable('platform_integrations') && ! Schema::hasColumn('platform_integrations', 'messaging_channels')) {

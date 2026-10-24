@@ -12,6 +12,7 @@ return new class extends Migration
             return;
         }
 
+        if (! Schema::hasTable('network_audit_logs')) {
         Schema::create('network_audit_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('isp_id')->constrained('i_s_p_s')->cascadeOnDelete();
@@ -27,6 +28,7 @@ return new class extends Migration
 
             $table->index(['isp_id', 'action', 'created_at']);
         });
+        }
     }
 
     public function down(): void
