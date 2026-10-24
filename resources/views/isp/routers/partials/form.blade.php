@@ -33,34 +33,16 @@
                        class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900"
                        placeholder="Rack A2, second floor" />
             </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="isp-form-label mb-1">Latitude</label>
-                    <input type="number" step="0.0000001" name="latitude" value="{{ $val('latitude') }}"
-                           class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900" />
-                </div>
-                <div>
-                    <label class="isp-form-label mb-1">Longitude</label>
-                    <input type="number" step="0.0000001" name="longitude" value="{{ $val('longitude') }}"
-                           class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900" />
-                </div>
-            </div>
-            <div>
-                <label class="isp-form-label mb-1">Tags <span class="text-slate-400">(comma-separated)</span></label>
-                <input type="text" name="tags" value="{{ $val('tags') }}"
-                       class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900"
-                       placeholder="core, ccr1036, hotspot" />
-            </div>
         </div>
     </x-form-section>
 
     <x-form-section title="RouterOS API" description="Credentials used by the polling job and bulk operations.">
         <div class="space-y-4">
             <div>
-                <label class="isp-form-label mb-1">IP / hostname *</label>
+                <label class="isp-form-label mb-1">Management IP / hostname *</label>
                 <input type="text" name="ip_address" id="ip_address" value="{{ $val('ip_address') }}" required
                        class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900"
-                       placeholder="192.168.88.1" />
+                       placeholder="192.168.88.1 or router.example.net" />
             </div>
             <div>
                 <label class="isp-form-label mb-1">Hotspot gateway IP</label>
@@ -71,7 +53,7 @@
             </div>
             <div class="grid grid-cols-3 gap-3">
                 <div>
-                    <label class="isp-form-label mb-1">Port *</label>
+                    <label class="isp-form-label mb-1">API port *</label>
                     <input type="number" name="port" id="port" value="{{ $val('port', $defaultPort) }}" required
                            class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900" />
                 </div>
@@ -79,7 +61,7 @@
                     <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                         <input type="checkbox" name="use_ssl" value="1" {{ $val('use_ssl', $defaultSsl) ? 'checked' : '' }}
                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                        Use SSL
+                        API over SSL
                     </label>
                     <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                         <input type="checkbox" name="is_active" value="1" {{ $val('is_active', true) ? 'checked' : '' }}
@@ -101,10 +83,15 @@
                        placeholder="{{ $isEdit ? 'Leave empty to keep current password' : '*****' }}" />
                 <p class="mt-1 text-[11px] text-slate-500">Stored encrypted at rest.</p>
             </div>
+            <p class="text-xs text-slate-500">RouterOS API defaults to port 8728; API over SSL commonly uses 8729. The router must allow this server through its firewall.</p>
         </div>
     </x-form-section>
 
-    <x-form-section title="Asset / CMDB" description="Treats the router as a fixed asset for ERP reporting.">
+    <details class="md:col-span-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900" {{ $isEdit ? 'open' : '' }}>
+        <summary class="cursor-pointer text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $isEdit ? 'Asset and ownership details' : 'Optional asset and ownership details' }}</summary>
+        <p class="mt-1 text-xs text-slate-500">These details are for inventory and operations; they are not needed to connect the router.</p>
+        <div class="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+    <x-form-section title="Asset / CMDB" description="Optional inventory and finance information.">
         <div class="grid grid-cols-2 gap-3">
             <div>
                 <label class="isp-form-label mb-1">Vendor</label>
@@ -171,4 +158,6 @@
             </div>
         </div>
     </x-form-section>
+        </div>
+    </details>
 </div>

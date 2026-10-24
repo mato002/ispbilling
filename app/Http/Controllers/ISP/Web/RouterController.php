@@ -469,7 +469,7 @@ HTML;
         $this->enforceTestRateLimit($request);
 
         $request->validate([
-            'ip_address' => 'required|ip',
+            'ip_address' => ['required', ...$this->routerAddressRules()],
             'port' => 'required|integer|min:1|max:65535',
             'username' => 'required|string|max:255',
             'password' => 'required|string|max:255',
@@ -748,7 +748,8 @@ HTML;
 
         $rules = [
             'name' => ['string', 'max:255'],
-            'ip_address' => ['ip'],
+            // RouterOS API clients can connect by DNS name as well as IP.
+            'ip_address' => $this->routerAddressRules(),
             'hotspot_gateway_ip' => ['nullable', 'ip'],
             'port' => ['integer', 'min:1', 'max:65535'],
             'username' => ['string', 'max:255'],
@@ -777,5 +778,21 @@ HTML;
         }
 
         return $this->formSettings->validateRequest($request, 'router', $rules, $ispId);
+    }
+
+    /** @return array<int, mixed> */
+    private function routerAddressRules(): array
+    {
+        return ['string', 'max:255', function ($attribute, $value, $fail) {
+            if (filter_var($value, FILTER_VALIDATE_IP)) {
+                return;
+            }
+
+            $hostname = rtrim((string) $value, '.');
+            if ($hostname === '' || strlen($hostname) > 253 ||
+                ! preg_match('/^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*$/', $hostname)) {
+                $fail('Enter a valid IP address or hostname.');
+            }
+        }];
     }
 }

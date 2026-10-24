@@ -6,7 +6,7 @@
     <x-isp-page-header
         :title="'Edit '.$bandwidthProfile->name"
         module="Network"
-        description="Update speed limits, burst, and queue type. Redeploy to routers after saving."
+        description="Update subscriber speeds and optional queue tuning. Redeploy to routers after saving."
     >
         <x-slot name="actions">
             <a href="{{ route('isp.bandwidth-profiles.show', $bandwidthProfile) }}" class="pb-btn">View profile</a>
@@ -29,21 +29,24 @@
             <div class="grid gap-5 sm:grid-cols-2">
                 <div>
                     <label class="isp-form-label" for="download_limit">Download (Mbps)</label>
-                    <input id="download_limit" type="number" step="0.1" min="1" name="download_limit"
+                    <input id="download_limit" type="number" step="0.1" min="0.1" name="download_limit"
                            value="{{ old('download_limit', $bandwidthProfile->download_limit / 1000) }}"
                            class="isp-form-input" required>
                     @error('download_limit')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
                 <div>
                     <label class="isp-form-label" for="upload_limit">Upload (Mbps)</label>
-                    <input id="upload_limit" type="number" step="0.1" min="1" name="upload_limit"
+                    <input id="upload_limit" type="number" step="0.1" min="0.1" name="upload_limit"
                            value="{{ old('upload_limit', $bandwidthProfile->upload_limit / 1000) }}"
                            class="isp-form-input" required>
                     @error('upload_limit')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
             </div>
+            <p class="-mt-3 text-xs text-slate-500">Data caps belong to service plans. IP pools and simultaneous-session limits depend on the router and access method, so they are configured in those settings.</p>
 
-            <div class="grid gap-5 sm:grid-cols-2">
+            <details class="rounded-xl border border-[var(--pb-border)] p-4">
+                <summary class="cursor-pointer text-sm font-semibold">Queue and QoS settings</summary>
+                <div class="mt-4 grid gap-5 sm:grid-cols-2">
                 <div>
                     <label class="isp-form-label" for="queue_type">Queue type</label>
                     <select id="queue_type" name="queue_type" class="isp-form-select" required>
@@ -52,7 +55,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="isp-form-label" for="parent_profile_id">Parent profile</label>
+                    <label class="isp-form-label" for="parent_profile_id">Parent profile (grouping)</label>
                     <select id="parent_profile_id" name="parent_profile_id" class="isp-form-select">
                         <option value="">None</option>
                         @foreach ($parentProfiles as $profile)
@@ -62,10 +65,22 @@
                         @endforeach
                     </select>
                 </div>
-            </div>
+                <div>
+                    <label class="isp-form-label" for="priority">Priority (1 highest, 8 lowest)</label>
+                    <select id="priority" name="priority" class="isp-form-select">
+                        @foreach (range(1, 8) as $priority)
+                            <option value="{{ $priority }}" @selected((int) old('priority', $bandwidthProfile->priority ?? 8) === $priority)>{{ $priority }}{{ $priority === 8 ? ' (default)' : '' }}</option>
+                        @endforeach
+                    </select>
+                    @error('priority')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+                </div>
+                <p class="mt-3 text-xs text-slate-500">Parent profile organizes profiles in this system; RouterOS queue-tree parent and mangle rules are configured on the router.</p>
+            </details>
 
-            <div class="border-t border-dashed border-[var(--pb-border)] pt-4">
-                <p class="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Burst (optional)</p>
+            <details class="rounded-xl border border-[var(--pb-border)] p-4" @if ($errors->hasAny(['download_burst_limit', 'upload_burst_limit', 'download_burst_threshold', 'upload_burst_threshold', 'download_burst_time', 'upload_burst_time'])) open @endif>
+                <summary class="cursor-pointer text-sm font-semibold">Burst speeds <span class="font-normal text-slate-500">(optional)</span></summary>
+                <p class="mt-1 text-xs text-slate-500">Leave blank for standard speeds. Values are in Mbps and seconds.</p>
                 <div class="grid gap-5 sm:grid-cols-2">
                     <div>
                         <label class="isp-form-label" for="download_burst_limit">Download burst (Mbps)</label>
@@ -104,19 +119,11 @@
                                class="isp-form-input">
                     </div>
                 </div>
-            </div>
+            </details>
 
-            <div class="grid gap-5 sm:grid-cols-2">
-                <div>
-                    <label class="isp-form-label" for="priority">Priority (1–8)</label>
-                    <input id="priority" type="number" min="1" max="8" name="priority"
-                           value="{{ old('priority', $bandwidthProfile->priority ?? 8) }}"
-                           class="isp-form-input">
-                </div>
-                <div>
-                    <label class="isp-form-label" for="comment">Comment</label>
-                    <input id="comment" type="text" name="comment" value="{{ old('comment', $bandwidthProfile->comment) }}" class="isp-form-input">
-                </div>
+            <div>
+                <label class="isp-form-label" for="comment">Comment</label>
+                <input id="comment" type="text" name="comment" value="{{ old('comment', $bandwidthProfile->comment) }}" class="isp-form-input">
             </div>
 
             <div class="flex flex-wrap justify-end gap-2 border-t border-[var(--pb-border)] pt-4">

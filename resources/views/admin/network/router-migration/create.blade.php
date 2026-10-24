@@ -1,12 +1,12 @@
 @extends('layouts.admin')
 
-@section('title', 'Router Migration Wizard')
+@section('title', 'Move customers to another router')
 
 @section('header')
     <x-isp-page-header
-        title="Fleet Router Migration Wizard"
-        module="Network Operations"
-        description="Cut over subscribers from one MikroTik router to another — all provisioning runs as background jobs."
+        title="Move customers to another router"
+        module="Network"
+        description="Choose the routers, review affected customers, and start the move."
     />
 @endsection
 
@@ -16,8 +16,8 @@
         <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{ session('error') }}</div>
     @endif
 
-    <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-        Migration orchestrates session disconnect, user recreation, queue rebuild, and MAC binding on the new router. Billing and subscription dates are never modified.
+    <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200">
+        Customers will use the new router. Their billing and subscription dates stay the same.
     </div>
 
     <form method="POST" action="{{ route('isp.router-migration.store') }}" class="space-y-6">
@@ -25,7 +25,7 @@
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 pb-card p-5">
             <div>
-                <label class="isp-form-label">Source router (old)</label>
+                <label class="isp-form-label">From router</label>
                 <select name="old_router_id" x-model="oldRouterId" @change="loadPreview()" required class="isp-form-select w-full">
                     <option value="">Select router…</option>
                     @foreach($routers as $router)
@@ -34,7 +34,7 @@
                 </select>
             </div>
             <div>
-                <label class="isp-form-label">Target router (new)</label>
+                <label class="isp-form-label">To router</label>
                 <select name="new_router_id" x-model="newRouterId" @change="loadPreview()" required class="isp-form-select w-full">
                     <option value="">Select router…</option>
                     @foreach($routers as $router)
@@ -46,8 +46,8 @@
                 <label class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <input type="checkbox" x-model="includeAll" @change="loadPreview()" class="mt-1 rounded border-slate-300">
                     <span>
-                        Include suspended / expired subscribers still assigned to the source router
-                        <span class="block text-xs text-slate-500">Default is active subscriptions only. Inactive accounts stay disabled on the target router.</span>
+                        Include inactive customers
+                        <span class="block text-xs text-slate-500">By default, only active subscriptions are moved.</span>
                     </span>
                 </label>
                 <input type="hidden" name="eligibility" :value="includeAll ? 'all_on_router' : 'active_only'">
@@ -56,9 +56,9 @@
 
         <div class="pb-card p-5" x-show="previewLoading || previewTotal !== null">
             <div class="flex items-center justify-between gap-3">
-                <h3 class="text-sm font-semibold">Affected subscribers</h3>
+                <h3 class="text-sm font-semibold">Customers to move</h3>
                 <span class="text-xs text-slate-500" x-show="previewTotal !== null">
-                    <span x-text="previewTotal"></span> with active subscriptions
+                    <span x-text="previewTotal"></span> customers to move
                 </span>
             </div>
             <p x-show="previewError" class="mt-2 text-sm text-rose-600" x-text="previewError"></p>
@@ -91,13 +91,13 @@
 
         <label class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input type="checkbox" name="confirm" value="1" required class="mt-1 rounded border-slate-300">
-            <span>I confirm this migration will queue background jobs to reprovision all listed subscribers on the target router.</span>
+            <span>I understand these customers will be moved to the new router.</span>
         </label>
 
         <div class="flex justify-end gap-3">
             <a href="{{ route('isp.router-migration.index') }}" class="pb-btn pb-btn-secondary">Cancel</a>
             <button type="submit" class="pb-btn" :disabled="!oldRouterId || !newRouterId || oldRouterId === newRouterId">
-                Start migration batch
+                Move customers
             </button>
         </div>
     </form>
