@@ -3,17 +3,15 @@
         <span class="pb-dashboard-dot bg-red-400"></span>
         <span class="pb-dashboard-dot bg-amber-400"></span>
         <span class="pb-dashboard-dot bg-emerald-400"></span>
-        <span class="ml-3 text-xs font-semibold text-slate-500">{{ config('app.name', 'PrimeBilling') }} · Operations</span>
-        <span class="ml-auto flex items-center gap-1.5 text-xs font-medium text-emerald-600">
-            <span class="pb-pulse-dot"></span> Live
-        </span>
+        <span class="ml-3 text-xs font-semibold text-slate-500">{{ config('app.name', 'PrimeBilling') }} · Workspace preview</span>
+        <span class="ml-auto rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Illustrative data</span>
     </div>
 
     <div class="p-4 sm:p-5">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Network overview</p>
-                <p class="text-lg font-bold text-slate-900">12 of 12 routers online</p>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Network overview · sample workspace</p>
+                <p class="text-lg font-bold text-slate-900">Router health at a glance</p>
             </div>
             <div class="flex gap-2">
                 <span class="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Hotspot active</span>

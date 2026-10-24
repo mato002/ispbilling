@@ -23,8 +23,8 @@
 
                 <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                     @guest
-                        <a href="{{ $registerRoute }}" class="pb-btn-primary">Start {{ $defaultTrialDays }}-day free trial</a>
-                        <a href="{{ route('login') }}" class="pb-btn-secondary">Operator sign in</a>
+                        <a href="{{ $registerRoute }}" class="pb-btn-primary">Start {{ $defaultTrialDays }}-day free trial <x-font-awesome-icon name="arrow-right" class="h-4 w-4" /></a>
+                        <a href="{{ route('login') }}" class="pb-btn-secondary"><x-font-awesome-icon name="arrow-right-to-bracket" class="h-4 w-4" /> Operator sign in</a>
                     @else
                         <a href="{{ url('/dashboard') }}" class="pb-btn-primary">Go to dashboard</a>
                     @endguest
@@ -32,9 +32,9 @@
 
                 <p class="mt-4 text-sm text-slate-500">No credit card required · Typical setup within 24 hours · Unlimited MikroTik routers</p>
                 <div class="mt-6 flex items-center gap-3" aria-label="Choose a platform highlight">
-                    <button type="button" class="pb-hero-arrow" @click="previous()" aria-label="Previous highlight">←</button>
+                    <button type="button" class="pb-hero-arrow" @click="previous()" aria-label="Previous highlight"><x-font-awesome-icon name="arrow-left" class="h-4 w-4" /></button>
                     <template x-for="(slide, index) in slides" :key="index"><button type="button" class="pb-hero-dot" :class="{ 'is-active': active === index }" @click="goTo(index)" :aria-label="`Show highlight ${index + 1}`" :aria-current="active === index ? 'true' : null"></button></template>
-                    <button type="button" class="pb-hero-arrow" @click="next()" aria-label="Next highlight">→</button>
+                    <button type="button" class="pb-hero-arrow" @click="next()" aria-label="Next highlight"><x-font-awesome-icon name="arrow-right" class="h-4 w-4" /></button>
                     <span class="ml-1 text-xs font-semibold text-slate-500" x-text="`${String(active + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`"></span>
                 </div>
             </div>
@@ -64,6 +64,25 @@
     </div>
 </section>
 
+{{-- Real-world network operations photography --}}
+<section class="pb-field-story px-4 py-14 text-white sm:px-6 lg:px-8">
+    <div class="mx-auto grid max-w-7xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900 lg:grid-cols-[1.05fr_.95fr]">
+        <div class="pb-field-story__image relative pb-reveal" style="background-image: url('https://images.pexels.com/photos/37605911/pexels-photo-37605911.jpeg?auto=compress&amp;cs=tinysrgb&amp;w=1600')" role="img" aria-label="Network technician working in a server room">
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/10 to-transparent"></div>
+            <span class="pb-field-story__photo-credit absolute bottom-4 left-4 rounded-full px-3 py-1.5 text-[11px] font-medium text-white/85">Network operations in the field · Photo: Panumas Nikhomkhai / Pexels</span>
+        </div>
+        <div class="flex flex-col justify-center p-7 sm:p-10 lg:p-12 pb-reveal">
+            <p class="text-xs font-bold uppercase tracking-[.18em] text-sky-300">Made for the work behind the signal</p>
+            <h2 class="mt-3 max-w-xl text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">Your team keeps people connected. The busywork should not get in the way.</h2>
+            <p class="mt-4 max-w-xl text-sm leading-6 text-slate-300">From the NOC to a technician at a customer site, keep payments, subscriber access, and network operations tied to the same live record.</p>
+            <div class="mt-7 grid gap-4 sm:grid-cols-2">
+                <div class="pb-story-point"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-400/10 text-sky-300"><x-font-awesome-icon name="broadcast-tower" class="h-4 w-4" /></span><span><strong class="block text-sm">Know what is online</strong><span class="mt-1 block text-xs leading-5 text-slate-400">Router health and active sessions in one place.</span></span></div>
+                <div class="pb-story-point"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><x-font-awesome-icon name="money-bill-wave" class="h-4 w-4" /></span><span><strong class="block text-sm">Close the payment loop</strong><span class="mt-1 block text-xs leading-5 text-slate-400">Confirmed payments can restore the right service.</span></span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
 {{-- Payment marquee --}}
 <section class="overflow-hidden bg-slate-900 px-4 py-5 sm:px-6">
     <div class="pb-marquee mx-auto max-w-7xl">
@@ -88,16 +107,16 @@
 
         <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ([
-                ['Manual reconnections', 'Teams spend hours checking payments and toggling users by hand after every M-Pesa confirmation.'],
-                ['Disconnected billing', 'Spreadsheets and payment statements never show the full subscriber state in real time.'],
-                ['Router script chaos', 'PPPoE profiles, hotspot users, and queues drift out of sync with billing records.'],
-                ['Weak visibility', 'Owners lack a live view of collections, churn risk, sessions, and network health.'],
-                ['Support overload', 'WhatsApp threads replace ticketing — issues get lost and repeat calls pile up.'],
-                ['Field gear gaps', 'CPE and inventory live in notebooks while technicians install blind.'],
-            ] as [$title, $desc])
+                ['bolt', 'Manual reconnections', 'Teams spend hours checking payments and toggling users by hand after every M-Pesa confirmation.'],
+                ['file-invoice-dollar', 'Disconnected billing', 'Spreadsheets and payment statements never show the full subscriber state in real time.'],
+                ['code-branch', 'Router script chaos', 'PPPoE profiles, hotspot users, and queues drift out of sync with billing records.'],
+                ['chart-line', 'Weak visibility', 'Owners lack a live view of collections, churn risk, sessions, and network health.'],
+                ['headset', 'Support overload', 'WhatsApp threads replace ticketing — issues get lost and repeat calls pile up.'],
+                ['box-open', 'Field gear gaps', 'CPE and inventory live in notebooks while technicians install blind.'],
+            ] as [$icon, $title, $desc])
                 <article class="pb-card pb-card-lift p-6 pb-reveal">
                     <div class="pb-icon-wrap mb-4">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <x-font-awesome-icon :name="$icon" class="h-5 w-5" />
                     </div>
                     <h3 class="font-bold text-slate-900">{{ $title }}</h3>
                     <p class="mt-2 text-sm leading-relaxed text-slate-600">{{ $desc }}</p>
@@ -117,13 +136,13 @@
 
         <div class="mt-14 grid gap-6 md:grid-cols-3 pb-reveal">
             @foreach ([
-                ['01', 'Collect', 'STK Push, Paybill confirmations, invoices, and reminders stay tied to each subscriber lifecycle.'],
-                ['02', 'Provision', 'MikroTik API syncs PPPoE, hotspot, bandwidth profiles, and IP pools from payment state.'],
-                ['03', 'Operate', 'Support tickets, SMS campaigns, inventory, outages, and reports from one live dashboard.'],
-            ] as [$step, $title, $desc])
+                ['01', 'money-bill-wave', 'Collect', 'STK Push, Paybill confirmations, invoices, and reminders stay tied to each subscriber lifecycle.'],
+                ['02', 'broadcast-tower', 'Provision', 'MikroTik API syncs PPPoE, hotspot, bandwidth profiles, and IP pools from payment state.'],
+                ['03', 'gears', 'Operate', 'Support tickets, SMS campaigns, inventory, outages, and reports from one live dashboard.'],
+            ] as [$step, $icon, $title, $desc])
                 <div class="relative pb-card p-6">
-                    <span class="text-4xl font-black text-blue-100">{{ $step }}</span>
-                    <h3 class="mt-2 text-xl font-bold text-slate-900">{{ $title }}</h3>
+                    <div class="flex items-center justify-between"><span class="text-4xl font-black text-blue-100">{{ $step }}</span><span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700"><x-font-awesome-icon :name="$icon" class="h-5 w-5" /></span></div>
+                    <h3 class="mt-3 text-xl font-bold text-slate-900">{{ $title }}</h3>
                     <p class="mt-3 text-sm leading-relaxed text-slate-600">{{ $desc }}</p>
                 </div>
             @endforeach
@@ -166,7 +185,7 @@
                     <ul class="mt-6 grid gap-3 sm:grid-cols-2">
                         <template x-for="bullet in tab.bullets" :key="bullet">
                             <li class="flex items-start gap-2 text-sm text-slate-700">
-                                <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <x-font-awesome-icon name="circle-check" class="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
                                 <span x-text="bullet"></span>
                             </li>
                         </template>
@@ -177,12 +196,12 @@
 
         <div class="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 pb-reveal">
             @foreach ([
-                'Billing & Invoices', 'M-Pesa Payments', 'MikroTik Routers', 'Hotspot & Vouchers',
-                'PPPoE Subscribers', 'Provisioning Hub', 'Router Migration', 'Data Usage',
-                'SMS Campaigns', 'Helpdesk Tickets', 'Inventory & QR', 'Technician Field Ops',
-                'Outage Compensation', 'Customer Portal', 'Reports & Analytics', 'Multi-tenant SaaS',
-            ] as $module)
-                <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-xs font-bold text-slate-700 shadow-sm">{{ $module }}</div>
+                ['file-invoice-dollar', 'Billing & Invoices'], ['money-bill-wave', 'M-Pesa Payments'], ['broadcast-tower', 'MikroTik Routers'], ['globe', 'Hotspot & Vouchers'],
+                ['ethernet', 'PPPoE Subscribers'], ['arrows-rotate', 'Provisioning Hub'], ['code-branch', 'Router Migration'], ['chart-line', 'Data Usage'],
+                ['comment-sms', 'SMS Campaigns'], ['headset', 'Helpdesk Tickets'], ['boxes-stacked', 'Inventory & QR'], ['location-dot', 'Technician Field Ops'],
+                ['circle-exclamation', 'Outage Compensation'], ['circle-user', 'Customer Portal'], ['chart-pie', 'Reports & Analytics'], ['building', 'Multi-tenant SaaS'],
+            ] as [$icon, $module])
+                <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-xs font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><x-font-awesome-icon :name="$icon" class="h-4 w-4" /></span>{{ $module }}</div>
             @endforeach
         </div>
     </div>

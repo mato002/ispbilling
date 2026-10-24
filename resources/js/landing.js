@@ -147,18 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const revealEls = document.querySelectorAll('.pb-reveal');
-    if (revealEls.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('is-visible');
-                        observer.unobserve(entry.target);
-                    }
-                });
-            },
-            { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
-        );
+    if (revealEls.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches && 'IntersectionObserver' in window) {
+        document.documentElement.classList.add('pb-reveal-ready');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => entry.target.classList.toggle('is-visible', entry.isIntersecting));
+        }, { threshold: 0.08, rootMargin: '-8% 0px -8% 0px' });
         revealEls.forEach((el) => observer.observe(el));
     } else {
         revealEls.forEach((el) => el.classList.add('is-visible'));
