@@ -9,16 +9,19 @@ Alpine.data('landingHero', () => ({
         {
             lead: 'Run billing, network access, and', emphasis: 'customer operations', end: 'from one platform',
             description: 'Connect M-Pesa collections, MikroTik provisioning, subscriber management, and field operations in one clear workspace — built for growing African ISPs.',
+            image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80',
             badges: ['MikroTik-native', 'M-Pesa STK Push', 'Hotspot & PPPoE', 'Multi-tenant SaaS'],
         },
         {
             lead: 'Turn every payment into', emphasis: 'instant access', end: 'for your subscribers',
             description: 'Reconcile M-Pesa payments, renew subscriptions, and restore network access automatically while your team stays focused on service.',
+            image: 'https://images.pexels.com/photos/37605911/pexels-photo-37605911.jpeg?auto=compress&cs=tinysrgb&w=1200',
             badges: ['Automatic renewals', 'STK Push', 'Live reconciliation', 'SMS updates'],
         },
         {
             lead: 'See your entire network', emphasis: 'at a glance', end: 'and act with confidence',
             description: 'Bring routers, sessions, collections, customer support, and field operations together with the visibility to grow reliably.',
+            image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
             badges: ['Live router health', 'Subscriber insights', 'Field operations', 'One dashboard'],
         },
     ],

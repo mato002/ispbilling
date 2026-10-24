@@ -6,7 +6,7 @@
         <x-landing-seo-meta :isp="$landingIsp" />
         <x-seo-json-ld :isp="$landingIsp" />
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700,800" rel="stylesheet">
+        <link href="https://fonts.bunny.net/css?family=roboto-condensed:300,400,500,600,700,800&display=swap" rel="stylesheet">
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
             <x-vite-assets :assets="['resources/css/landing.css', 'resources/js/landing.js']" />
         @endif

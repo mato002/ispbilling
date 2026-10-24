@@ -6,32 +6,32 @@
 {{-- Hero --}}
 <section class="pb-hero-mesh px-4 pb-16 pt-28 sm:px-6 lg:px-8" x-data="landingHero()" @mouseenter="pause()" @mouseleave="resume()" @focusin="pause()" @focusout="if (!$el.contains($event.relatedTarget)) resume()" aria-roledescription="carousel" aria-label="Platform highlights">
     <div class="mx-auto max-w-7xl">
-        <div class="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+        <div class="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] items-center gap-3 sm:gap-8 lg:gap-16">
             <div class="pb-reveal">
-                <div class="mb-6 flex flex-wrap gap-2" aria-label="Platform capabilities">
+                <div class="mb-6 hidden flex-wrap gap-2 sm:flex" aria-label="Platform capabilities">
                     <template x-for="badge in slides[active].badges" :key="badge"><span class="rounded-full border border-blue-200/80 bg-white/85 px-3 py-1 text-xs font-bold text-blue-700 shadow-sm" x-text="badge"></span></template>
                 </div>
 
                 <div class="pb-hero-slide" aria-live="polite" aria-atomic="true">
                     <template x-for="(slide, index) in slides" :key="slide.emphasis">
-                        <div x-show="active === index" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 -translate-y-2" class="pb-hero-slide-content">
-                            <h1 class="text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.25rem]"><span x-text="slide.lead"></span> <span class="pb-gradient-text" x-text="slide.emphasis"></span> <span x-text="slide.end"></span></h1>
-                            <p class="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg" x-text="slide.description"></p>
+                        <div x-show="active === index" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 -translate-y-2" class="pb-hero-slide-content" :style="`--pb-slide-image: url('${slide.image}')`">
+                            <h1 class="text-xl font-extrabold leading-[1.08] tracking-tight sm:text-4xl lg:text-[3.25rem]"><span x-text="slide.lead"></span> <span class="pb-gradient-text" x-text="slide.emphasis"></span> <span x-text="slide.end"></span></h1>
+                            <p class="mt-3 hidden max-w-xl text-base leading-relaxed text-slate-600 sm:mt-5 sm:block sm:text-lg" x-text="slide.description"></p>
                         </div>
                     </template>
                 </div>
 
-                <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div class="mt-3 flex flex-col gap-2 sm:mt-8 sm:flex-row sm:items-center sm:gap-3">
                     @guest
                         <a href="{{ $registerRoute }}" class="pb-btn-primary">Start {{ $defaultTrialDays }}-day free trial <x-font-awesome-icon name="arrow-right" class="h-4 w-4" /></a>
-                        <a href="{{ route('login') }}" class="pb-btn-secondary"><x-font-awesome-icon name="arrow-right-to-bracket" class="h-4 w-4" /> Operator sign in</a>
+                        <a href="{{ route('login') }}" class="pb-btn-secondary hidden sm:inline-flex"><x-font-awesome-icon name="arrow-right-to-bracket" class="h-4 w-4" /> Operator sign in</a>
                     @else
                         <a href="{{ url('/dashboard') }}" class="pb-btn-primary">Go to dashboard</a>
                     @endguest
                 </div>
 
-                <p class="mt-4 text-sm text-slate-500">No credit card required · Typical setup within 24 hours · Unlimited MikroTik routers</p>
-                <div class="mt-6 flex items-center gap-3" aria-label="Choose a platform highlight">
+                <p class="mt-4 hidden text-sm text-slate-500 sm:block">No credit card required · Typical setup within 24 hours · Unlimited MikroTik routers</p>
+                <div class="mt-3 flex items-center gap-2 sm:mt-6 sm:gap-3" aria-label="Choose a platform highlight">
                     <button type="button" class="pb-hero-arrow" @click="previous()" aria-label="Previous highlight"><x-font-awesome-icon name="arrow-left" class="h-4 w-4" /></button>
                     <template x-for="(slide, index) in slides" :key="index"><button type="button" class="pb-hero-dot" :class="{ 'is-active': active === index }" @click="goTo(index)" :aria-label="`Show highlight ${index + 1}`" :aria-current="active === index ? 'true' : null"></button></template>
                     <button type="button" class="pb-hero-arrow" @click="next()" aria-label="Next highlight"><x-font-awesome-icon name="arrow-right" class="h-4 w-4" /></button>
@@ -39,7 +39,7 @@
                 </div>
             </div>
 
-            <div class="pb-reveal lg:pl-4" style="transition-delay: 0.1s">
+            <div class="pb-reveal min-w-0 lg:pl-4" style="transition-delay: 0.1s">
                 @include('landing.partials.dashboard-mockup')
             </div>
         </div>
