@@ -244,7 +244,6 @@
                     <input type="url" name="callback_url" value="{{ $paymentMethod->callback_url }}"
                            class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                            placeholder="https://your-domain.com/payment/callback">
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Optional: URL for payment status notifications</p>
                     @error('callback_url')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror

@@ -6,7 +6,6 @@
     <x-isp-page-header
         title="Provision router"
         module="Network"
-        description="Add a MikroTik device to the fleet. The first telemetry poll is queued automatically after a successful connection test."
     >
         <x-slot name="actions">
             <a href="{{ route('isp.routers.index') }}" class="pb-btn">Back to fleet</a>
@@ -28,7 +27,6 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h3 class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Test connection</h3>
-                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Validates credentials without saving. Saved routers are polled every minute automatically.</p>
                 </div>
                 <button type="button" id="testConnectionBtn" class="pb-btn pb-btn-primary">Test connection</button>
             </div>

@@ -43,7 +43,6 @@
                     </label>
                     <input type="number" id="quantity" name="quantity" min="1" max="1000" value="10" required
                            class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                    <p class="mt-1 text-xs text-gray-500">Maximum 1000 vouchers per batch</p>
                     @error('quantity')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -147,7 +146,6 @@
                     </label>
                     <input type="datetime-local" id="expires_at" name="expires_at"
                            class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                    <p class="mt-1 text-xs text-gray-500">Leave empty for no expiration</p>
                     @error('expires_at')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror

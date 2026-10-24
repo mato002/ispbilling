@@ -50,7 +50,6 @@
                         <input type="text" name="phone_number" id="phone_number" 
                                placeholder="254712345678"
                                class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Format: 254712345678</p>
                     </div>
 
                     <div>

@@ -28,7 +28,6 @@
                     @error('upload_limit')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
             </div>
-            <p class="-mt-3 text-xs text-slate-500">Data caps belong to service plans. IP pools and simultaneous-session limits depend on the router and access method, so they are configured in those settings.</p>
 
             <details class="rounded-xl border border-[var(--pb-border)] p-4">
                 <summary class="cursor-pointer text-sm font-semibold">Queue and QoS settings <span class="font-normal text-slate-500">(optional)</span></summary>
@@ -61,12 +60,10 @@
                         @error('priority')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                     </div>
                 </div>
-                <p class="mt-3 text-xs text-slate-500">Parent profile organizes profiles in this system; RouterOS queue-tree parent and mangle rules are configured on the router.</p>
             </details>
 
             <details class="rounded-xl border border-[var(--pb-border)] p-4" @if ($errors->hasAny(['download_burst_limit', 'upload_burst_limit', 'download_burst_threshold', 'upload_burst_threshold', 'download_burst_time', 'upload_burst_time'])) open @endif>
                 <summary class="cursor-pointer text-sm font-semibold">Burst speeds <span class="font-normal text-slate-500">(optional)</span></summary>
-                <p class="mt-1 text-xs text-slate-500">Leave blank for standard speeds. Values are in Mbps and seconds.</p>
                 <div class="mt-4 grid gap-5 sm:grid-cols-2">
                     @foreach ([
                         'download_burst_limit' => 'Download burst limit (Mbps)',

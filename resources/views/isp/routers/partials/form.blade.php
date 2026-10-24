@@ -13,7 +13,7 @@
 @endphp
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <x-form-section title="Identity" description="Friendly name and where this device lives.">
+    <x-form-section title="Identity">
         <div class="space-y-4">
             <div>
                 <label class="isp-form-label mb-1">Router name *</label>
@@ -36,7 +36,7 @@
         </div>
     </x-form-section>
 
-    <x-form-section title="RouterOS API" description="Credentials used by the polling job and bulk operations.">
+    <x-form-section title="RouterOS API">
         <div class="space-y-4">
             <div>
                 <label class="isp-form-label mb-1">Management IP / hostname *</label>
@@ -49,7 +49,6 @@
                 <input type="text" name="hotspot_gateway_ip" id="hotspot_gateway_ip" value="{{ $val('hotspot_gateway_ip') }}"
                        class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900"
                        placeholder="192.168.88.1" />
-                <p class="mt-1 text-xs text-slate-500">Client-side router address used by RouterOS captive-portal login. Defaults to the API IP when blank.</p>
             </div>
             <div class="grid grid-cols-3 gap-3">
                 <div>
@@ -81,17 +80,14 @@
                 <input type="password" name="password" id="password" {{ $isEdit ? '' : 'required' }}
                        class="w-full rounded-md border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-900"
                        placeholder="{{ $isEdit ? 'Leave empty to keep current password' : '*****' }}" />
-                <p class="mt-1 text-[11px] text-slate-500">Stored encrypted at rest.</p>
             </div>
-            <p class="text-xs text-slate-500">RouterOS API defaults to port 8728; API over SSL commonly uses 8729. The router must allow this server through its firewall.</p>
         </div>
     </x-form-section>
 
     <details class="md:col-span-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900" {{ $isEdit ? 'open' : '' }}>
         <summary class="cursor-pointer text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $isEdit ? 'Asset and ownership details' : 'Optional asset and ownership details' }}</summary>
-        <p class="mt-1 text-xs text-slate-500">These details are for inventory and operations; they are not needed to connect the router.</p>
         <div class="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
-    <x-form-section title="Asset / CMDB" description="Optional inventory and finance information.">
+    <x-form-section title="Asset / CMDB">
         <div class="grid grid-cols-2 gap-3">
             <div>
                 <label class="isp-form-label mb-1">Vendor</label>
@@ -142,7 +138,7 @@
         </div>
     </x-form-section>
 
-    <x-form-section title="Ownership" description="Who is responsible for this router?">
+    <x-form-section title="Ownership">
         <div class="space-y-4">
             <div>
                 <label class="isp-form-label mb-1">Owner / on-call engineer</label>
@@ -154,7 +150,6 @@
                         </option>
                     @endforeach
                 </select>
-                <p class="mt-1 text-[11px] text-slate-500">Used for routing outage notifications.</p>
             </div>
         </div>
     </x-form-section>
